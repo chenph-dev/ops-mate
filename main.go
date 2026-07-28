@@ -20,6 +20,10 @@ func main() {
 		Title:  "ops-mate",
 		Width:  1024,
 		Height: 768,
+		// 允许窗口调整大小（最大化按钮需要）
+		DisableResize: false,
+		// 窗口无边框
+		Frameless: true,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
