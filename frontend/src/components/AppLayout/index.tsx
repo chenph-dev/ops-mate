@@ -1,40 +1,40 @@
-import { Layout, Menu, Button, theme } from 'antd';
-import {
-  Outlet,
-  useLocation,
-  useNavigate,
-} from 'react-router-dom';
+import { Button, Tooltip, theme } from "antd";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   MinusOutlined,
   BorderOutlined,
   SwitcherOutlined,
   CloseOutlined,
-} from '@ant-design/icons';
+  SunOutlined,
+  MoonOutlined,
+} from "@ant-design/icons";
+import { useThemeToggle } from "@/context/ThemeContext";
 import {
   WindowMinimise,
   WindowToggleMaximise,
   WindowIsMaximised,
   Quit,
   EventsOn,
-} from '@wailsjs/runtime/runtime';
-import { routes, toMenuItems } from './menuConfig';
-import logo from '@/assets/images/logo-universal.png';
-import { useEffect, useState } from 'react';
-import './index.module.css';
-
-const { Header, Content } = Layout;
+} from "@wailsjs/runtime/runtime";
+import { routes } from "./menuConfig";
+import logo from "@/assets/images/logo-universal.png";
+import { useEffect, useState } from "react";
 
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = theme.useToken();
   const [isMaximised, setIsMaximised] = useState(false);
+  const { isDark, toggleTheme } = useThemeToggle();
 
-  // 同步窗口最大化状态（初始化 + 监听系统事件）
   useEffect(() => {
     WindowIsMaximised().then(setIsMaximised);
-    const offMax = EventsOn('wails:window:maximized', () => setIsMaximised(true));
-    const offUnmax = EventsOn('wails:window:unmaximized', () => setIsMaximised(false));
+    const offMax = EventsOn("wails:window:maximized", () =>
+      setIsMaximised(true),
+    );
+    const offUnmax = EventsOn("wails:window:unmaximized", () =>
+      setIsMaximised(false),
+    );
     return () => {
       offMax();
       offUnmax();
@@ -47,103 +47,135 @@ export default function AppLayout() {
 
   const handleToggleMaximize = () => {
     WindowToggleMaximise();
-    // 切换后更新状态
     WindowIsMaximised().then(setIsMaximised);
   };
 
   return (
-    <Layout style={{ height: '100vh' }}>
-      <Header
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      {/* 顶部栏：Logo + 主题切换 + 窗口控制 */}
+      <div
         className="titlebar-drag-region"
         style={{
           background: token.colorBgContainer,
-          padding: '0 8px',
-          minHeight: 38,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          padding: "0 8px",
+          height: 38,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           borderBottom: `1px solid ${token.colorBorderSecondary}`,
         }}
       >
-        {/* 左侧：图标 + 软件名称 */}
-        <div
-          className="titlebar-no-drag"
-          style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 120 }}
-        >
-          <img src={logo} alt="logo" style={{ width: 20, height: 20 }} />
+        {/* 左侧：Logo + 名称（独立组件） */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <img src={logo} alt="logo" style={{ width: 22, height: 22 }} />
           <span
             style={{
               color: token.colorText,
-              fontWeight: 600,
               fontSize: 13,
-              whiteSpace: 'nowrap',
+              fontWeight: 600,
+              whiteSpace: "nowrap",
             }}
           >
             ops-mate
           </span>
         </div>
 
-        {/* 中间：水平菜单 */}
-        <Menu
-          className="titlebar-no-drag"
-          mode="horizontal"
-          selectedKeys={selectedKey ? [selectedKey] : []}
-          items={toMenuItems(routes)}
-          onClick={({ key }) => navigate(key)}
-          style={{
-            flex: 1,
-            justifyContent: 'center',
-            border: 'none',
-            background: 'transparent',
-            minWidth: 0,
-          }}
-        />
-
-        {/* 右侧：窗口控制按钮 */}
-        <div
-          className="titlebar-no-drag"
-          style={{ display: 'flex', minWidth: 132, justifyContent: 'flex-end' }}
-        >
-          {/* 最小化 */}
+        {/* 右侧：主题切换 + 窗口控制 */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+          <WindowButton
+            icon={isDark ? <SunOutlined /> : <MoonOutlined />}
+            onClick={toggleTheme}
+            title={isDark ? "切换浅色" : "切换深色"}
+            color={token.colorText}
+          />
           <WindowButton
             icon={<MinusOutlined />}
             onClick={() => WindowMinimise()}
             title="最小化"
+            color={token.colorText}
           />
-          {/* 最大化 / 还原 */}
           <WindowButton
             icon={isMaximised ? <SwitcherOutlined /> : <BorderOutlined />}
             onClick={handleToggleMaximize}
-            title={isMaximised ? '还原' : '最大化'}
+            title={isMaximised ? "还原" : "最大化"}
+            color={token.colorText}
           />
-          {/* 关闭 */}
           <WindowButton
             icon={<CloseOutlined />}
             onClick={() => Quit()}
             isDanger
             title="关闭"
+            color={token.colorText}
           />
         </div>
-      </Header>
+      </div>
 
-      <Content style={{ overflow: 'auto', padding: 16 }}>
-        <Outlet />
-      </Content>
-    </Layout>
+      {/* 下方：左侧菜单条 + 主内容 */}
+      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+        {/* 左侧图标菜单条 — 独立 28px */}
+        <div
+          style={{
+            width: 44,
+            background: token.colorBgContainer,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            paddingTop: 4,
+            borderRight: `1px solid ${token.colorBorderSecondary}`,
+          }}
+        >
+          {routes.map((r) => (
+            <Tooltip key={r.path} placement="right" title={r.label}>
+              <Button
+                type="text"
+                size="small"
+                icon={<span style={{ fontSize: 18, color: token.colorText }}>{r.icon}</span>}
+                onClick={() => navigate(r.path)}
+                className={
+                  selectedKey === r.path
+                    ? "sidebar-menu-item active"
+                    : "sidebar-menu-item"
+                }
+                style={{
+                  width: 34,
+                  height: 34,
+                  border: "none",
+                  borderRadius: 4,
+                  borderLeft: selectedKey === r.path ? `3px solid ${token.colorPrimary}` : "3px solid transparent",
+                  color: token.colorText,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: 6,
+                  paddingLeft: 0,
+                  paddingRight: 0,
+                }}
+              />
+            </Tooltip>
+          ))}
+        </div>
+
+        {/* 主内容区 */}
+        <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
+          <Outlet />
+        </div>
+      </div>
+    </div>
   );
 }
 
-/** 无边框窗口控制按钮 — 无背景、悬停高亮 */
 function WindowButton({
   icon,
   onClick,
   isDanger,
   title,
+  color,
 }: {
   icon: React.ReactNode;
   onClick: () => void;
   isDanger?: boolean;
   title?: string;
+  color: string;
 }) {
   return (
     <Button
@@ -152,13 +184,16 @@ function WindowButton({
       icon={icon}
       title={title}
       onClick={onClick}
-      className={isDanger ? 'window-btn danger' : 'window-btn'}
+      className={isDanger ? "window-btn danger" : "window-btn"}
       style={{
-        width: 46,
-        height: '100%',
-        border: 'none',
+        width: 28,
+        height: 28,
+        border: "none",
         borderRadius: 0,
-        color: 'inherit',
+        color,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
       }}
     />
   );
