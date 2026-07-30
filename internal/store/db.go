@@ -37,7 +37,12 @@ func Open() (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
-	return &Store{DB: db}, nil
+	key, err := masterKey(dir)
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("master key: %w", err)
+	}
+	return &Store{DB: db, key: key}, nil
 }
 
 func dataDir() (string, error) {
