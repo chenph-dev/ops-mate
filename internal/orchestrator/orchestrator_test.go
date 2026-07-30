@@ -35,7 +35,7 @@ type stubExecutor struct {
 	lines []sshexec.Line
 }
 
-func (e *stubExecutor) Exec(ctx context.Context, hostID, command string) (<-chan sshexec.Line, error) {
+func (e *stubExecutor) Exec(ctx context.Context, command string) (<-chan sshexec.Line, error) {
 	ch := make(chan sshexec.Line, 8)
 	go func() {
 		defer close(ch)

@@ -11,8 +11,9 @@ import (
 )
 
 // Exec 执行器接口（供测试 stub 与真实 SSHExecutor 实现）。
+// 执行器构造时已绑定目标主机，故 Exec 只接收命令本身。
 type Exec interface {
-	Exec(ctx context.Context, hostID, command string) (<-chan sshexec.Line, error)
+	Exec(ctx context.Context, command string) (<-chan sshexec.Line, error)
 }
 
 // LLM AI 后端接口别名，便于替换。
@@ -191,7 +192,7 @@ func (o *Orchestrator) executeCommand(s *Session, command string) {
 		o.emitEvent(s.ID, "session:state", "Idle")
 		return
 	}
-	ch, err := ex.Exec(s.ctx, s.HostID, command)
+	ch, err := ex.Exec(s.ctx, command)
 	if err != nil {
 		o.emitEvent(s.ID, "ai:text", "连接失败："+err.Error())
 		s.setState("AwaitingApproval")
