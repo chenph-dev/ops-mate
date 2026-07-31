@@ -1,10 +1,15 @@
-package store
+// Package convstore 管理对话、消息与命令记录的 CRUD。
+package convstore
 
 import (
 	"fmt"
 	"time"
+
+	"ops-mate/internal/store"
+	"ops-mate/internal/store/crypto"
 )
 
+// Conversation 一次会话。
 type Conversation struct {
 	ID        string `json:"id"`
 	HostID    string `json:"hostId"`
@@ -13,6 +18,7 @@ type Conversation struct {
 	UpdatedAt int64  `json:"updatedAt"`
 }
 
+// Message 一条对话消息。
 type Message struct {
 	ID         string `json:"id"`
 	SessionID  string `json:"sessionId"`
@@ -22,10 +28,20 @@ type Message struct {
 	Ts         int64  `json:"ts"`
 }
 
-func (s *Store) NewConversation(hostID, title string) (string, error) {
-	id := newID()
+// ConvStore 提供对话/消息/命令操作。
+type ConvStore struct {
+	app *store.DB
+}
+
+// NewConvStore 构造 ConvStore。
+func NewConvStore(app *store.DB) *ConvStore {
+	return &ConvStore{app: app}
+}
+
+func (s *ConvStore) NewConversation(hostID, title string) (string, error) {
+	id := crypto.NewID()
 	now := time.Now().Unix()
-	_, err := s.DB.Exec(
+	_, err := s.app.DB().Exec(
 		`INSERT INTO conversations(id,host_id,title,created_at,updated_at) VALUES(?,?,?,?,?)`,
 		id, hostID, title, now, now)
 	if err != nil {
@@ -34,8 +50,8 @@ func (s *Store) NewConversation(hostID, title string) (string, error) {
 	return id, nil
 }
 
-func (s *Store) ListConversations(hostID string) ([]Conversation, error) {
-	rows, err := s.DB.Query(
+func (s *ConvStore) ListConversations(hostID string) ([]Conversation, error) {
+	rows, err := s.app.DB().Query(
 		`SELECT id,host_id,title,created_at,updated_at FROM conversations WHERE host_id=? ORDER BY updated_at DESC`,
 		hostID)
 	if err != nil {
@@ -53,20 +69,20 @@ func (s *Store) ListConversations(hostID string) ([]Conversation, error) {
 	return out, rows.Err()
 }
 
-func (s *Store) AppendMessage(sessionID, role, content, toolResult string) error {
-	id := newID()
-	_, err := s.DB.Exec(
+func (s *ConvStore) AppendMessage(sessionID, role, content, toolResult string) error {
+	id := crypto.NewID()
+	_, err := s.app.DB().Exec(
 		`INSERT INTO messages(id,session_id,role,content,tool_result,ts) VALUES(?,?,?,?,?,?)`,
-		id, sessionID, role, content, nullable(toolResult), time.Now().Unix())
+		id, sessionID, role, content, crypto.Nullable(toolResult), time.Now().Unix())
 	if err != nil {
 		return err
 	}
-	_, err = s.DB.Exec(`UPDATE conversations SET updated_at=? WHERE id=?`, time.Now().Unix(), sessionID)
+	_, err = s.app.DB().Exec(`UPDATE conversations SET updated_at=? WHERE id=?`, time.Now().Unix(), sessionID)
 	return err
 }
 
-func (s *Store) LoadMessages(sessionID string) ([]Message, error) {
-	rows, err := s.DB.Query(
+func (s *ConvStore) LoadMessages(sessionID string) ([]Message, error) {
+	rows, err := s.app.DB().Query(
 		`SELECT id,session_id,role,content,tool_result,ts FROM messages WHERE session_id=? ORDER BY ts`,
 		sessionID)
 	if err != nil {
@@ -88,22 +104,15 @@ func (s *Store) LoadMessages(sessionID string) ([]Message, error) {
 	return out, rows.Err()
 }
 
-func (s *Store) SaveCommand(sessionID, command string, exitCode int, output string) error {
-	id := newID()
-	_, err := s.DB.Exec(
+func (s *ConvStore) SaveCommand(sessionID, command string, exitCode int, output string) error {
+	id := crypto.NewID()
+	_, err := s.app.DB().Exec(
 		`INSERT INTO commands(id,session_id,command,exit_code,output,ts) VALUES(?,?,?,?,?,?)`,
-		id, sessionID, command, exitCode, nullable(output), time.Now().Unix())
+		id, sessionID, command, exitCode, crypto.Nullable(output), time.Now().Unix())
 	return err
 }
 
-func (s *Store) DeleteConversation(id string) error {
-	_, err := s.DB.Exec(`DELETE FROM conversations WHERE id=?`, id)
+func (s *ConvStore) DeleteConversation(id string) error {
+	_, err := s.app.DB().Exec(`DELETE FROM conversations WHERE id=?`, id)
 	return err
-}
-
-func nullable(s string) any {
-	if s == "" {
-		return nil
-	}
-	return s
 }

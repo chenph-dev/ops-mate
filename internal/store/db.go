@@ -7,17 +7,19 @@ import (
 	"path/filepath"
 
 	_ "modernc.org/sqlite"
+
+	"ops-mate/internal/store/crypto"
 )
 
-// Store 持有 DB 句柄与主密钥。
-type Store struct {
-	DB  *sql.DB
+// DB 持有数据库连接与主密钥，供各子包 store 共享。
+type DB struct {
+	db  *sql.DB
 	key []byte
 }
 
 // Open 打开（必要时创建）ops-mate.db 并执行建表迁移。
 // 数据库文件位于用户数据目录（Windows: %APPDATA%/ops-mate）。
-func Open() (*Store, error) {
+func Open() (*DB, error) {
 	dir, err := dataDir()
 	if err != nil {
 		return nil, err
@@ -37,12 +39,12 @@ func Open() (*Store, error) {
 		db.Close()
 		return nil, fmt.Errorf("apply schema: %w", err)
 	}
-	key, err := masterKey(dir)
+	key, err := crypto.MasterKey(dir)
 	if err != nil {
 		db.Close()
 		return nil, fmt.Errorf("master key: %w", err)
 	}
-	return &Store{DB: db, key: key}, nil
+	return &DB{db: db, key: key}, nil
 }
 
 func dataDir() (string, error) {
@@ -51,4 +53,19 @@ func dataDir() (string, error) {
 		return "", err
 	}
 	return filepath.Join(base, "ops-mate"), nil
+}
+
+// DB 返回底层数据库连接，供子包执行 SQL。
+func (d *DB) DB() *sql.DB {
+	return d.db
+}
+
+// Encrypt 委托 crypto 包加密。
+func (d *DB) Encrypt(plaintext []byte) ([]byte, error) {
+	return crypto.Encrypt(d.key, plaintext)
+}
+
+// Decrypt 委托 crypto 包解密。
+func (d *DB) Decrypt(blob []byte) ([]byte, error) {
+	return crypto.Decrypt(d.key, blob)
 }

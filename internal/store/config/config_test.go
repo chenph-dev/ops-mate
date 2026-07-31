@@ -1,18 +1,23 @@
-package store
+package configstore
 
-import "testing"
+import (
+	"testing"
+
+	"ops-mate/internal/store"
+)
 
 func TestAIConfig_SaveLoad_APIKeyEncrypted(t *testing.T) {
 	t.Setenv("APPDATA", t.TempDir())
-	s, _ := Open()
-	defer s.DB.Close()
+	app, _ := store.Open()
+	defer app.DB().Close()
 
+	s := NewConfigStore(app)
 	cfg := AIConfig{Provider: "claude", Model: "claude-sonnet-5", BaseURL: "https://api.anthropic.com", APIKey: "sk-secret"}
 	if err := s.SaveAIConfig(cfg); err != nil {
 		t.Fatalf("SaveAIConfig: %v", err)
 	}
 	var blob []byte
-	s.DB.QueryRow(`SELECT api_key_encrypted FROM ai_config WHERE id=1`).Scan(&blob)
+	app.DB().QueryRow(`SELECT api_key_encrypted FROM ai_config WHERE id=1`).Scan(&blob)
 	if string(blob) == "sk-secret" {
 		t.Fatal("API Key 明文存储")
 	}

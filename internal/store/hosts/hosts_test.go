@@ -1,15 +1,20 @@
-package store
+package hoststore
 
-import "testing"
+import (
+	"testing"
+
+	"ops-mate/internal/store"
+)
 
 func TestHostCRUD_AuthEncrypted(t *testing.T) {
 	t.Setenv("APPDATA", t.TempDir())
-	s, err := Open()
+	app, err := store.Open()
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer s.DB.Close()
+	defer app.DB().Close()
 
+	s := NewHostsStore(app)
 	h := HostInput{
 		Name: "web-01", Addr: "10.0.0.5", Port: 22, User: "ops",
 		AuthType: "password", Secret: "p@ss",
@@ -20,7 +25,7 @@ func TestHostCRUD_AuthEncrypted(t *testing.T) {
 	}
 
 	var blob []byte
-	if err := s.DB.QueryRow(`SELECT auth_encrypted FROM hosts WHERE id=?`, id).Scan(&blob); err != nil {
+	if err := app.DB().QueryRow(`SELECT auth_encrypted FROM hosts WHERE id=?`, id).Scan(&blob); err != nil {
 		t.Fatalf("查 auth_encrypted: %v", err)
 	}
 	if string(blob) == "p@ss" {

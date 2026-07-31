@@ -8,10 +8,10 @@ func TestOpen_CreatesAndMigrates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer s.DB.Close()
+	defer s.DB().Close()
 
 	var name string
-	err = s.DB.QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name='commands_fts'`).Scan(&name)
+	err = s.DB().QueryRow(`SELECT name FROM sqlite_master WHERE type='table' AND name='commands_fts'`).Scan(&name)
 	if err != nil {
 		t.Fatalf("查询 FTS 表失败: %v", err)
 	}

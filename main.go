@@ -12,28 +12,31 @@ import (
 	"ops-mate/internal/einoagent"
 	"ops-mate/internal/handler"
 	"ops-mate/internal/store"
+	cfgstore "ops-mate/internal/store/config"
+	convstore "ops-mate/internal/store/conversations"
+	hoststore "ops-mate/internal/store/hosts"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
 
 func main() {
-	st, err := store.Open()
+	app, err := store.Open()
 	if err != nil {
 		fmt.Println("store open error:", err)
 		return
 	}
 
-	chatModel, err := einoagent.NewChatModel(context.Background(), mustAIConfig(st))
+	cfgStore := cfgstore.NewConfigStore(app)
+	chatModel, err := einoagent.NewChatModel(context.Background(), mustAIConfig(cfgStore))
 	if err != nil {
 		fmt.Println("build chat model error:", err)
 	}
 
-	sessionManager := einoagent.NewSessionManager(st, chatModel)
+	sessionManager := einoagent.NewSessionManager(app, chatModel)
 
-	hosts := handler.NewHostsHandler(st)
-	aiConfig := handler.NewAIConfigHandler(st)
-	sessions := handler.NewSessionsHandler(st, sessionManager)
+	hostsStore := hoststore.NewHostsStore(app)
+	convStore := convstore.NewConvStore(app)
 
 	err = wails.Run(&options.App{
 		Title:  "ops-mate",
@@ -52,9 +55,9 @@ func main() {
 		},
 		// 每个 handler 是独立模块，前端通过 wailsjs/go/main/<TypeName> 访问。
 		Bind: []interface{}{
-			hosts,
-			aiConfig,
-			sessions,
+			handler.NewHostsHandler(hostsStore),
+			handler.NewAIConfigHandler(cfgStore),
+			handler.NewSessionsHandler(hostsStore, convStore, sessionManager),
 		},
 	})
 
@@ -64,7 +67,7 @@ func main() {
 }
 
 // mustAIConfig 读取 AI 配置（启动阶段，错误可忽略，用空配置兜底）。
-func mustAIConfig(st *store.Store) store.AIConfig {
-	cfg, _ := st.GetAIConfig()
+func mustAIConfig(s *cfgstore.ConfigStore) cfgstore.AIConfig {
+	cfg, _ := s.GetAIConfig()
 	return cfg
 }

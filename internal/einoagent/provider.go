@@ -9,7 +9,7 @@ import (
 	ollamamodel "github.com/cloudwego/eino-ext/components/model/ollama"
 	openaimodel "github.com/cloudwego/eino-ext/components/model/openai"
 
-	"ops-mate/internal/store"
+	"ops-mate/internal/store/config"
 )
 
 // NewChatModel 按 store.AIConfig 构造 eino ToolCallingChatModel。
@@ -20,7 +20,7 @@ import (
 //
 // 返回的 model.ToolCallingChatModel 实现了 Stream/Generate，可直接用于 eino Graph，
 // 也可通过 LLMAdapter 适配为 einoagent.LLMClient 接口。
-func NewChatModel(ctx context.Context, cfg store.AIConfig) (model.ToolCallingChatModel, error) {
+func NewChatModel(ctx context.Context, cfg configstore.AIConfig) (model.ToolCallingChatModel, error) {
 	switch cfg.Provider {
 	case "ollama":
 		baseURL := cfg.BaseURL

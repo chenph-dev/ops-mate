@@ -5,33 +5,33 @@ import (
 	"time"
 
 	"ops-mate/internal/sshexec"
-	"ops-mate/internal/store"
+	hoststore "ops-mate/internal/store/hosts"
 )
 
 // HostsHandler 处理主机管理相关的前端调用。
 type HostsHandler struct {
-	store *store.Store
+	hosts *hoststore.HostsStore
 }
 
 // NewHostsHandler 构造 HostsHandler。
-func NewHostsHandler(store *store.Store) *HostsHandler {
-	return &HostsHandler{store: store}
+func NewHostsHandler(hosts *hoststore.HostsStore) *HostsHandler {
+	return &HostsHandler{hosts: hosts}
 }
 
-func (h *HostsHandler) ListHosts() ([]store.HostMeta, error) {
-	return h.store.ListHosts()
+func (h *HostsHandler) ListHosts() ([]hoststore.HostMeta, error) {
+	return h.hosts.ListHosts()
 }
 
-func (h *HostsHandler) SaveHost(in store.HostInput) (string, error) {
-	return h.store.SaveHost(in)
+func (h *HostsHandler) SaveHost(in hoststore.HostInput) (string, error) {
+	return h.hosts.SaveHost(in)
 }
 
 func (h *HostsHandler) DeleteHost(id string) error {
-	return h.store.DeleteHost(id)
+	return h.hosts.DeleteHost(id)
 }
 
 // TestConnection 保存前验证：临时构造执行器跑 `echo ok`。
-func (h *HostsHandler) TestConnection(in store.HostInput) (bool, string, error) {
+func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, string, error) {
 	ex := sshexec.NewExecutor(sshexec.Host{
 		Addr: in.Addr, Port: in.Port, User: in.User,
 		AuthType: in.AuthType, Secret: in.Secret,

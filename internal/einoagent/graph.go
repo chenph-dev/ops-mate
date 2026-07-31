@@ -7,6 +7,7 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 
+	"ops-mate/internal/store/memory"
 	"ops-mate/internal/sshexec"
 	"ops-mate/internal/store"
 )
@@ -56,7 +57,7 @@ func BuildAgentGraph(
 	ctx context.Context,
 	chatModel model.ToolCallingChatModel,
 	tools []tool.BaseTool,
-	st *store.Store,
+	st *store.DB,
 ) (compose.Runnable[*GraphState, *GraphState], error) {
 	toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{Tools: tools})
 	if err != nil {
@@ -99,11 +100,12 @@ func BuildAgentGraph(
 }
 
 // InjectMemoryNode 从 FTS5 召回历史命令，注入到 history 中。
-func InjectMemoryNode(ctx context.Context, state *GraphState, st *store.Store) (*GraphState, error) {
+func InjectMemoryNode(ctx context.Context, state *GraphState, st *store.DB) (*GraphState, error) {
 	if st == nil {
 		return state, nil
 	}
-	recall, err := st.Recall(state.HostID, lastUserText(state.History))
+	mem := memorystore.NewMemoryStore(st)
+	recall, err := mem.Recall(state.HostID, lastUserText(state.History))
 	if err != nil || len(recall.PastCommands) == 0 {
 		return state, err
 	}
@@ -124,7 +126,7 @@ func lastUserText(msgs []Message) string {
 	return ""
 }
 
-func pastCommandsNote(pcs []store.PastCommand) string {
+func pastCommandsNote(pcs []memorystore.PastCommand) string {
 	note := "该主机过去执行过的相关命令记录（供参考）：\n"
 	for _, c := range pcs {
 		note += "- " + c.Command + "\n"

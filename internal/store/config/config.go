@@ -1,27 +1,41 @@
-package store
+// Package configstore 管理 AI 提供商配置的读写与加密。
+package configstore
 
 import (
 	"database/sql"
 	"fmt"
+
+	"ops-mate/internal/store"
 )
 
+// AIConfig AI 提供商配置。
 type AIConfig struct {
-	Provider string `json:"provider"` // "ollama" | "claude"
+	Provider string `json:"provider"` // "ollama" | "claude" | "openai" 等
 	Model    string `json:"model"`
 	BaseURL  string `json:"baseURL"`
 	APIKey   string `json:"apiKey"` // 内存中明文；落库加密
 }
 
-func (s *Store) SaveAIConfig(c AIConfig) error {
+// ConfigStore 提供 AI 配置读写。
+type ConfigStore struct {
+	app *store.DB
+}
+
+// NewConfigStore 构造 ConfigStore。
+func NewConfigStore(app *store.DB) *ConfigStore {
+	return &ConfigStore{app: app}
+}
+
+func (s *ConfigStore) SaveAIConfig(c AIConfig) error {
 	var enc []byte
 	if c.APIKey != "" {
-		b, err := encrypt(s.key, []byte(c.APIKey))
+		b, err := s.app.Encrypt([]byte(c.APIKey))
 		if err != nil {
 			return fmt.Errorf("encrypt key: %w", err)
 		}
 		enc = b
 	}
-	_, err := s.DB.Exec(
+	_, err := s.app.DB().Exec(
 		`INSERT INTO ai_config(id,provider,model,base_url,api_key_encrypted) VALUES(1,?,?,?,?)
 		 ON CONFLICT(id) DO UPDATE SET provider=excluded.provider, model=excluded.model,
 		   base_url=excluded.base_url, api_key_encrypted=excluded.api_key_encrypted`,
@@ -30,10 +44,10 @@ func (s *Store) SaveAIConfig(c AIConfig) error {
 	return err
 }
 
-func (s *Store) GetAIConfig() (AIConfig, error) {
+func (s *ConfigStore) GetAIConfig() (AIConfig, error) {
 	var c AIConfig
 	var enc []byte
-	err := s.DB.QueryRow(`SELECT provider,model,base_url,api_key_encrypted FROM ai_config WHERE id=1`).
+	err := s.app.DB().QueryRow(`SELECT provider,model,base_url,api_key_encrypted FROM ai_config WHERE id=1`).
 		Scan(&c.Provider, &c.Model, &c.BaseURL, &enc)
 	if err == sql.ErrNoRows {
 		return AIConfig{}, nil
@@ -42,7 +56,7 @@ func (s *Store) GetAIConfig() (AIConfig, error) {
 		return AIConfig{}, err
 	}
 	if len(enc) > 0 {
-		pt, err := decrypt(s.key, enc)
+		pt, err := s.app.Decrypt(enc)
 		if err != nil {
 			return AIConfig{}, fmt.Errorf("decrypt key: %w", err)
 		}

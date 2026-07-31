@@ -10,6 +10,7 @@ import (
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
+	"ops-mate/internal/store/conversations"
 	"ops-mate/internal/sshexec"
 	"ops-mate/internal/store"
 )
@@ -46,7 +47,8 @@ func (h *executorHolder) Exec(ctx context.Context, command string) (<-chan sshex
 
 // SessionManager 管理所有对话会话。
 type SessionManager struct {
-	store     *store.Store
+	app       *store.DB
+	convs     *convstore.ConvStore
 	baseModel model.ToolCallingChatModel
 
 	mu       sync.Mutex
@@ -65,9 +67,10 @@ type agentSession struct {
 }
 
 // NewSessionManager 构造会话管理器。
-func NewSessionManager(st *store.Store, baseModel model.ToolCallingChatModel) *SessionManager {
+func NewSessionManager(app *store.DB, baseModel model.ToolCallingChatModel) *SessionManager {
 	return &SessionManager{
-		store:     st,
+		app:       app,
+		convs:     convstore.NewConvStore(app),
 		baseModel: baseModel,
 		sessions:  map[string]*agentSession{},
 	}
@@ -75,7 +78,7 @@ func NewSessionManager(st *store.Store, baseModel model.ToolCallingChatModel) *S
 
 // CreateSession 创建新会话。
 func (m *SessionManager) CreateSession(ctx context.Context, hostID, title string, emit func(string, string, any)) (string, error) {
-	sid, err := m.store.NewConversation(hostID, title)
+	sid, err := m.convs.NewConversation(hostID, title)
 	if err != nil {
 		return "", err
 	}
@@ -102,7 +105,7 @@ func (m *SessionManager) CreateSession(ctx context.Context, hostID, title string
 	}
 
 	// Per-session Graph
-	graph, err := BuildAgentGraph(ctx, modelWithTools, tools, m.store)
+	graph, err := BuildAgentGraph(ctx, modelWithTools, tools, m.app)
 	if err != nil {
 		return "", fmt.Errorf("build graph: %w", err)
 	}
@@ -205,5 +208,5 @@ func (m *SessionManager) DeleteSession(sid string) error {
 	m.mu.Lock()
 	delete(m.sessions, sid)
 	m.mu.Unlock()
-	return m.store.DeleteConversation(sid)
+	return m.convs.DeleteConversation(sid)
 }

@@ -1,8 +1,11 @@
-package store
+// Package memorystore 提供基于 FTS5 的历史命令召回，用于 AI 记忆注入。
+package memorystore
 
 import (
 	"fmt"
 	"strings"
+
+	"ops-mate/internal/store"
 )
 
 // PastCommand 召回的历史命令记录。
@@ -16,14 +19,24 @@ type RecallContext struct {
 	PastCommands []PastCommand `json:"pastCommands"`
 }
 
+// MemoryStore 提供历史命令召回操作。
+type MemoryStore struct {
+	app *store.DB
+}
+
+// NewMemoryStore 构造 MemoryStore。
+func NewMemoryStore(app *store.DB) *MemoryStore {
+	return &MemoryStore{app: app}
+}
+
 // Recall 按 hostID + 关键词从 commands 表 FTS5 检索这台机器过往命令。
 // 取 top-N（默认 5）。关键词做简单分词后 OR 拼接。
-func (s *Store) Recall(hostID, question string) (RecallContext, error) {
+func (s *MemoryStore) Recall(hostID, question string) (RecallContext, error) {
 	q := ftsQuery(question)
 	if q == "" {
 		return RecallContext{}, nil
 	}
-	rows, err := s.DB.Query(`
+	rows, err := s.app.DB().Query(`
 		SELECT c.command, COALESCE(c.output,'')
 		FROM commands c
 		JOIN conversations v ON v.id = c.session_id

@@ -1,9 +1,11 @@
-package store
+// Package crypto 提供 ops-mate 的主密钥管理、ID 生成与 AES-256-GCM 加解密。
+package crypto
 
 import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -13,14 +15,29 @@ import (
 	"github.com/zalando/go-keyring"
 )
 
+// NewID 生成 16 进制随机 ID。
+func NewID() string {
+	b := make([]byte, 8)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// Nullable 空字符串返回 NULL，否则返回原值。
+func Nullable(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
+}
+
 const (
 	keyringService = "ops-mate"
 	keyringKey     = "master-key"
 )
 
-// masterKey 返回 32 字节主密钥。优先 OS keyring；失败时回退到
+// MasterKey 返回 32 字节主密钥。优先 OS keyring；失败时回退到
 // 数据目录下 master.key 文件（0600）。
-func masterKey(appDir string) ([]byte, error) {
+func MasterKey(appDir string) ([]byte, error) {
 	if os.Getenv("OPS_MATE_TEST_NO_KEYRING") != "1" {
 		secret, err := keyring.Get(keyringService, keyringKey)
 		if err == nil && len(secret) == 32 {
@@ -64,8 +81,8 @@ func randomKey(n int) ([]byte, error) {
 	return b, nil
 }
 
-// encrypt 用 AES-256-GCM 加密。输出格式: nonce(12) || ciphertext。
-func encrypt(key, plaintext []byte) ([]byte, error) {
+// Encrypt 用 AES-256-GCM 加密。输出格式: nonce(12) || ciphertext。
+func Encrypt(key, plaintext []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -82,8 +99,8 @@ func encrypt(key, plaintext []byte) ([]byte, error) {
 	return append(nonce, ct...), nil
 }
 
-// decrypt 解密 encrypt 的输出。
-func decrypt(key, blob []byte) ([]byte, error) {
+// Decrypt 解密 Encrypt 的输出。
+func Decrypt(key, blob []byte) ([]byte, error) {
 	if len(blob) < 13 {
 		return nil, errors.New("密文过短")
 	}

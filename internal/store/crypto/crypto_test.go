@@ -1,4 +1,4 @@
-package store
+package crypto
 
 import (
 	"bytes"
@@ -11,16 +11,16 @@ func TestMasterKey_PersistsAcrossOpens(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("APPDATA", dir)
 
-	k1, err := masterKey(filepath.Join(dir, "ops-mate"))
+	k1, err := MasterKey(filepath.Join(dir, "ops-mate"))
 	if err != nil {
-		t.Fatalf("masterKey 1: %v", err)
+		t.Fatalf("MasterKey 1: %v", err)
 	}
 	if len(k1) != 32 {
 		t.Fatalf("密钥长度 %d，期望 32", len(k1))
 	}
-	k2, err := masterKey(filepath.Join(dir, "ops-mate"))
+	k2, err := MasterKey(filepath.Join(dir, "ops-mate"))
 	if err != nil {
-		t.Fatalf("masterKey 2: %v", err)
+		t.Fatalf("MasterKey 2: %v", err)
 	}
 	if !bytes.Equal(k1, k2) {
 		t.Fatal("同一目录应返回同一主密钥")
@@ -30,21 +30,21 @@ func TestMasterKey_PersistsAcrossOpens(t *testing.T) {
 func TestEncryptDecrypt_RoundTrip(t *testing.T) {
 	key := []byte("01234567890123456789012345678901") // 32 字节
 	plain := []byte("super-secret-password")
-	ct, err := encrypt(key, plain)
+	ct, err := Encrypt(key, plain)
 	if err != nil {
-		t.Fatalf("encrypt: %v", err)
+		t.Fatalf("Encrypt: %v", err)
 	}
 	if bytes.Contains(ct, plain) {
 		t.Fatal("密文不应包含明文")
 	}
-	pt, err := decrypt(key, ct)
+	pt, err := Decrypt(key, ct)
 	if err != nil {
-		t.Fatalf("decrypt: %v", err)
+		t.Fatalf("Decrypt: %v", err)
 	}
 	if !bytes.Equal(pt, plain) {
 		t.Fatalf("解密结果不匹配")
 	}
-	ct2, _ := encrypt(key, plain)
+	ct2, _ := Encrypt(key, plain)
 	if bytes.Equal(ct, ct2) {
 		t.Fatal("相同明文应产生不同密文（随机 nonce）")
 	}
@@ -56,7 +56,7 @@ func TestMasterKey_FallsBackToFile(t *testing.T) {
 	os.Setenv("OPS_MATE_TEST_NO_KEYRING", "1")
 	defer os.Unsetenv("OPS_MATE_TEST_NO_KEYRING")
 
-	k, err := masterKey(filepath.Join(dir, "ops-mate"))
+	k, err := MasterKey(filepath.Join(dir, "ops-mate"))
 	if err != nil {
 		t.Fatalf("文件回退失败: %v", err)
 	}

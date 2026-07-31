@@ -3,29 +3,31 @@ package handler
 import (
 	"ops-mate/internal/einoagent"
 	"ops-mate/internal/sshexec"
-	"ops-mate/internal/store"
+	convstore "ops-mate/internal/store/conversations"
+	hoststore "ops-mate/internal/store/hosts"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // SessionsHandler 处理会话/对话相关的前端调用。
 type SessionsHandler struct {
-	store          *store.Store
+	hosts          *hoststore.HostsStore
+	convs          *convstore.ConvStore
 	sessionManager *einoagent.SessionManager
 }
 
 // NewSessionsHandler 构造 SessionsHandler。
-func NewSessionsHandler(store *store.Store, sm *einoagent.SessionManager) *SessionsHandler {
-	return &SessionsHandler{store: store, sessionManager: sm}
+func NewSessionsHandler(hosts *hoststore.HostsStore, convs *convstore.ConvStore, sm *einoagent.SessionManager) *SessionsHandler {
+	return &SessionsHandler{hosts: hosts, convs: convs, sessionManager: sm}
 }
 
 // getExecutor 按 hostID 取凭据构造 SSHExecutor。
 func (h *SessionsHandler) getExecutor(hostID string) sshexec.Exec {
-	secret, authType, err := h.store.GetHostSecret(hostID)
+	secret, authType, err := h.hosts.GetHostSecret(hostID)
 	if err != nil {
 		return nil
 	}
-	meta, err := h.store.HostMetaByID(hostID)
+	meta, err := h.hosts.HostMetaByID(hostID)
 	if err != nil || meta == nil {
 		return nil
 	}
@@ -62,14 +64,14 @@ func (h *SessionsHandler) CancelRun(sid string) error {
 	return h.sessionManager.CancelRun(sid)
 }
 
-func (h *SessionsHandler) ListConversations(hostID string) ([]store.Conversation, error) {
-	return h.store.ListConversations(hostID)
+func (h *SessionsHandler) ListConversations(hostID string) ([]convstore.Conversation, error) {
+	return h.convs.ListConversations(hostID)
 }
 
-func (h *SessionsHandler) LoadMessages(sid string) ([]store.Message, error) {
-	return h.store.LoadMessages(sid)
+func (h *SessionsHandler) LoadMessages(sid string) ([]convstore.Message, error) {
+	return h.convs.LoadMessages(sid)
 }
 
 func (h *SessionsHandler) DeleteConversation(sid string) error {
-	return h.store.DeleteConversation(sid)
+	return h.convs.DeleteConversation(sid)
 }
