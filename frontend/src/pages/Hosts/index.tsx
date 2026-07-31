@@ -7,12 +7,14 @@ type HostInput = hoststore.HostInput;
 import { useHosts } from '@/hooks/useHosts';
 import { useSessions } from '@/hooks/useSessions';
 import { useWailsEvents } from '@/hooks/useWailsEvents';
+import { useThemeToggle } from '@/context/ThemeContext';
 import HostList from '@/components/HostList';
 import HostForm from '@/components/HostForm';
 import Terminal, { type TerminalLine } from '@/components/Terminal';
 import AIChat from '@/components/AIChat';
 
 export default function HostsPage(): React.JSX.Element {
+  const { isDark } = useThemeToggle();
   const { tree, loading, addHost, removeHost, testConnection, createFolder, deleteNode } = useHosts();
   const [selectedHost, setSelectedHost] = useState<TreeNode | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -118,7 +120,7 @@ export default function HostsPage(): React.JSX.Element {
       />
 
       {/* 中：终端输出 */}
-      <Terminal lines={terminalLines} onClear={() => setTerminalLines([])} />
+      <Terminal lines={terminalLines} isDark={isDark} />
 
       {/* 右：AI 对话 */}
       {selectedHost ? (
