@@ -129,7 +129,11 @@ export default function AppLayout() {
               <Button
                 type="text"
                 size="small"
-                icon={<span style={{ fontSize: 18, color: token.colorText }}>{r.icon}</span>}
+                icon={
+                  <span style={{ fontSize: 18, color: token.colorText }}>
+                    {r.icon}
+                  </span>
+                }
                 onClick={() => navigate(r.path)}
                 className={
                   selectedKey === r.path
@@ -141,7 +145,10 @@ export default function AppLayout() {
                   height: 34,
                   border: "none",
                   borderRadius: 4,
-                  borderLeft: selectedKey === r.path ? `3px solid ${token.colorPrimary}` : "3px solid transparent",
+                  borderLeft:
+                    selectedKey === r.path
+                      ? `3px solid ${token.colorPrimary}`
+                      : "3px solid transparent",
                   color: token.colorText,
                   display: "flex",
                   alignItems: "center",
