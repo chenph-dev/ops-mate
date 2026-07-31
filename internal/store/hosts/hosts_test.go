@@ -12,7 +12,7 @@ func TestHostCRUD_AuthEncrypted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
-	defer app.DB().Close()
+	defer closeDB(app)
 
 	s := NewHostsStore(app)
 	h := HostInput{
@@ -24,11 +24,11 @@ func TestHostCRUD_AuthEncrypted(t *testing.T) {
 		t.Fatalf("SaveHost: %v", err)
 	}
 
-	var blob []byte
-	if err := app.DB().QueryRow(`SELECT auth_encrypted FROM hosts WHERE id=?`, id).Scan(&blob); err != nil {
-		t.Fatalf("查 auth_encrypted: %v", err)
+	var dbHost Host
+	if err := app.GORM().First(&dbHost, "id = ?", id).Error; err != nil {
+		t.Fatalf("查 host: %v", err)
 	}
-	if string(blob) == "p@ss" {
+	if string(dbHost.AuthEncrypted) == "p@ss" {
 		t.Fatal("密码被明文存储")
 	}
 
@@ -54,5 +54,12 @@ func TestHostCRUD_AuthEncrypted(t *testing.T) {
 	list, _ = s.ListHosts()
 	if len(list) != 0 {
 		t.Fatal("删除后应无主机")
+	}
+}
+
+func closeDB(app *store.DB) {
+	sqlDB, _ := app.GORM().DB()
+	if sqlDB != nil {
+		sqlDB.Close()
 	}
 }

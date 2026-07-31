@@ -9,7 +9,42 @@ import (
 	"ops-mate/internal/store/crypto"
 )
 
-// Conversation 一次会话。
+// Conversation GORM 模型。
+type convConversation struct {
+	ID        string `gorm:"column:id;primaryKey"`
+	HostID    string `gorm:"column:host_id"`
+	Title     string `gorm:"column:title"`
+	CreatedAt int64  `gorm:"column:created_at"`
+	UpdatedAt int64  `gorm:"column:updated_at"`
+}
+
+func (convConversation) TableName() string { return "conversations" }
+
+// Message GORM 模型。
+type convMessage struct {
+	ID         string  `gorm:"column:id;primaryKey"`
+	SessionID  string  `gorm:"column:session_id"`
+	Role       string  `gorm:"column:role"`
+	Content    string  `gorm:"column:content"`
+	ToolResult *string `gorm:"column:tool_result"`
+	Ts         int64   `gorm:"column:ts"`
+}
+
+func (convMessage) TableName() string { return "messages" }
+
+// Command GORM 模型。
+type convCommand struct {
+	ID        string  `gorm:"column:id;primaryKey"`
+	SessionID string  `gorm:"column:session_id"`
+	Command   string  `gorm:"column:command"`
+	ExitCode  *int    `gorm:"column:exit_code"`
+	Output    *string `gorm:"column:output"`
+	Ts        int64   `gorm:"column:ts"`
+}
+
+func (convCommand) TableName() string { return "commands" }
+
+// Conversation 一次会话（DTO）。
 type Conversation struct {
 	ID        string `json:"id"`
 	HostID    string `json:"hostId"`
@@ -18,7 +53,7 @@ type Conversation struct {
 	UpdatedAt int64  `json:"updatedAt"`
 }
 
-// Message 一条对话消息。
+// Message 一条对话消息（DTO）。
 type Message struct {
 	ID         string `json:"id"`
 	SessionID  string `json:"sessionId"`
@@ -41,9 +76,10 @@ func NewConvStore(app *store.DB) *ConvStore {
 func (s *ConvStore) NewConversation(hostID, title string) (string, error) {
 	id := crypto.NewID()
 	now := time.Now().Unix()
-	_, err := s.app.DB().Exec(
-		`INSERT INTO conversations(id,host_id,title,created_at,updated_at) VALUES(?,?,?,?,?)`,
-		id, hostID, title, now, now)
+	err := s.app.GORM().Create(&convConversation{
+		ID: id, HostID: hostID, Title: title,
+		CreatedAt: now, UpdatedAt: now,
+	}).Error
 	if err != nil {
 		return "", fmt.Errorf("insert conversation: %w", err)
 	}
@@ -51,68 +87,72 @@ func (s *ConvStore) NewConversation(hostID, title string) (string, error) {
 }
 
 func (s *ConvStore) ListConversations(hostID string) ([]Conversation, error) {
-	rows, err := s.app.DB().Query(
-		`SELECT id,host_id,title,created_at,updated_at FROM conversations WHERE host_id=? ORDER BY updated_at DESC`,
-		hostID)
-	if err != nil {
+	var convs []convConversation
+	if err := s.app.GORM().Where("host_id = ?", hostID).Order("updated_at desc").Find(&convs).Error; err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Conversation
-	for rows.Next() {
-		var c Conversation
-		if err := rows.Scan(&c.ID, &c.HostID, &c.Title, &c.CreatedAt, &c.UpdatedAt); err != nil {
-			return nil, err
-		}
-		out = append(out, c)
+	out := make([]Conversation, 0, len(convs))
+	for _, c := range convs {
+		out = append(out, Conversation{
+			ID: c.ID, HostID: c.HostID, Title: c.Title,
+			CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt,
+		})
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s *ConvStore) AppendMessage(sessionID, role, content, toolResult string) error {
-	id := crypto.NewID()
-	_, err := s.app.DB().Exec(
-		`INSERT INTO messages(id,session_id,role,content,tool_result,ts) VALUES(?,?,?,?,?,?)`,
-		id, sessionID, role, content, crypto.Nullable(toolResult), time.Now().Unix())
+	err := s.app.GORM().Create(&convMessage{
+		ID: crypto.NewID(), SessionID: sessionID, Role: role,
+		Content: content, ToolResult: strPtr(toolResult),
+		Ts: time.Now().Unix(),
+	}).Error
 	if err != nil {
 		return err
 	}
-	_, err = s.app.DB().Exec(`UPDATE conversations SET updated_at=? WHERE id=?`, time.Now().Unix(), sessionID)
-	return err
+	return s.app.GORM().Model(&convConversation{}).
+		Where("id = ?", sessionID).
+		Update("updated_at", time.Now().Unix()).Error
 }
 
 func (s *ConvStore) LoadMessages(sessionID string) ([]Message, error) {
-	rows, err := s.app.DB().Query(
-		`SELECT id,session_id,role,content,tool_result,ts FROM messages WHERE session_id=? ORDER BY ts`,
-		sessionID)
-	if err != nil {
+	var msgs []convMessage
+	if err := s.app.GORM().Where("session_id = ?", sessionID).Order("ts").Find(&msgs).Error; err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Message
-	for rows.Next() {
-		var m Message
-		var tr *string
-		if err := rows.Scan(&m.ID, &m.SessionID, &m.Role, &m.Content, &tr, &m.Ts); err != nil {
-			return nil, err
-		}
-		if tr != nil {
-			m.ToolResult = *tr
-		}
-		out = append(out, m)
+	out := make([]Message, 0, len(msgs))
+	for _, m := range msgs {
+		out = append(out, Message{
+			ID: m.ID, SessionID: m.SessionID, Role: m.Role,
+			Content: m.Content, ToolResult: strDeref(m.ToolResult),
+			Ts: m.Ts,
+		})
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 func (s *ConvStore) SaveCommand(sessionID, command string, exitCode int, output string) error {
-	id := crypto.NewID()
-	_, err := s.app.DB().Exec(
-		`INSERT INTO commands(id,session_id,command,exit_code,output,ts) VALUES(?,?,?,?,?,?)`,
-		id, sessionID, command, exitCode, crypto.Nullable(output), time.Now().Unix())
-	return err
+	return s.app.GORM().Create(&convCommand{
+		ID: crypto.NewID(), SessionID: sessionID, Command: command,
+		ExitCode: &exitCode, Output: strPtr(output),
+		Ts: time.Now().Unix(),
+	}).Error
 }
 
 func (s *ConvStore) DeleteConversation(id string) error {
-	_, err := s.app.DB().Exec(`DELETE FROM conversations WHERE id=?`, id)
-	return err
+	return s.app.GORM().Delete(&convConversation{}, "id = ?", id).Error
+}
+
+func strPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
+func strDeref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

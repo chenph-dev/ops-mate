@@ -10,7 +10,7 @@ import (
 func TestConversationAndCommands_FTS(t *testing.T) {
 	t.Setenv("APPDATA", t.TempDir())
 	app, _ := store.Open()
-	defer app.DB().Close()
+	defer closeDB(app)
 
 	hosts := hoststore.NewHostsStore(app)
 	convs := NewConvStore(app)
@@ -38,5 +38,12 @@ func TestConversationAndCommands_FTS(t *testing.T) {
 	msgs, _ := convs.LoadMessages(sid)
 	if len(msgs) != 2 || msgs[0].Role != "user" {
 		t.Fatalf("LoadMessages: %+v", msgs)
+	}
+}
+
+func closeDB(app *store.DB) {
+	sqlDB, _ := app.GORM().DB()
+	if sqlDB != nil {
+		sqlDB.Close()
 	}
 }

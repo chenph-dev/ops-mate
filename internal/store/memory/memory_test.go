@@ -11,7 +11,7 @@ import (
 func TestMemory_RecallReturnsPastCommands(t *testing.T) {
 	t.Setenv("APPDATA", t.TempDir())
 	app, _ := store.Open()
-	defer app.DB().Close()
+	defer closeDB(app)
 
 	hosts := hoststore.NewHostsStore(app)
 	convs := convstore.NewConvStore(app)
@@ -37,5 +37,12 @@ func TestMemory_RecallReturnsPastCommands(t *testing.T) {
 	}
 	if !hit {
 		t.Fatalf("应召回 top 命令，得到 %+v", ctx.PastCommands)
+	}
+}
+
+func closeDB(app *store.DB) {
+	sqlDB, _ := app.GORM().DB()
+	if sqlDB != nil {
+		sqlDB.Close()
 	}
 }

@@ -9,6 +9,20 @@ import (
 	"ops-mate/internal/store/crypto"
 )
 
+// Host GORM 模型，对应 hosts 表。
+type Host struct {
+	ID            string `gorm:"column:id;primaryKey"`
+	Name          string `gorm:"column:name"`
+	Addr          string `gorm:"column:addr"`
+	Port          int    `gorm:"column:port"`
+	User          string `gorm:"column:user"`
+	AuthEncrypted []byte `gorm:"column:auth_encrypted"`
+	AuthType      string `gorm:"column:auth_type"`
+	CreatedAt     int64  `gorm:"column:created_at"`
+}
+
+func (Host) TableName() string { return "hosts" }
+
 // HostInput 主机录入数据。Secret 为密码或私钥 PEM 明文。
 type HostInput struct {
 	Name     string `json:"name"`
@@ -45,10 +59,11 @@ func (s *HostsStore) SaveHost(in HostInput) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("encrypt auth: %w", err)
 	}
-	_, err = s.app.DB().Exec(
-		`INSERT INTO hosts(id,name,addr,port,user,auth_encrypted,auth_type,created_at) VALUES(?,?,?,?,?,?,?,?)`,
-		id, in.Name, in.Addr, in.Port, in.User, enc, in.AuthType, time.Now().Unix(),
-	)
+	err = s.app.GORM().Create(&Host{
+		ID: id, Name: in.Name, Addr: in.Addr, Port: in.Port,
+		User: in.User, AuthEncrypted: enc, AuthType: in.AuthType,
+		CreatedAt: time.Now().Unix(),
+	}).Error
 	if err != nil {
 		return "", fmt.Errorf("insert host: %w", err)
 	}
@@ -56,48 +71,46 @@ func (s *HostsStore) SaveHost(in HostInput) (string, error) {
 }
 
 func (s *HostsStore) ListHosts() ([]HostMeta, error) {
-	rows, err := s.app.DB().Query(`SELECT id,name,addr,port,user,auth_type FROM hosts ORDER BY name`)
-	if err != nil {
+	var hosts []Host
+	if err := s.app.GORM().Order("name").Find(&hosts).Error; err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []HostMeta
-	for rows.Next() {
-		var h HostMeta
-		if err := rows.Scan(&h.ID, &h.Name, &h.Addr, &h.Port, &h.User, &h.AuthType); err != nil {
-			return nil, err
-		}
-		out = append(out, h)
+	out := make([]HostMeta, 0, len(hosts))
+	for _, h := range hosts {
+		out = append(out, HostMeta{
+			ID: h.ID, Name: h.Name, Addr: h.Addr,
+			Port: h.Port, User: h.User, AuthType: h.AuthType,
+		})
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // GetHostSecret 返回解密后的凭据与类型。
 func (s *HostsStore) GetHostSecret(id string) (secret, authType string, err error) {
-	var blob []byte
-	err = s.app.DB().QueryRow(`SELECT auth_encrypted, auth_type FROM hosts WHERE id=?`, id).Scan(&blob, &authType)
+	var h Host
+	err = s.app.GORM().First(&h, "id = ?", id).Error
 	if err != nil {
 		return "", "", err
 	}
-	pt, err := s.app.Decrypt(blob)
+	pt, err := s.app.Decrypt(h.AuthEncrypted)
 	if err != nil {
 		return "", "", fmt.Errorf("decrypt auth: %w", err)
 	}
-	return string(pt), authType, nil
+	return string(pt), h.AuthType, nil
 }
 
 // HostMetaByID 取单主机元数据。
 func (s *HostsStore) HostMetaByID(id string) (*HostMeta, error) {
-	var h HostMeta
-	err := s.app.DB().QueryRow(`SELECT id,name,addr,port,user,auth_type FROM hosts WHERE id=?`, id).
-		Scan(&h.ID, &h.Name, &h.Addr, &h.Port, &h.User, &h.AuthType)
-	if err != nil {
+	var h Host
+	if err := s.app.GORM().First(&h, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
-	return &h, nil
+	return &HostMeta{
+		ID: h.ID, Name: h.Name, Addr: h.Addr,
+		Port: h.Port, User: h.User, AuthType: h.AuthType,
+	}, nil
 }
 
 func (s *HostsStore) DeleteHost(id string) error {
-	_, err := s.app.DB().Exec(`DELETE FROM hosts WHERE id=?`, id)
-	return err
+	return s.app.GORM().Delete(&Host{}, "id = ?", id).Error
 }

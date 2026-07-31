@@ -9,7 +9,7 @@ import (
 func TestAIConfig_SaveLoad_APIKeyEncrypted(t *testing.T) {
 	t.Setenv("APPDATA", t.TempDir())
 	app, _ := store.Open()
-	defer app.DB().Close()
+	defer closeDB(app)
 
 	s := NewConfigStore(app)
 	cfg := AIConfig{Provider: "claude", Model: "claude-sonnet-5", BaseURL: "https://api.anthropic.com", APIKey: "sk-secret"}
@@ -17,7 +17,7 @@ func TestAIConfig_SaveLoad_APIKeyEncrypted(t *testing.T) {
 		t.Fatalf("SaveAIConfig: %v", err)
 	}
 	var blob []byte
-	app.DB().QueryRow(`SELECT api_key_encrypted FROM ai_config WHERE id=1`).Scan(&blob)
+	app.GORM().Raw(`SELECT api_key_encrypted FROM ai_config WHERE id=1`).Scan(&blob)
 	if string(blob) == "sk-secret" {
 		t.Fatal("API Key 明文存储")
 	}
@@ -36,5 +36,12 @@ func TestAIConfig_SaveLoad_APIKeyEncrypted(t *testing.T) {
 	got2, _ := s.GetAIConfig()
 	if got2.APIKey != "" {
 		t.Fatal("空 key 应为空")
+	}
+}
+
+func closeDB(app *store.DB) {
+	sqlDB, _ := app.GORM().DB()
+	if sqlDB != nil {
+		sqlDB.Close()
 	}
 }

@@ -36,27 +36,19 @@ func (s *MemoryStore) Recall(hostID, question string) (RecallContext, error) {
 	if q == "" {
 		return RecallContext{}, nil
 	}
-	rows, err := s.app.DB().Query(`
+	var pcs []PastCommand
+	err := s.app.GORM().Raw(`
 		SELECT c.command, COALESCE(c.output,'')
 		FROM commands c
 		JOIN conversations v ON v.id = c.session_id
 		WHERE v.host_id = ?
 		  AND c.rowid IN (SELECT rowid FROM commands_fts WHERE commands_fts MATCH ?)
 		ORDER BY c.ts DESC
-		LIMIT 5`, hostID, q)
+		LIMIT 5`, hostID, q).Scan(&pcs).Error
 	if err != nil {
 		return RecallContext{}, fmt.Errorf("recall query: %w", err)
 	}
-	defer rows.Close()
-	var out RecallContext
-	for rows.Next() {
-		var pc PastCommand
-		if err := rows.Scan(&pc.Command, &pc.Output); err != nil {
-			return RecallContext{}, err
-		}
-		out.PastCommands = append(out.PastCommands, pc)
-	}
-	return out, rows.Err()
+	return RecallContext{PastCommands: pcs}, nil
 }
 
 // ftsQuery 把自然语言问题转成 FTS5 OR 查询，过滤停用词与过短词。
