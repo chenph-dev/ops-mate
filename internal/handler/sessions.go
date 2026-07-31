@@ -1,9 +1,6 @@
 package handler
 
 import (
-	"context"
-	"sync/atomic"
-
 	"ops-mate/internal/einoagent"
 	"ops-mate/internal/sshexec"
 	"ops-mate/internal/store"
@@ -15,17 +12,11 @@ import (
 type SessionsHandler struct {
 	store          *store.Store
 	sessionManager *einoagent.SessionManager
-	ctx            atomic.Value // context.Context
 }
 
 // NewSessionsHandler 构造 SessionsHandler。
 func NewSessionsHandler(store *store.Store, sm *einoagent.SessionManager) *SessionsHandler {
 	return &SessionsHandler{store: store, sessionManager: sm}
-}
-
-// SetCtx 注入 Wails 上下文（由 OnStartup 调用）。
-func (h *SessionsHandler) SetCtx(ctx context.Context) {
-	h.ctx.Store(ctx)
 }
 
 // getExecutor 按 hostID 取凭据构造 SSHExecutor。
@@ -46,25 +37,25 @@ func (h *SessionsHandler) getExecutor(hostID string) sshexec.Exec {
 
 // emit 向 Wails 前端推送事件。
 func (h *SessionsHandler) emit(sessionID, event string, data any) {
-	wailsruntime.EventsEmit(h.ctx.Load().(context.Context), event, map[string]any{
+	wailsruntime.EventsEmit(Ctx(), event, map[string]any{
 		"sessionId": sessionID, "data": data,
 	})
 }
 
 func (h *SessionsHandler) NewSession(hostID, title string) (string, error) {
-	return h.sessionManager.CreateSession(h.ctx.Load().(context.Context), hostID, title, h.emit)
+	return h.sessionManager.CreateSession(Ctx(), hostID, title, h.emit)
 }
 
 func (h *SessionsHandler) SendMessage(sid, text string) error {
-	return h.sessionManager.SendMessage(h.ctx.Load().(context.Context), sid, text, h.getExecutor(sid))
+	return h.sessionManager.SendMessage(Ctx(), sid, text, h.getExecutor(sid))
 }
 
 func (h *SessionsHandler) ApproveCommand(sid, command string) error {
-	return h.sessionManager.ApproveCommand(h.ctx.Load().(context.Context), sid, command)
+	return h.sessionManager.ApproveCommand(Ctx(), sid, command)
 }
 
 func (h *SessionsHandler) RejectCommand(sid string) error {
-	return h.sessionManager.RejectCommand(h.ctx.Load().(context.Context), sid)
+	return h.sessionManager.RejectCommand(Ctx(), sid)
 }
 
 func (h *SessionsHandler) CancelRun(sid string) error {

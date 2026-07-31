@@ -48,8 +48,7 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup: func(ctx context.Context) {
-			hosts.SetCtx(ctx)
-			sessions.SetCtx(ctx)
+			handler.SetCtx(ctx)
 		},
 		// 每个 handler 是独立模块，前端通过 wailsjs/go/main/<TypeName> 访问。
 		Bind: []interface{}{

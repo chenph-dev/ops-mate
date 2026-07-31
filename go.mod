@@ -2,7 +2,16 @@ module ops-mate
 
 go 1.25.0
 
-require github.com/wailsapp/wails/v2 v2.12.0
+require (
+	github.com/cloudwego/eino v0.10.0-alpha.13
+	github.com/cloudwego/eino-ext/components/model/claude v0.1.24
+	github.com/cloudwego/eino-ext/components/model/ollama v0.1.9
+	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
+	github.com/wailsapp/wails/v2 v2.12.0
+	github.com/zalando/go-keyring v0.2.8
+	golang.org/x/crypto v0.54.0
+	modernc.org/sqlite v1.55.0
+)
 
 require (
 	cloud.google.com/go/auth v0.7.2 // indirect
@@ -31,10 +40,6 @@ require (
 	github.com/bytedance/sonic v1.15.0 // indirect
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
-	github.com/cloudwego/eino v0.10.0-alpha.13 // indirect
-	github.com/cloudwego/eino-ext/components/model/claude v0.1.24 // indirect
-	github.com/cloudwego/eino-ext/components/model/ollama v0.1.9 // indirect
-	github.com/cloudwego/eino-ext/components/model/openai v0.1.13 // indirect
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -93,7 +98,6 @@ require (
 	github.com/wailsapp/mimetype v1.4.1 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
 	github.com/yargevad/filepathx v1.0.0 // indirect
-	github.com/zalando/go-keyring v0.2.8 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.49.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0 // indirect
@@ -102,7 +106,6 @@ require (
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
 	go.yaml.in/yaml/v4 v4.0.0-rc.2 // indirect
 	golang.org/x/arch v0.11.0 // indirect
-	golang.org/x/crypto v0.54.0 // indirect
 	golang.org/x/exp v0.0.0-20250218142911-aa4b98e5adaa // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
@@ -118,7 +121,6 @@ require (
 	modernc.org/libc v1.74.1 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
-	modernc.org/sqlite v1.55.0 // indirect
 )
 
 // replace github.com/wailsapp/wails/v2 v2.12.0 => C:\Users\chenph\go\pkg\mod

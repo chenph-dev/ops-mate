@@ -8,13 +8,7 @@ export function CancelRun(arg1:string):Promise<void>;
 
 export function DeleteConversation(arg1:string):Promise<void>;
 
-export function DeleteHost(arg1:string):Promise<void>;
-
-export function GetAIConfig():Promise<store.AIConfig>;
-
 export function ListConversations(arg1:string):Promise<Array<store.Conversation>>;
-
-export function ListHosts():Promise<Array<store.HostMeta>>;
 
 export function LoadMessages(arg1:string):Promise<Array<store.Message>>;
 
@@ -22,10 +16,4 @@ export function NewSession(arg1:string,arg2:string):Promise<string>;
 
 export function RejectCommand(arg1:string):Promise<void>;
 
-export function SaveAIConfig(arg1:store.AIConfig):Promise<void>;
-
-export function SaveHost(arg1:store.HostInput):Promise<string>;
-
 export function SendMessage(arg1:string,arg2:string):Promise<void>;
-
-export function TestConnection(arg1:store.HostInput):Promise<boolean>;
