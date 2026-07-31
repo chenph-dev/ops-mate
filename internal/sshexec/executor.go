@@ -15,17 +15,23 @@ import (
 
 // Host 描述一个 SSH 目标。Secret 为密码或私钥 PEM 明文。
 type Host struct {
-	Addr      string // host 或 host:port
-	Port      int
-	User      string
-	AuthType  string // "password" | "privatekey"
-	Secret    string
+	Addr     string // host 或 host:port
+	Port     int
+	User     string
+	AuthType string // "password" | "privatekey"
+	Secret   string
 }
 
 // Line 一行输出，带来源 stdout/stderr。
 type Line struct {
 	Stream string `json:"stream"` // "stdout" | "stderr"
 	Text   string `json:"text"`
+}
+
+// Exec 执行器接口（供测试 stub 与真实 Executor 实现）。
+// 执行器构造时已绑定目标主机，故 Exec 只接收命令本身。
+type Exec interface {
+	Exec(ctx context.Context, command string) (<-chan Line, error)
 }
 
 // Executor 执行命令并逐行流式输出。
@@ -120,7 +126,14 @@ func (e *Executor) Exec(ctx context.Context, command string) (<-chan Line, error
 		}
 		go pipe(stdout, "stdout")
 		pipe(stderr, "stderr")
-		_ = sess.Wait()
+		if err := sess.Wait(); err != nil {
+			if exitErr, ok := err.(*ssh.ExitError); ok {
+				select {
+				case out <- Line{Stream: "exit", Text: fmt.Sprintf("exit_code=%d", exitErr.ExitStatus())}:
+				default:
+				}
+			}
+		}
 		close(out)
 	}()
 	return out, nil

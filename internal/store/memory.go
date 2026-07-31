@@ -1,6 +1,9 @@
 package store
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // PastCommand 召回的历史命令记录。
 type PastCommand struct {
@@ -44,6 +47,7 @@ func (s *Store) Recall(hostID, question string) (RecallContext, error) {
 }
 
 // ftsQuery 把自然语言问题转成 FTS5 OR 查询，过滤停用词与过短词。
+// 对每个 token 用双引号包裹并转义内部引号，防止 FTS5 注入。
 func ftsQuery(s string) string {
 	stop := map[string]bool{"the": true, "a": true, "an": true, "is": true,
 		"为什么": true, "怎么": true, "怎么回事": true}
@@ -56,7 +60,9 @@ func ftsQuery(s string) string {
 		cur = ""
 	}
 	for _, r := range s {
-		if r == ' ' || r == ',' || r == '？' || r == '?' || r == '。' {
+		// 将 FTS5 特殊字符视为分隔符，避免注入
+		if r == ' ' || r == ',' || r == '？' || r == '?' || r == '。' ||
+			r == '"' || r == '*' || r == '(' || r == ')' || r == ':' || r == '^' {
 			flush()
 			continue
 		}
@@ -68,7 +74,8 @@ func ftsQuery(s string) string {
 		if i > 0 {
 			out += " OR "
 		}
-		out += "\"" + tk + "\""
+		// 转义内部双引号（FTS5 用 "" 转义 "）
+		out += "\"" + strings.ReplaceAll(tk, "\"", "\"\"") + "\""
 	}
 	return out
 }
