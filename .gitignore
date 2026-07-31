@@ -1,4 +1,17 @@
+# Build artifacts
 build/bin
-node_modules
 frontend/dist
+
+# Wails generated frontend bindings (auto-generated from Go code)
+frontend/wailsjs/
+
+# Dependencies
+node_modules
+
+# IDE
 .idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
