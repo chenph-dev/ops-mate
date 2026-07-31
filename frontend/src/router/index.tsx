@@ -1,8 +1,8 @@
-import React, { Suspense } from 'react';
-import { createHashRouter, Navigate, type RouteObject } from 'react-router-dom';
-import { Spin } from 'antd';
-import AppLayout from '@/components/AppLayout';
-import { routes } from '@/components/AppLayout/menuConfig';
+import React, { Suspense } from "react";
+import { createHashRouter, Navigate, type RouteObject } from "react-router-dom";
+import { Spin } from "antd";
+import AppLayout from "@/components/AppLayout";
+import { routes } from "@/components/AppLayout/menuConfig";
 
 const childRoutes: RouteObject[] = routes.map((r) => ({
   path: r.path,
@@ -15,12 +15,12 @@ const childRoutes: RouteObject[] = routes.map((r) => ({
 
 export const router = createHashRouter([
   {
-    path: '/',
+    path: "/",
     element: <AppLayout />,
     children: [
-      { index: true, element: <Navigate to="/home" replace /> },
+      { index: true, element: <Navigate to="/hosts" replace /> },
       ...childRoutes,
-      { path: '*', element: <div style={{ padding: 24 }}>页面不存在</div> },
+      { path: "*", element: <div style={{ padding: 24 }}>页面不存在</div> },
     ],
   },
 ]);

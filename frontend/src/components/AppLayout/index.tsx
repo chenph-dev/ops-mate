@@ -1,4 +1,4 @@
-import { Button, Tooltip, theme } from "antd";
+import { Button, Tooltip, Layout, theme } from "antd";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   MinusOutlined,
@@ -20,7 +20,9 @@ import { routes } from "./menuConfig";
 import logo from "@/assets/images/logo-universal.png";
 import { useEffect, useState } from "react";
 
-export default function AppLayout() {
+const { Header, Sider, Content } = Layout;
+
+export default function AppLayout(): React.JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
   const { token } = theme.useToken();
@@ -51,31 +53,23 @@ export default function AppLayout() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      {/* 顶部栏：Logo + 主题切换 + 窗口控制 */}
-      <div
+    <Layout style={{ height: "100vh" }}>
+      {/* 顶部栏 */}
+      <Header
         className="titlebar-drag-region"
         style={{
-          background: token.colorBgContainer,
           padding: "0 8px",
           height: 38,
+          lineHeight: "38px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          borderBottom: `1px solid ${token.colorBorderSecondary}`,
         }}
       >
-        {/* 左侧：Logo + 名称（独立组件） */}
+        {/* 左侧：Logo + 名称 */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <img src={logo} alt="logo" style={{ width: 22, height: 22 }} />
-          <span
-            style={{
-              color: token.colorText,
-              fontSize: 13,
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-            }}
-          >
+          <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>
             ops-mate
           </span>
         </div>
@@ -86,88 +80,69 @@ export default function AppLayout() {
             icon={isDark ? <SunOutlined /> : <MoonOutlined />}
             onClick={toggleTheme}
             title={isDark ? "切换浅色" : "切换深色"}
-            color={token.colorText}
           />
           <WindowButton
             icon={<MinusOutlined />}
             onClick={() => WindowMinimise()}
             title="最小化"
-            color={token.colorText}
           />
           <WindowButton
             icon={isMaximised ? <SwitcherOutlined /> : <BorderOutlined />}
             onClick={handleToggleMaximize}
             title={isMaximised ? "还原" : "最大化"}
-            color={token.colorText}
           />
           <WindowButton
             icon={<CloseOutlined />}
             onClick={() => Quit()}
             isDanger
             title="关闭"
-            color={token.colorText}
           />
         </div>
-      </div>
+      </Header>
 
       {/* 下方：左侧菜单条 + 主内容 */}
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* 左侧图标菜单条 — 独立 28px */}
-        <div
-          style={{
-            width: 44,
-            background: token.colorBgContainer,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            paddingTop: 4,
-            borderRight: `1px solid ${token.colorBorderSecondary}`,
-          }}
-        >
-          {routes.map((r) => (
-            <Tooltip key={r.path} placement="right" title={r.label}>
-              <Button
-                type="text"
-                size="small"
-                icon={
-                  <span style={{ fontSize: 18, color: token.colorText }}>
-                    {r.icon}
-                  </span>
-                }
-                onClick={() => navigate(r.path)}
-                className={
-                  selectedKey === r.path
-                    ? "sidebar-menu-item active"
-                    : "sidebar-menu-item"
-                }
-                style={{
-                  width: 34,
-                  height: 34,
-                  border: "none",
-                  borderRadius: 4,
-                  borderLeft:
-                    selectedKey === r.path
-                      ? `3px solid ${token.colorPrimary}`
-                      : "3px solid transparent",
-                  color: token.colorText,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  marginBottom: 6,
-                  paddingLeft: 0,
-                  paddingRight: 0,
-                }}
-              />
-            </Tooltip>
-          ))}
-        </div>
+      <Layout hasSider>
+        {/* 左侧图标菜单条 */}
+        <Sider width={44} theme={isDark ? "dark" : "light"}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              paddingTop: 4,
+              height: "100%",
+            }}
+          >
+            {routes.map((r) => (
+              <Tooltip key={r.path} placement="right" title={r.label}>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<span style={{ fontSize: 18 }}>{r.icon}</span>}
+                  onClick={() => navigate(r.path)}
+                  style={{
+                    width: 34,
+                    height: 34,
+                    border: "none",
+                    borderRadius: 4,
+                    borderLeft:
+                      selectedKey === r.path
+                        ? `3px solid ${token.colorPrimary}`
+                        : "3px solid transparent",
+                    marginBottom: 6,
+                  }}
+                />
+              </Tooltip>
+            ))}
+          </div>
+        </Sider>
 
         {/* 主内容区 */}
-        <div style={{ flex: 1, overflow: "auto", padding: 16 }}>
+        <Content style={{ padding: 16, overflow: "auto" }}>
           <Outlet />
-        </div>
-      </div>
-    </div>
+        </Content>
+      </Layout>
+    </Layout>
   );
 }
 
@@ -176,13 +151,11 @@ function WindowButton({
   onClick,
   isDanger,
   title,
-  color,
 }: {
   icon: React.ReactNode;
   onClick: () => void;
   isDanger?: boolean;
   title?: string;
-  color: string;
 }) {
   return (
     <Button
@@ -197,7 +170,6 @@ function WindowButton({
         height: 28,
         border: "none",
         borderRadius: 0,
-        color,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

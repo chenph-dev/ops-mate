@@ -1,9 +1,10 @@
 import React, { lazy, type ComponentType } from 'react';
 import type { ItemType, MenuItemType } from 'antd/es/menu/interface';
 import {
-  HomeOutlined,
-  InfoCircleOutlined,
+  DesktopOutlined,
+  CloudServerOutlined,
   SettingOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 
 /** 路由项定义 — 同时驱动菜单和路由 */
@@ -20,22 +21,22 @@ const lazyPage = (loader: () => Promise<{ default: ComponentType }>) =>
 
 export const routes: RouteItem[] = [
   {
-    path: '/home',
-    label: '首页',
-    icon: <HomeOutlined />,
-    component: lazyPage(() => import('@/pages/Home')),
+    path: '/hosts',
+    label: '主机',
+    icon: <DesktopOutlined />,
+    component: lazyPage(() => import('@/pages/Hosts')),
+  },
+  {
+    path: '/config',
+    label: 'AI 配置',
+    icon: <CloudServerOutlined />,
+    component: lazyPage(() => import('@/pages/Config')),
   },
   {
     path: '/about',
     label: '关于',
     icon: <InfoCircleOutlined />,
     component: lazyPage(() => import('@/pages/About')),
-  },
-  {
-    path: '/settings',
-    label: '设置',
-    icon: <SettingOutlined />,
-    component: lazyPage(() => import('@/pages/Settings')),
   },
 ];
 
