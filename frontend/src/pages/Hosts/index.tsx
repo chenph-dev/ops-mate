@@ -8,20 +8,22 @@ import { useHosts } from '@/hooks/useHosts';
 import { useSessions } from '@/hooks/useSessions';
 import { useWailsEvents } from '@/hooks/useWailsEvents';
 import { useThemeToggle } from '@/context/ThemeContext';
+import { useTerminal, type TerminalEntry } from '@/hooks/useTerminal';
 import HostList from '@/components/HostList';
 import HostForm from '@/components/HostForm';
-import Terminal, { type TerminalLine } from '@/components/Terminal';
-import AIChat from '@/components/AIChat';
+import Terminal from '@/components/Terminal';
+import AIPanel from '@/components/AIPanel';
 
 export default function HostsPage(): React.JSX.Element {
   const { isDark } = useThemeToggle();
-  const { tree, loading, addHost, removeHost, testConnection, createFolder, deleteNode } = useHosts();
+  const { tree, addHost, removeHost, testConnection, createFolder, deleteNode } = useHosts();
   const [selectedHost, setSelectedHost] = useState<TreeNode | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formParentId, setFormParentId] = useState('');
-  const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
+  const [aiCollapsed, setAiCollapsed] = useState(true);
 
   const sessions = useSessions(selectedHost?.id ?? null);
+  const terminal = useTerminal(selectedHost?.id ?? null);
 
   // Wails 事件处理
   const onCommand = useCallback(
@@ -46,10 +48,7 @@ export default function HostsPage(): React.JSX.Element {
   );
 
   const onState = useCallback((event: { data: unknown }) => {
-    setTerminalLines((prev) => [
-      ...prev,
-      { stream: 'info', text: `状态: ${event.data}` },
-    ]);
+    // 状态变化可通过 terminal hook 处理
   }, []);
 
   useWailsEvents(onCommand, onState);
@@ -96,13 +95,18 @@ export default function HostsPage(): React.JSX.Element {
 
   const handleSelect = useCallback((node: TreeNode) => {
     setSelectedHost(node);
-  }, []);
+    terminal.clearEntries();
+  }, [terminal]);
+
+  const handleTerminalCommand = useCallback((command: string) => {
+    terminal.runCommand(command);
+  }, [terminal]);
 
   return (
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '240px 1fr 1.2fr',
+        gridTemplateColumns: '240px 1fr',
         height: '100%',
         gap: 0,
       }}
@@ -119,38 +123,30 @@ export default function HostsPage(): React.JSX.Element {
         onTest={handleTest}
       />
 
-      {/* 中：终端输出 */}
-      <Terminal lines={terminalLines} isDark={isDark} />
+      {/* 右：终端 + AI 面板（悬浮） */}
+      <div style={{ position: 'relative', height: '100%' }}>
+        {/* 终端区域：占满整个右侧 */}
+        <Terminal
+          entries={terminal.entries}
+          isDark={isDark}
+          interactive={true}
+          hostConnected={!!selectedHost}
+          onCommand={handleTerminalCommand}
+        />
 
-      {/* 右：AI 对话 */}
-      {selectedHost ? (
-        <AIChat
-          conversations={sessions.conversations}
-          activeSession={sessions.activeSession}
+        {/* AI 面板：悬浮在终端之上 */}
+        <AIPanel
           messages={sessions.messages}
           pendingCommand={sessions.pendingCommand}
           sessionState={sessions.sessionState}
-          hostName={selectedHost.name}
-          onSelectSession={sessions.selectSession}
-          onCreateSession={sessions.createSession}
-          onDeleteSession={sessions.removeConversation}
+          hostName={selectedHost?.name ?? ''}
+          collapsed={aiCollapsed}
+          onToggleCollapse={() => setAiCollapsed(!aiCollapsed)}
           onSendMessage={sessions.sendMessage}
           onApprove={sessions.approve}
           onReject={sessions.reject}
         />
-      ) : (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--ant-color-text-secondary)',
-            fontSize: 13,
-          }}
-        >
-          请选择一个主机开始对话
-        </div>
-      )}
+      </div>
 
       {/* 主机表单弹窗 */}
       <HostForm

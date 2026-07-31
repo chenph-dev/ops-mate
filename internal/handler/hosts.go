@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"ops-mate/internal/sshexec"
@@ -61,4 +62,35 @@ func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, string, err
 	for range ch {
 	}
 	return true, "", nil
+}
+
+// ExecuteCommand 在指定主机上执行单条命令，返回输出。
+func (h *HostsHandler) ExecuteCommand(hostID, command string) (string, error) {
+	secret, authType, err := h.hosts.GetHostSecret(hostID)
+	if err != nil {
+		return "", fmt.Errorf("获取主机凭据失败: %w", err)
+	}
+	meta, err := h.hosts.HostMetaByID(hostID)
+	if err != nil {
+		return "", fmt.Errorf("获取主机信息失败: %w", err)
+	}
+	ex := sshexec.NewExecutor(sshexec.Host{
+		Addr: meta.Addr, Port: meta.Port, User: meta.User,
+		AuthType: authType, Secret: secret,
+	})
+	ctx, cancel := context.WithTimeout(Ctx(), 30*time.Second)
+	defer cancel()
+	ch, err := ex.Exec(ctx, command)
+	if err != nil {
+		return "", err
+	}
+	var output string
+	for line := range ch {
+		if line.Stream == "stdout" {
+			output += line.Text + "\n"
+		} else if line.Stream == "stderr" {
+			output += line.Text + "\n"
+		}
+	}
+	return output, nil
 }
