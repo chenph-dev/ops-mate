@@ -28,7 +28,15 @@ export default function App() {
     token: {
       colorPrimary: '#1677ff',
     },
-  }), [algorithm]);
+    // antd 官方方案：通过 components.Layout 覆盖 headerBg/siderBg
+    // 类型定义见 antd/es/layout/style/index.d.ts → ComponentToken
+    components: {
+      Layout: {
+        headerBg: isDark ? '#001529' : '#f0f2f5',
+        siderBg: isDark ? '#001529' : '#f0f2f5',
+      },
+    },
+  }), [algorithm, isDark]);
 
   return (
     <ThemeContext.Provider value={{ isDark, toggleTheme: toggleAlgorithm }}>

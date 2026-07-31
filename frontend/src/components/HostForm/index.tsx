@@ -14,6 +14,7 @@ interface HostFormProps {
 
 const defaultValues: HostInput = {
   name: "",
+  parentId: "",
   addr: "",
   port: 22,
   user: "root",

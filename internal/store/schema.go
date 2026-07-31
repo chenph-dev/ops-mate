@@ -4,11 +4,13 @@ const schemaSQL = `
 CREATE TABLE IF NOT EXISTS hosts (
     id            TEXT PRIMARY KEY,
     name          TEXT NOT NULL,
-    addr          TEXT NOT NULL,
-    port          INTEGER NOT NULL,
-    user          TEXT NOT NULL,
+    node_type     TEXT NOT NULL DEFAULT 'host',  -- 'folder' | 'host'
+    parent_id     TEXT,                           -- NULL = 根级
+    addr          TEXT,
+    port          INTEGER,
+    user          TEXT,
     auth_encrypted BLOB,
-    auth_type     TEXT NOT NULL,
+    auth_type     TEXT,
     created_at    INTEGER NOT NULL
 );
 

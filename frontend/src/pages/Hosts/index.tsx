@@ -1,21 +1,22 @@
-import { useState, useCallback } from "react";
-import { message } from "antd";
-import type { hoststore } from "@wailsjs/go/models";
+import { useState, useCallback } from 'react';
+import { message, Modal, Input } from 'antd';
+import type { hoststore } from '@wailsjs/go/models';
 
-type HostMeta = hoststore.HostMeta;
+type TreeNode = hoststore.TreeNode;
 type HostInput = hoststore.HostInput;
-import { useHosts } from "@/hooks/useHosts";
-import { useSessions } from "@/hooks/useSessions";
-import { useWailsEvents } from "@/hooks/useWailsEvents";
-import HostList from "@/components/HostList";
-import HostForm from "@/components/HostForm";
-import Terminal, { type TerminalLine } from "@/components/Terminal";
-import AIChat from "@/components/AIChat";
+import { useHosts } from '@/hooks/useHosts';
+import { useSessions } from '@/hooks/useSessions';
+import { useWailsEvents } from '@/hooks/useWailsEvents';
+import HostList from '@/components/HostList';
+import HostForm from '@/components/HostForm';
+import Terminal, { type TerminalLine } from '@/components/Terminal';
+import AIChat from '@/components/AIChat';
 
 export default function HostsPage(): React.JSX.Element {
-  const { hosts, loading, addHost, removeHost, testConnection } = useHosts();
-  const [selectedHost, setSelectedHost] = useState<HostMeta | null>(null);
+  const { tree, loading, addHost, removeHost, testConnection, createFolder, deleteNode } = useHosts();
+  const [selectedHost, setSelectedHost] = useState<TreeNode | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [formParentId, setFormParentId] = useState('');
   const [terminalLines, setTerminalLines] = useState<TerminalLine[]>([]);
 
   const sessions = useSessions(selectedHost?.id ?? null);
@@ -23,13 +24,13 @@ export default function HostsPage(): React.JSX.Element {
   // Wails 事件处理
   const onCommand = useCallback(
     (event: { data: unknown }) => {
-      if (event.data && typeof event.data === "object") {
+      if (event.data && typeof event.data === 'object') {
         const d = event.data as Record<string, unknown>;
-        if ("command" in d) {
+        if ('command' in d) {
           sessions.setPendingCommand(
             d as unknown as Parameters<
               typeof sessions.handleEvent
-            >[0]["data"] & {
+            >[0]['data'] & {
               command: string;
               why: string;
               risk: string;
@@ -45,40 +46,74 @@ export default function HostsPage(): React.JSX.Element {
   const onState = useCallback((event: { data: unknown }) => {
     setTerminalLines((prev) => [
       ...prev,
-      { stream: "info", text: `状态: ${event.data}` },
+      { stream: 'info', text: `状态: ${event.data}` },
     ]);
   }, []);
 
   useWailsEvents(onCommand, onState);
 
-  const handleTest = useCallback(async (host: HostMeta) => {
-    const input: HostInput = {
-      name: host.name,
-      addr: host.addr,
-      port: host.port,
-      user: host.user,
-      authType: host.authType,
-      secret: "", // 测试需要完整凭据，这里仅提示
-    };
-    message.info("请编辑主机以测试连接（需要密码/密钥）");
+  const handleAddFolder = useCallback((parentId: string) => {
+    let name = '';
+    Modal.confirm({
+      title: '新建目录',
+      content: (
+        <Input
+          autoFocus
+          placeholder="输入目录名称"
+          onChange={(e) => (name = e.target.value)}
+        />
+      ),
+      onOk: async () => {
+        if (name.trim()) {
+          await createFolder(name.trim(), parentId);
+        }
+      },
+    });
+  }, [createFolder]);
+
+  const handleAddHost = useCallback((parentId: string) => {
+    setFormParentId(parentId);
+    setFormOpen(true);
+  }, []);
+
+  const handleEditHost = useCallback((host: TreeNode) => {
+    message.info('编辑功能待实现');
+  }, []);
+
+  const handleDelete = useCallback(async (node: TreeNode) => {
+    Modal.confirm({
+      title: `确定删除"${node.name}"？`,
+      content: node.nodeType === 'folder' ? '目录内的所有主机将被一并删除。' : '',
+      onOk: () => deleteNode(node.id),
+    });
+  }, [deleteNode]);
+
+  const handleTest = useCallback(async (host: TreeNode) => {
+    message.info('请编辑主机以测试连接（需要密码/密钥）');
+  }, []);
+
+  const handleSelect = useCallback((node: TreeNode) => {
+    setSelectedHost(node);
   }, []);
 
   return (
     <div
       style={{
-        display: "grid",
-        gridTemplateColumns: "220px 1fr 1.2fr",
-        height: "100%",
+        display: 'grid',
+        gridTemplateColumns: '240px 1fr 1.2fr',
+        height: '100%',
         gap: 0,
       }}
     >
-      {/* 左：主机列表 */}
+      {/* 左：主机树 */}
       <HostList
-        hosts={hosts}
+        treeData={tree}
         selectedId={selectedHost?.id ?? null}
-        onSelect={setSelectedHost}
-        onAdd={() => setFormOpen(true)}
-        onDelete={removeHost}
+        onSelect={handleSelect}
+        onAddHost={handleAddHost}
+        onAddFolder={handleAddFolder}
+        onEditHost={handleEditHost}
+        onDelete={handleDelete}
         onTest={handleTest}
       />
 
@@ -104,10 +139,10 @@ export default function HostsPage(): React.JSX.Element {
       ) : (
         <div
           style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "var(--ant-color-text-secondary)",
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--ant-color-text-secondary)',
             fontSize: 13,
           }}
         >
@@ -120,7 +155,7 @@ export default function HostsPage(): React.JSX.Element {
         open={formOpen}
         onCancel={() => setFormOpen(false)}
         onSubmit={async (input) => {
-          await addHost(input);
+          await addHost({ ...input, parentId: formParentId });
           setFormOpen(false);
         }}
         onTest={async (input) => {

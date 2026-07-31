@@ -27,7 +27,23 @@ func (h *HostsHandler) SaveHost(in hoststore.HostInput) (string, error) {
 }
 
 func (h *HostsHandler) DeleteHost(id string) error {
-	return h.hosts.DeleteHost(id)
+	return h.hosts.DeleteNode(id)
+}
+
+func (h *HostsHandler) CreateFolder(name, parentID string) (string, error) {
+	return h.hosts.CreateFolder(name, parentID)
+}
+
+func (h *HostsHandler) ListTree() ([]hoststore.TreeNode, error) {
+	return h.hosts.ListTree()
+}
+
+func (h *HostsHandler) MoveNode(nodeID, newParentID string) error {
+	return h.hosts.MoveNode(nodeID, newParentID)
+}
+
+func (h *HostsHandler) DeleteNode(nodeID string) error {
+	return h.hosts.DeleteNode(nodeID)
 }
 
 // TestConnection 保存前验证：临时构造执行器跑 `echo ok`。
