@@ -1,0 +1,574 @@
+[
+  {
+    "name": "git",
+    "desc": "分布式版本控制系统",
+    "templates": [
+      { "text": "git status", "desc": "查看工作区状态" },
+      { "text": "git log", "desc": "查看提交历史" },
+      { "text": "git add ", "desc": "添加文件到暂存区" },
+      { "text": "git commit -m \"\"", "desc": "提交暂存区更改" },
+      { "text": "git push origin ", "desc": "推送到远程分支" },
+      { "text": "git pull origin ", "desc": "从远程拉取并合并" },
+      { "text": "git checkout ", "desc": "切换分支或恢复文件" },
+      { "text": "git branch ", "desc": "列出或创建分支" },
+      { "text": "git clone ", "desc": "克隆远程仓库" },
+      { "text": "git diff", "desc": "查看变更差异" },
+      { "text": "git reset --hard ", "desc": "强制回退到指定提交" },
+      { "text": "git stash", "desc": "临时保存工作区改动" }
+    ]
+  },
+  {
+    "name": "docker",
+    "desc": "容器运行时管理工具",
+    "templates": [
+      { "text": "docker ps", "desc": "列出运行中的容器" },
+      { "text": "docker ps -a", "desc": "列出所有容器" },
+      { "text": "docker images", "desc": "列出本地镜像" },
+      { "text": "docker run -it ", "desc": "交互式运行新容器" },
+      { "text": "docker run -d --name ", "desc": "后台运行并命名容器" },
+      { "text": "docker exec -it ", "desc": "进入运行中容器" },
+      { "text": "docker logs -f ", "desc": "跟踪容器日志" },
+      { "text": "docker build -t ", "desc": "构建镜像并打标签" },
+      { "text": "docker stop ", "desc": "停止容器" },
+      { "text": "docker rm ", "desc": "删除容器" },
+      { "text": "docker rmi ", "desc": "删除镜像" },
+      { "text": "docker-compose up -d", "desc": "后台启动 compose 服务" },
+      { "text": "docker-compose logs -f", "desc": "跟踪 compose 日志" },
+      { "text": "docker-compose down", "desc": "停止并移除 compose 服务" }
+    ]
+  },
+  {
+    "name": "kubectl",
+    "desc": "Kubernetes 集群命令行工具",
+    "templates": [
+      { "text": "kubectl get pods", "desc": "查看 Pod 列表" },
+      { "text": "kubectl get nodes", "desc": "查看节点列表" },
+      { "text": "kubectl get svc", "desc": "查看 Service 列表" },
+      { "text": "kubectl logs ", "desc": "查看 Pod 日志" },
+      { "text": "kubectl logs -f ", "desc": "跟踪 Pod 日志" },
+      { "text": "kubectl exec -it ", "desc": "进入 Pod 容器" },
+      { "text": "kubectl describe pod ", "desc": "查看 Pod 详情" },
+      { "text": "kubectl apply -f ", "desc": "应用 YAML 配置" },
+      { "text": "kubectl delete -f ", "desc": "删除 YAML 资源" },
+      { "text": "kubectl top pods", "desc": "查看 Pod 资源使用" },
+      { "text": "kubectl port-forward ", "desc": "本地端口转发到 Pod" }
+    ]
+  },
+  {
+    "name": "systemctl",
+    "desc": "控制系统服务",
+    "templates": [
+      { "text": "systemctl status ", "desc": "查看服务状态" },
+      { "text": "systemctl start ", "desc": "启动服务" },
+      { "text": "systemctl stop ", "desc": "停止服务" },
+      { "text": "systemctl restart ", "desc": "重启服务" },
+      { "text": "systemctl enable ", "desc": "开机自启服务" },
+      { "text": "systemctl disable ", "desc": "禁用开机自启" },
+      { "text": "systemctl daemon-reload", "desc": "重新加载 systemd 配置" },
+      { "text": "systemctl list-units", "desc": "列出已加载单元" }
+    ]
+  },
+  {
+    "name": "journalctl",
+    "desc": "查看 systemd 日志",
+    "templates": [
+      { "text": "journalctl -u ", "desc": "查看指定服务日志" },
+      { "text": "journalctl -f", "desc": "实时跟踪日志" },
+      { "text": "journalctl -n 100", "desc": "查看最近 100 条日志" },
+      { "text": "journalctl --since \"1 hour ago\"", "desc": "查看最近一小时日志" }
+    ]
+  },
+  {
+    "name": "ls",
+    "desc": "列出目录内容",
+    "templates": [
+      { "text": "ls -la", "desc": "以长格式列出所有文件" },
+      { "text": "ls -lh", "desc": "人类可读大小显示" },
+      { "text": "ls -ltr", "desc": "按修改时间倒序" }
+    ]
+  },
+  { "name": "cd", "desc": "切换当前目录" },
+  {
+    "name": "cat",
+    "desc": "查看或合并文件内容",
+    "templates": [
+      { "text": "cat ", "desc": "输出文件内容" },
+      { "text": "cat > ", "desc": "重定向写入文件" },
+      { "text": "cat >> ", "desc": "追加内容到文件" }
+    ]
+  },
+  {
+    "name": "grep",
+    "desc": "文本模式搜索",
+    "templates": [
+      { "text": "grep -n \"\" ", "desc": "显示行号搜索字符串" },
+      { "text": "grep -r \"\" ", "desc": "递归搜索目录" },
+      { "text": "grep -i \"\" ", "desc": "忽略大小写搜索" },
+      { "text": "grep -v \"\" ", "desc": "反向匹配" }
+    ]
+  },
+  {
+    "name": "find",
+    "desc": "查找文件或目录",
+    "templates": [
+      { "text": "find . -name \"\"", "desc": "按名称查找" },
+      { "text": "find . -type f", "desc": "查找普通文件" },
+      { "text": "find . -type d", "desc": "查找目录" },
+      { "text": "find . -mtime -1", "desc": "查找一天内修改的文件" }
+    ]
+  },
+  {
+    "name": "tar",
+    "desc": "归档压缩工具",
+    "templates": [
+      { "text": "tar -czvf ", "desc": "创建 gzip 压缩包" },
+      { "text": "tar -xzvf ", "desc": "解压 gzip 压缩包" },
+      { "text": "tar -tvf ", "desc": "查看压缩包内容" }
+    ]
+  },
+  {
+    "name": "chmod",
+    "desc": "修改文件权限",
+    "templates": [
+      { "text": "chmod +x ", "desc": "添加可执行权限" },
+      { "text": "chmod 755 ", "desc": "设置 rwxr-xr-x" },
+      { "text": "chmod -R 644 ", "desc": "递归设置文件权限" }
+    ]
+  },
+  {
+    "name": "chown",
+    "desc": "修改文件所有者",
+    "templates": [
+      { "text": "chown user:group ", "desc": "修改所有者和组" },
+      { "text": "chown -R user: ", "desc": "递归修改所有者" }
+    ]
+  },
+  {
+    "name": "rm",
+    "desc": "删除文件或目录",
+    "templates": [
+      { "text": "rm -rf ", "desc": "强制递归删除" },
+      { "text": "rm -i ", "desc": "删除前确认" }
+    ]
+  },
+  {
+    "name": "cp",
+    "desc": "复制文件或目录",
+    "templates": [
+      { "text": "cp -r ", "desc": "递归复制目录" },
+      { "text": "cp -i ", "desc": "覆盖前确认" }
+    ]
+  },
+  { "name": "mv", "desc": "移动或重命名文件" },
+  { "name": "mkdir", "desc": "创建目录", "templates": [{ "text": "mkdir -p ", "desc": "递归创建目录" }] },
+  { "name": "ln", "desc": "创建链接", "templates": [{ "text": "ln -s ", "desc": "创建符号链接" }] },
+  { "name": "touch", "desc": "创建空文件或更新修改时间" },
+  {
+    "name": "sed",
+    "desc": "流编辑器",
+    "templates": [
+      { "text": "sed -i 's///g' ", "desc": "原地替换文本" },
+      { "text": "sed -n '1,10p' ", "desc": "打印指定行" }
+    ]
+  },
+  {
+    "name": "awk",
+    "desc": "文本处理工具",
+    "templates": [
+      { "text": "awk '{print $1}' ", "desc": "打印第一列" },
+      { "text": "awk -F',' '{print $1}' ", "desc": "按逗号分隔打印" }
+    ]
+  },
+  {
+    "name": "curl",
+    "desc": "命令行 HTTP 客户端",
+    "templates": [
+      { "text": "curl -O ", "desc": "下载文件" },
+      { "text": "curl -s ", "desc": "静默请求" },
+      { "text": "curl -X POST -d '' ", "desc": "发送 POST 请求" },
+      { "text": "curl -H \"Authorization: Bearer ", "desc": "带认证头请求" }
+    ]
+  },
+  { "name": "wget", "desc": "命令行下载工具", "templates": [{ "text": "wget ", "desc": "下载文件" }] },
+  {
+    "name": "ssh",
+    "desc": "安全远程登录",
+    "templates": [
+      { "text": "ssh ", "desc": "登录远程主机" },
+      { "text": "ssh -p 22 ", "desc": "指定端口登录" },
+      { "text": "ssh -i ", "desc": "指定私钥登录" }
+    ]
+  },
+  {
+    "name": "scp",
+    "desc": "安全复制文件",
+    "templates": [
+      { "text": "scp ", "desc": "本地与远程互传" },
+      { "text": "scp -P 22 ", "desc": "指定端口复制" },
+      { "text": "scp -r ", "desc": "递归复制目录" }
+    ]
+  },
+  { "name": "ssh-keygen", "desc": "生成 SSH 密钥", "templates": [{ "text": "ssh-keygen -t ed25519", "desc": "生成 ed25519 密钥" }] },
+  { "name": "ssh-copy-id", "desc": "复制公钥到远程主机", "templates": [{ "text": "ssh-copy-id ", "desc": "上传公钥" }] },
+  {
+    "name": "ps",
+    "desc": "查看进程状态",
+    "templates": [
+      { "text": "ps aux", "desc": "显示所有进程详情" },
+      { "text": "ps -ef", "desc": "全格式显示进程" }
+    ]
+  },
+  {
+    "name": "top",
+    "desc": "实时进程监控",
+    "templates": [
+      { "text": "top", "desc": "打开进程监控" },
+      { "text": "top -p ", "desc": "监控指定进程" }
+    ]
+  },
+  { "name": "htop", "desc": "交互式进程查看器" },
+  { "name": "kill", "desc": "终止进程", "templates": [{ "text": "kill -9 ", "desc": "强制终止进程" }] },
+  { "name": "killall", "desc": "按名称终止进程" },
+  {
+    "name": "df",
+    "desc": "查看磁盘空间",
+    "templates": [
+      { "text": "df -h", "desc": "人类可读显示" },
+      { "text": "df -T", "desc": "显示文件系统类型" }
+    ]
+  },
+  { "name": "du", "desc": "查看目录大小", "templates": [{ "text": "du -sh ", "desc": "汇总显示目录大小" }] },
+  { "name": "free", "desc": "查看内存使用", "templates": [{ "text": "free -h", "desc": "人类可读显示" }] },
+  {
+    "name": "tail",
+    "desc": "查看文件尾部",
+    "templates": [
+      { "text": "tail -f ", "desc": "实时跟踪文件" },
+      { "text": "tail -n 100 ", "desc": "查看最后 100 行" }
+    ]
+  },
+  { "name": "head", "desc": "查看文件头部", "templates": [{ "text": "head -n 20 ", "desc": "查看前 20 行" }] },
+  { "name": "less", "desc": "分页查看文件" },
+  { "name": "more", "desc": "分页查看文件" },
+  { "name": "sort", "desc": "排序文本行" },
+  { "name": "uniq", "desc": "去重或计数相邻行" },
+  { "name": "wc", "desc": "统计行/词/字节", "templates": [{ "text": "wc -l ", "desc": "统计行数" }] },
+  {
+    "name": "xargs",
+    "desc": "从标准输入构建命令",
+    "templates": [
+      { "text": "xargs -I {} ", "desc": "占位符替换执行" },
+      { "text": "xargs -P 4 ", "desc": "并行 4 进程执行" }
+    ]
+  },
+  { "name": "history", "desc": "查看命令历史" },
+  {
+    "name": "sudo",
+    "desc": "以超级用户执行命令",
+    "templates": [
+      { "text": "sudo ", "desc": "提权执行" },
+      { "text": "sudo -i", "desc": "切换到 root shell" }
+    ]
+  },
+  {
+    "name": "apt",
+    "desc": "Debian/Ubuntu 包管理",
+    "templates": [
+      { "text": "apt update", "desc": "更新包列表" },
+      { "text": "apt install ", "desc": "安装软件包" },
+      { "text": "apt remove ", "desc": "移除软件包" },
+      { "text": "apt upgrade", "desc": "升级已安装包" }
+    ]
+  },
+  {
+    "name": "yum",
+    "desc": "RHEL/CentOS 包管理",
+    "templates": [
+      { "text": "yum install ", "desc": "安装软件包" },
+      { "text": "yum remove ", "desc": "移除软件包" },
+      { "text": "yum update", "desc": "更新系统" }
+    ]
+  },
+  {
+    "name": "dnf",
+    "desc": "新一代 RPM 包管理",
+    "templates": [
+      { "text": "dnf install ", "desc": "安装软件包" },
+      { "text": "dnf remove ", "desc": "移除软件包" },
+      { "text": "dnf update", "desc": "更新系统" }
+    ]
+  },
+  {
+    "name": "pacman",
+    "desc": "Arch Linux 包管理",
+    "templates": [
+      { "text": "pacman -S ", "desc": "安装软件包" },
+      { "text": "pacman -R ", "desc": "移除软件包" },
+      { "text": "pacman -Sy", "desc": "同步包数据库" }
+    ]
+  },
+  {
+    "name": "crontab",
+    "desc": "管理定时任务",
+    "templates": [
+      { "text": "crontab -e", "desc": "编辑当前用户定时任务" },
+      { "text": "crontab -l", "desc": "列出定时任务" }
+    ]
+  },
+  { "name": "nohup", "desc": "忽略挂起信号运行命令", "templates": [{ "text": "nohup  &", "desc": "后台运行并忽略退出信号" }] },
+  {
+    "name": "tmux",
+    "desc": "终端复用器",
+    "templates": [
+      { "text": "tmux new -s ", "desc": "创建新会话" },
+      { "text": "tmux attach -t ", "desc": "接入已有会话" },
+      { "text": "tmux ls", "desc": "列出会话" }
+    ]
+  },
+  {
+    "name": "screen",
+    "desc": "终端复用器",
+    "templates": [
+      { "text": "screen -S ", "desc": "创建新会话" },
+      { "text": "screen -r ", "desc": "恢复会话" }
+    ]
+  },
+  { "name": "vim", "desc": "Vi IMproved 文本编辑器" },
+  { "name": "nano", "desc": "简易文本编辑器" },
+  { "name": "echo", "desc": "输出文本" },
+  { "name": "export", "desc": "设置环境变量" },
+  { "name": "source", "desc": "执行脚本并生效环境" },
+  { "name": "pwd", "desc": "显示当前目录" },
+  { "name": "whoami", "desc": "显示当前用户" },
+  { "name": "uname", "desc": "显示系统信息", "templates": [{ "text": "uname -a", "desc": "显示全部系统信息" }] },
+  { "name": "date", "desc": "显示或设置日期时间" },
+  { "name": "sleep", "desc": "暂停指定时间" },
+  { "name": "time", "desc": "测量命令执行时间" },
+  { "name": "watch", "desc": "定时执行命令", "templates": [{ "text": "watch -n 1 ", "desc": "每秒执行一次" }] },
+  { "name": "which", "desc": "查找可执行文件路径" },
+  { "name": "whereis", "desc": "定位二进制/源码/手册" },
+  { "name": "file", "desc": "识别文件类型" },
+  { "name": "md5sum", "desc": "计算 MD5 校验和" },
+  { "name": "sha256sum", "desc": "计算 SHA256 校验和" },
+  { "name": "base64", "desc": "Base64 编解码" },
+  {
+    "name": "cut",
+    "desc": "按列截取文本",
+    "templates": [
+      { "text": "cut -d' ' -f1 ", "desc": "按空格分隔取第一列" },
+      { "text": "cut -c1-10 ", "desc": "截取第 1-10 个字符" }
+    ]
+  },
+  { "name": "tr", "desc": "字符转换", "templates": [{ "text": "tr 'a-z' 'A-Z'", "desc": "小写转大写" }] },
+  { "name": "tee", "desc": "输出到屏幕和文件", "templates": [{ "text": " | tee ", "desc": "同时输出到文件" }] },
+  { "name": "gzip", "desc": "gzip 压缩" },
+  { "name": "gunzip", "desc": "gzip 解压" },
+  { "name": "zip", "desc": "zip 压缩", "templates": [{ "text": "zip -r ", "desc": "递归压缩目录" }] },
+  { "name": "unzip", "desc": "zip 解压" },
+  {
+    "name": "rsync",
+    "desc": "远程同步工具",
+    "templates": [
+      { "text": "rsync -avz ", "desc": "归档压缩同步" },
+      { "text": "rsync -avz --delete ", "desc": "同步并删除目标多余文件" }
+    ]
+  },
+  {
+    "name": "netstat",
+    "desc": "查看网络连接",
+    "templates": [
+      { "text": "netstat -tlnp", "desc": "查看监听端口和进程" },
+      { "text": "netstat -an", "desc": "查看所有连接" }
+    ]
+  },
+  {
+    "name": "ss",
+    "desc": "查看套接字统计",
+    "templates": [
+      { "text": "ss -tlnp", "desc": "查看监听端口" },
+      { "text": "ss -s", "desc": "查看套接字摘要" }
+    ]
+  },
+  {
+    "name": "lsof",
+    "desc": "查看打开的文件",
+    "templates": [
+      { "text": "lsof -i :80", "desc": "查看占用 80 端口的进程" },
+      { "text": "lsof ", "desc": "查看文件被谁占用" }
+    ]
+  },
+  {
+    "name": "ip",
+    "desc": "网络配置工具",
+    "templates": [
+      { "text": "ip addr", "desc": "查看 IP 地址" },
+      { "text": "ip route", "desc": "查看路由表" },
+      { "text": "ip link", "desc": "查看网络接口" }
+    ]
+  },
+  { "name": "ifconfig", "desc": "查看/配置网络接口" },
+  { "name": "ping", "desc": "测试网络连通", "templates": [{ "text": "ping -c 4 ", "desc": "发送 4 个包" }] },
+  { "name": "traceroute", "desc": "追踪路由路径" },
+  { "name": "dig", "desc": "DNS 查询工具" },
+  { "name": "nslookup", "desc": "DNS 查询工具" },
+  { "name": "nmap", "desc": "网络扫描工具", "templates": [{ "text": "nmap -p 1-65535 ", "desc": "扫描端口" }] },
+  {
+    "name": "iptables",
+    "desc": "Linux 防火墙",
+    "templates": [
+      { "text": "iptables -L", "desc": "列出规则" },
+      { "text": "iptables -A INPUT -p tcp --dport ", "desc": "添加 INPUT 规则" }
+    ]
+  },
+  {
+    "name": "ufw",
+    "desc": "简易防火墙",
+    "templates": [
+      { "text": "ufw status", "desc": "查看防火墙状态" },
+      { "text": "ufw allow ", "desc": "放行端口或服务" },
+      { "text": "ufw deny ", "desc": "拒绝端口或服务" }
+    ]
+  },
+  {
+    "name": "nginx",
+    "desc": "Nginx Web 服务器",
+    "templates": [
+      { "text": "nginx -t", "desc": "测试配置文件" },
+      { "text": "systemctl reload nginx", "desc": "重载 Nginx" }
+    ]
+  },
+  {
+    "name": "mysql",
+    "desc": "MySQL 客户端",
+    "templates": [
+      { "text": "mysql -u root -p", "desc": "root 登录" },
+      { "text": "mysql -h ", "desc": "连接远程 MySQL" }
+    ]
+  },
+  { "name": "psql", "desc": "PostgreSQL 客户端", "templates": [{ "text": "psql -U ", "desc": "指定用户连接" }] },
+  { "name": "redis-cli", "desc": "Redis 命令行客户端" },
+  { "name": "mongosh", "desc": "MongoDB 命令行客户端" },
+  {
+    "name": "python",
+    "desc": "Python 解释器",
+    "templates": [
+      { "text": "python -m ", "desc": "运行模块" },
+      { "text": "python -c \"\"", "desc": "执行单行代码" }
+    ]
+  },
+  {
+    "name": "python3",
+    "desc": "Python 3 解释器",
+    "templates": [
+      { "text": "python3 -m ", "desc": "运行模块" },
+      { "text": "python3 -c \"\"", "desc": "执行单行代码" }
+    ]
+  },
+  {
+    "name": "pip",
+    "desc": "Python 包管理",
+    "templates": [
+      { "text": "pip install ", "desc": "安装包" },
+      { "text": "pip list", "desc": "列出已安装包" },
+      { "text": "pip freeze", "desc": "导出依赖" }
+    ]
+  },
+  {
+    "name": "pip3",
+    "desc": "Python 3 包管理",
+    "templates": [
+      { "text": "pip3 install ", "desc": "安装包" },
+      { "text": "pip3 list", "desc": "列出已安装包" }
+    ]
+  },
+  {
+    "name": "conda",
+    "desc": "Conda 环境管理",
+    "templates": [
+      { "text": "conda activate ", "desc": "激活环境" },
+      { "text": "conda env list", "desc": "列出环境" },
+      { "text": "conda install ", "desc": "安装包" }
+    ]
+  },
+  { "name": "node", "desc": "Node.js 运行时", "templates": [{ "text": "node ", "desc": "运行 JS 文件" }] },
+  {
+    "name": "npm",
+    "desc": "Node.js 包管理",
+    "templates": [
+      { "text": "npm install", "desc": "安装依赖" },
+      { "text": "npm install ", "desc": "安装指定包" },
+      { "text": "npm run ", "desc": "运行脚本" },
+      { "text": "npm test", "desc": "运行测试" },
+      { "text": "npm run build", "desc": "执行构建脚本" }
+    ]
+  },
+  {
+    "name": "pnpm",
+    "desc": "高效的 Node.js 包管理器",
+    "templates": [
+      { "text": "pnpm install", "desc": "安装依赖" },
+      { "text": "pnpm dev", "desc": "启动开发服务器" },
+      { "text": "pnpm build", "desc": "构建项目" },
+      { "text": "pnpm run ", "desc": "运行脚本" }
+    ]
+  },
+  {
+    "name": "yarn",
+    "desc": "Node.js 包管理",
+    "templates": [
+      { "text": "yarn install", "desc": "安装依赖" },
+      { "text": "yarn dev", "desc": "启动开发服务器" },
+      { "text": "yarn build", "desc": "构建项目" }
+    ]
+  },
+  {
+    "name": "go",
+    "desc": "Go 工具链",
+    "templates": [
+      { "text": "go run ", "desc": "运行 Go 程序" },
+      { "text": "go build", "desc": "构建当前包" },
+      { "text": "go test ./...", "desc": "运行所有测试" },
+      { "text": "go mod tidy", "desc": "整理依赖" },
+      { "text": "go vet ./...", "desc": "静态检查" }
+    ]
+  },
+  {
+    "name": "cargo",
+    "desc": "Rust 构建工具",
+    "templates": [
+      { "text": "cargo build", "desc": "编译项目" },
+      { "text": "cargo run", "desc": "编译并运行" },
+      { "text": "cargo test", "desc": "运行测试" }
+    ]
+  },
+  {
+    "name": "make",
+    "desc": "构建自动化工具",
+    "templates": [
+      { "text": "make", "desc": "执行默认目标" },
+      { "text": "make install", "desc": "安装" },
+      { "text": "make clean", "desc": "清理构建产物" }
+    ]
+  },
+  { "name": "cmake", "desc": "跨平台构建系统", "templates": [{ "text": "cmake . && make", "desc": "生成并构建" }] },
+  {
+    "name": "terraform",
+    "desc": "基础设施即代码工具",
+    "templates": [
+      { "text": "terraform init", "desc": "初始化工作区" },
+      { "text": "terraform plan", "desc": "查看变更计划" },
+      { "text": "terraform apply", "desc": "应用变更" },
+      { "text": "terraform destroy", "desc": "销毁资源" }
+    ]
+  },
+  {
+    "name": "ansible-playbook",
+    "desc": "运行 Ansible Playbook",
+    "templates": [
+      { "text": "ansible-playbook -i ", "desc": "指定 inventory 运行" },
+      { "text": "ansible-playbook --check ", "desc": "空运行检查" }
+    ]
+  },
+  { "name": "vagrant", "desc": "虚拟机管理工具", "templates": [{ "text": "vagrant up", "desc": "启动虚拟机" }, { "text": "vagrant ssh", "desc": "SSH 进入虚拟机" }] },
+  { "name": "helm", "desc": "Kubernetes 包管理", "templates": [{ "text": "helm list", "desc": "列出 Release" }, { "text": "helm install ", "desc": "安装 Chart" }] }
+]

@@ -22,7 +22,10 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { ClipboardGetText, ClipboardSetText } from "@wailsjs/runtime/runtime";
+import { ListHostCommands } from "@wailsjs/go/handler/TerminalHandler";
 import { terminalTheme } from "@/theme";
+import { useCommandCompletion } from "@/hooks/useCommandCompletion";
+import CompletionPopup from "./CompletionPopup";
 
 interface TerminalProps {
   isDark: boolean;
@@ -30,6 +33,7 @@ interface TerminalProps {
   connecting: boolean;
   reconnecting?: boolean;
   reconnectCount?: number;
+  hostID?: string;
   hostName: string;
   hostAddr: string;
   onData: (data: string) => void;
@@ -110,6 +114,7 @@ export default function Terminal({
   connecting,
   reconnecting = false,
   reconnectCount = 0,
+  hostID,
   hostName,
   hostAddr,
   onData,
@@ -135,6 +140,16 @@ export default function Terminal({
     x: number;
     y: number;
   } | null>(null);
+
+  const {
+    completion,
+    handleInputData,
+    handleKeyEvent,
+    onCursorMove,
+    closeCompletion,
+    acceptMatch,
+    loadRemoteCommands,
+  } = useCommandCompletion(xtermRef, onData);
 
   // 用 ref 保存最新回调，避免 effect 只初始化一次导致闭包过期
   const onDataRef = useRef(onData);
@@ -213,8 +228,13 @@ export default function Terminal({
     xtermRef.current = xterm;
     fitRef.current = fit;
 
-    // 键盘输入 → 后端
-    xterm.onData((d) => onDataRef.current(d));
+    // 键盘输入 → 后端（同时给命令补全 hook 一份）
+    xterm.onData((d) => {
+      handleInputData(d);
+      onDataRef.current(d);
+    });
+    // 光标移动时更新补全浮层位置
+    xterm.onCursorMove(onCursorMove);
     // 后端输出 → xterm
     setOutputHandler((data) => xterm.write(data));
 
@@ -235,6 +255,10 @@ export default function Terminal({
 
     // Ctrl+F 打开搜索、Esc 关闭；Ctrl++/-/0 缩放字体；用 attachCustomKeyEventHandler 拦截，避免发给远程 shell。
     xterm.attachCustomKeyEventHandler((e) => {
+      // 命令补全优先消费 Tab / ↑ / ↓ / Enter / Esc
+      if (!handleKeyEvent(e)) {
+        return false;
+      }
       const isModifier = e.ctrlKey || e.metaKey;
       if (isModifier && e.key.toLowerCase() === "f") {
         e.preventDefault();
@@ -311,6 +335,24 @@ export default function Terminal({
       }
     }
   }, [connected]);
+
+  // 连接成功后异步抓取该主机命令列表，用于补全
+  useEffect(() => {
+    if (connected && hostID) {
+      void loadRemoteCommands(hostID, ListHostCommands);
+    }
+  }, [connected, hostID, loadRemoteCommands]);
+
+  // 断开或字体大小变化时关闭补全气泡
+  useEffect(() => {
+    if (!connected) {
+      closeCompletion();
+    }
+  }, [connected, closeCompletion]);
+
+  useEffect(() => {
+    closeCompletion();
+  }, [fontSize, closeCompletion]);
 
   // 断开时（从已连接 → 未连接）在终端末尾写一行提示（非重连场景）
   const prevConnectedRef = useRef(false);
@@ -656,6 +698,18 @@ export default function Terminal({
           borderRadiusLG={token.borderRadiusLG}
           boxShadowSecondary={token.boxShadowSecondary}
           colorText={token.colorText}
+        />
+      )}
+
+      {/* 命令补全气泡 */}
+      {completion.open && completion.position && (
+        <CompletionPopup
+          x={completion.position.x}
+          y={completion.position.y}
+          matches={completion.matches}
+          selectedIndex={completion.selectedIndex}
+          prefix={completion.prefix}
+          onSelect={acceptMatch}
         />
       )}
     </div>

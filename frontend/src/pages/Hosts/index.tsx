@@ -145,6 +145,7 @@ export default function HostsPage(): React.JSX.Element {
         {/* 终端区域：占满整个右侧 */}
         <Terminal
           isDark={isDark}
+          hostID={selectedHost?.id}
           connected={terminal.connected}
           connecting={terminal.connecting}
           reconnecting={terminal.reconnecting}
