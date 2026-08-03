@@ -5,6 +5,7 @@ import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import type { TerminalEntry } from '@/hooks/useTerminal';
+import { terminalTheme } from '@/theme';
 
 interface TerminalProps {
   entries: TerminalEntry[];
@@ -28,20 +29,7 @@ export default function Terminal({ entries, isDark, interactive, hostConnected, 
     initialized.current = true;
 
     const xterm = new XTerm({
-      theme: {
-        background: isDark ? '#1e1e1e' : '#ffffff',
-        foreground: isDark ? '#d4d4d4' : '#333333',
-        cursor: isDark ? '#d4d4d4' : '#333333',
-        selectionBackground: isDark ? '#264f78' : '#add6ff',
-        black: '#000000',
-        red: '#cd3131',
-        green: '#0dbc79',
-        yellow: '#e5e510',
-        blue: '#2472c8',
-        magenta: '#bc3fbc',
-        cyan: '#11a8cd',
-        white: '#e5e5e5',
-      },
+      theme: terminalTheme(isDark),
       fontSize: 13,
       fontFamily: '"Cascadia Code", "Fira Code", "Consolas", "Monaco", monospace',
       cursorBlink: interactive,
@@ -99,20 +87,7 @@ export default function Terminal({ entries, isDark, interactive, hostConnected, 
   useEffect(() => {
     const xterm = xtermRef.current;
     if (!xterm) return;
-    xterm.options.theme = {
-      background: isDark ? '#1e1e1e' : '#ffffff',
-      foreground: isDark ? '#d4d4d4' : '#333333',
-      cursor: isDark ? '#d4d4d4' : '#333333',
-      selectionBackground: isDark ? '#264f78' : '#add6ff',
-      black: '#000000',
-      red: '#cd3131',
-      green: '#0dbc79',
-      yellow: '#e5e510',
-      blue: '#2472c8',
-      magenta: '#bc3fbc',
-      cyan: '#11a8cd',
-      white: '#e5e5e5',
-    };
+    xterm.options.theme = terminalTheme(isDark);
   }, [isDark]);
 
   // 写入输出行
@@ -187,7 +162,7 @@ export default function Terminal({ entries, isDark, interactive, hostConnected, 
         style={{
           flex: 1,
           overflow: 'hidden',
-          backgroundColor: isDark ? '#1e1e1e' : '#ffffff',
+          backgroundColor: terminalTheme(isDark).background,
         }}
       />
     </div>

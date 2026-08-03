@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { message, Modal, Input } from 'antd';
+import { App as AntdApp, Input } from 'antd';
 import type { hoststore } from '@wailsjs/go/models';
 
 type TreeNode = hoststore.TreeNode;
@@ -15,6 +15,7 @@ import Terminal from '@/components/Terminal';
 import AIPanel from '@/components/AIPanel';
 
 export default function HostsPage(): React.JSX.Element {
+  const { message, modal } = AntdApp.useApp();
   const { isDark } = useThemeToggle();
   const { tree, addHost, removeHost, testConnection, createFolder, deleteNode } = useHosts();
   const [selectedHost, setSelectedHost] = useState<TreeNode | null>(null);
@@ -55,7 +56,7 @@ export default function HostsPage(): React.JSX.Element {
 
   const handleAddFolder = useCallback((parentId: string) => {
     let name = '';
-    Modal.confirm({
+    modal.confirm({
       title: '新建目录',
       content: (
         <Input
@@ -70,7 +71,7 @@ export default function HostsPage(): React.JSX.Element {
         }
       },
     });
-  }, [createFolder]);
+  }, [createFolder, modal]);
 
   const handleAddHost = useCallback((parentId: string) => {
     setFormParentId(parentId);
@@ -79,19 +80,19 @@ export default function HostsPage(): React.JSX.Element {
 
   const handleEditHost = useCallback((host: TreeNode) => {
     message.info('编辑功能待实现');
-  }, []);
+  }, [message]);
 
   const handleDelete = useCallback(async (node: TreeNode) => {
-    Modal.confirm({
+    modal.confirm({
       title: `确定删除"${node.name}"？`,
       content: node.nodeType === 'folder' ? '目录内的所有主机将被一并删除。' : '',
       onOk: () => deleteNode(node.id),
     });
-  }, [deleteNode]);
+  }, [deleteNode, modal]);
 
   const handleTest = useCallback(async (host: TreeNode) => {
     message.info('请编辑主机以测试连接（需要密码/密钥）');
-  }, []);
+  }, [message]);
 
   const handleSelect = useCallback((node: TreeNode) => {
     setSelectedHost(node);
@@ -106,7 +107,9 @@ export default function HostsPage(): React.JSX.Element {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '240px 1fr',
+        gridTemplateColumns: '20% 80%',
+        // 行高必须确定，否则子元素 height:100% 解析不到高度，会按内容撑开（终端残留最大化高度）
+        gridTemplateRows: '100%',
         height: '100%',
         gap: 0,
       }}

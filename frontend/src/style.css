@@ -18,5 +18,7 @@ body {
 }
 
 #root {
-  height: 100vh;
+  /* 用百分比高度链而非 100vh：WebView2 中 vh 在窗口缩放时不会更新，会导致布局停留在最大化高度 */
+  height: 100%;
+  overflow: hidden;
 }

@@ -38,6 +38,7 @@ interface ContextMenuProps {
 }
 
 function ContextMenu({ node, x, y, onClose, onAddHost, onAddFolder, onEdit, onDelete, onTest }: ContextMenuProps) {
+  const { token } = theme.useToken();
   const items = node.nodeType === 'folder'
     ? [
         { key: 'add-folder', icon: <PlusOutlined />, label: '新建子目录', onClick: onAddFolder },
@@ -57,9 +58,9 @@ function ContextMenu({ node, x, y, onClose, onAddHost, onAddFolder, onEdit, onDe
         left: x,
         top: y,
         zIndex: 9999,
-        background: '#fff',
-        borderRadius: 6,
-        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        background: token.colorBgElevated,
+        borderRadius: token.borderRadiusLG,
+        boxShadow: token.boxShadowSecondary,
         padding: '4px 0',
         minWidth: 140,
       }}
@@ -72,7 +73,7 @@ function ContextMenu({ node, x, y, onClose, onAddHost, onAddFolder, onEdit, onDe
             padding: '6px 16px',
             cursor: 'pointer',
             fontSize: 13,
-            color: item.danger ? '#ff4d4f' : undefined,
+            color: item.danger ? token.colorError : token.colorText,
           }}
           onClick={item.onClick}
         >

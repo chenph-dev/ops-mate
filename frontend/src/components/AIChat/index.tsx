@@ -229,7 +229,7 @@ export default function AIChat({
                       style={{
                         marginTop: 6,
                         padding: "4px 8px",
-                        background: "rgba(0,0,0,0.15)",
+                        background: token.colorFillTertiary,
                         borderRadius: 4,
                         fontFamily: "monospace",
                         fontSize: 12,

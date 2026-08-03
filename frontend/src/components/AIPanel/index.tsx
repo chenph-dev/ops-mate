@@ -1,5 +1,5 @@
-import { Button, Input, Spin, Tooltip, theme, Divider } from 'antd';
-import { MessageOutlined, CloseOutlined, ExpandOutlined, CompressOutlined, SendOutlined } from '@ant-design/icons';
+import { Button, Input, Spin, Tooltip } from 'antd';
+import { MessageOutlined, CompressOutlined, SendOutlined } from '@ant-design/icons';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import type { convstore } from '@wailsjs/go/models';
 import type { CommandSuggestion } from '@/hooks/useSessions';
@@ -30,7 +30,6 @@ export default function AIPanel({
   onApprove,
   onReject,
 }: AIPanelProps) {
-  const { token } = theme.useToken();
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const msgRef = useRef<HTMLDivElement>(null);
@@ -69,25 +68,26 @@ export default function AIPanel({
           position: 'absolute',
           bottom: 12,
           right: 12,
-          background: token.colorBgElevated,
-          border: `1px solid ${token.colorBorder}`,
+          background: 'var(--antd-color-bg-elevated)',
+          border: '1px solid var(--antd-color-border)',
           borderRadius: 20,
           padding: '8px 14px',
           cursor: 'pointer',
           display: 'flex',
           alignItems: 'center',
           gap: 6,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          boxShadow: 'var(--antd-box-shadow-secondary)',
           zIndex: 100,
           fontSize: 13,
+          color: 'var(--antd-color-text)',
         }}
       >
-        <MessageOutlined style={{ color: token.colorPrimary }} />
+        <MessageOutlined style={{ color: 'var(--antd-color-primary)' }} />
         <span>AI</span>
         {messages.length > 0 && (
           <span
             style={{
-              background: token.colorPrimary,
+              background: 'var(--antd-color-primary)',
               color: '#fff',
               borderRadius: 10,
               padding: '0 6px',
@@ -113,9 +113,9 @@ export default function AIPanel({
         height: 360,
         display: 'flex',
         flexDirection: 'column',
-        background: token.colorBgElevated,
-        borderTop: `1px solid ${token.colorBorder}`,
-        boxShadow: '0 -2px 12px rgba(0,0,0,0.15)',
+        background: 'var(--antd-color-bg-elevated)',
+        borderTop: '1px solid var(--antd-color-border)',
+        boxShadow: 'var(--antd-box-shadow)',
         zIndex: 99,
         borderTopLeftRadius: 8,
         borderTopRightRadius: 8,
@@ -128,16 +128,18 @@ export default function AIPanel({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: `1px solid ${token.colorBorderSecondary}`,
+          borderBottom: '1px solid var(--antd-color-border-secondary)',
           flexShrink: 0,
+          background: 'var(--antd-color-bg-elevated)',
+          color: 'var(--antd-color-text)',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <MessageOutlined style={{ color: token.colorPrimary }} />
+          <MessageOutlined style={{ color: 'var(--antd-color-primary)' }} />
           <span style={{ fontSize: 12, fontWeight: 600 }}>AI 助手</span>
-          <span style={{ fontSize: 11, color: token.colorTextSecondary }}>· {hostName}</span>
+          <span style={{ fontSize: 11, color: 'var(--antd-color-text-secondary)' }}>· {hostName}</span>
           {sessionState && (
-            <span style={{ fontSize: 11, color: token.colorWarning }}>[{sessionState}]</span>
+            <span style={{ fontSize: 11, color: 'var(--antd-color-warning)' }}>[{sessionState}]</span>
           )}
         </div>
         <Tooltip title="收起">
@@ -146,9 +148,9 @@ export default function AIPanel({
       </div>
 
       {/* 消息区 */}
-      <div ref={msgRef} style={{ flex: 1, overflow: 'auto', padding: '8px 12px' }}>
+      <div ref={msgRef} style={{ flex: 1, overflow: 'auto', padding: '8px 12px', background: 'var(--antd-color-bg-elevated)' }}>
         {messages.length === 0 && !pendingCommand ? (
-          <div style={{ color: token.colorTextSecondary, fontSize: 12, padding: 16, textAlign: 'center' }}>
+          <div style={{ color: 'var(--antd-color-text-secondary)', fontSize: 12, padding: 16, textAlign: 'center' }}>
             发送消息开始对话...
           </div>
         ) : (
@@ -169,8 +171,8 @@ export default function AIPanel({
                     borderRadius: 8,
                     fontSize: 12,
                     lineHeight: 1.5,
-                    background: msg.role === 'user' ? token.colorPrimary : token.colorFillSecondary,
-                    color: msg.role === 'user' ? '#fff' : token.colorText,
+                    background: msg.role === 'user' ? 'var(--antd-color-primary)' : 'var(--antd-color-fill-secondary)',
+                    color: msg.role === 'user' ? '#fff' : 'var(--antd-color-text)',
                   }}
                 >
                   <div style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{msg.content}</div>
@@ -179,7 +181,7 @@ export default function AIPanel({
                       style={{
                         marginTop: 4,
                         padding: '3px 6px',
-                        background: 'rgba(0,0,0,0.1)',
+                        background: 'rgba(0,0,0,0.15)',
                         borderRadius: 4,
                         fontFamily: 'monospace',
                         fontSize: 11,
@@ -212,11 +214,12 @@ export default function AIPanel({
       <div
         style={{
           padding: '6px 8px',
-          borderTop: `1px solid ${token.colorBorderSecondary}`,
+          borderTop: '1px solid var(--antd-color-border-secondary)',
           display: 'flex',
           gap: 6,
           alignItems: 'flex-end',
           flexShrink: 0,
+          background: 'var(--antd-color-bg-elevated)',
         }}
       >
         <Input.TextArea

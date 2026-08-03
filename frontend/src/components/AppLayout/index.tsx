@@ -13,12 +13,13 @@ import {
   WindowMinimise,
   WindowToggleMaximise,
   WindowIsMaximised,
+  WindowGetSize,
   Quit,
   EventsOn,
 } from "@wailsjs/runtime/runtime";
 import { routes } from "./menuConfig";
 import logo from "@/assets/images/logo-universal.png";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 const { Header, Sider, Content } = Layout;
 
@@ -28,20 +29,45 @@ export default function AppLayout(): React.JSX.Element {
   const { token } = theme.useToken();
   const [isMaximised, setIsMaximised] = useState(false);
   const { isDark, toggleTheme } = useThemeToggle();
+  // WebView2 中 CSS 单位（vh / 百分比）和 window.innerHeight 在窗口还原时不更新，
+  // 必须通过 Wails 原生 API WindowGetSize 读取真实窗口高度
+  const [winHeight, setWinHeight] = useState(() => window.innerHeight);
+
+  const refreshWindowHeight = useCallback(() => {
+    WindowGetSize().then((size) => setWinHeight(size.h));
+  }, []);
+
+  useEffect(() => {
+    // 浏览器 resize 兜底：window.innerHeight 连续更新，作为 Wails 事件的补充
+    const onResize = () => setWinHeight(window.innerHeight);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   useEffect(() => {
     WindowIsMaximised().then(setIsMaximised);
-    const offMax = EventsOn("wails:window:maximized", () =>
-      setIsMaximised(true),
-    );
-    const offUnmax = EventsOn("wails:window:unmaximized", () =>
-      setIsMaximised(false),
-    );
+    refreshWindowHeight();
+    // 所有窗口尺寸变化统一走 Wails 原生事件，直接读事件载荷里的新尺寸（w/h），
+    // 避免在事件触发瞬间调用 WindowGetSize 拿到旧值
+    const offResize = EventsOn("wails:window:resized", (data) => {
+      const h = (data as { h?: number } | undefined)?.h;
+      if (typeof h === "number") setWinHeight(h);
+      else refreshWindowHeight();
+    });
+    const offMax = EventsOn("wails:window:maximized", () => {
+      setIsMaximised(true);
+      refreshWindowHeight();
+    });
+    const offUnmax = EventsOn("wails:window:unmaximized", () => {
+      setIsMaximised(false);
+      refreshWindowHeight();
+    });
     return () => {
+      offResize();
       offMax();
       offUnmax();
     };
-  }, []);
+  }, [refreshWindowHeight]);
 
   const selectedKey = routes.find((r) =>
     location.pathname.startsWith(r.path),
@@ -53,7 +79,7 @@ export default function AppLayout(): React.JSX.Element {
   };
 
   return (
-    <Layout style={{ height: "100vh" }}>
+    <Layout style={{ height: winHeight, overflow: "hidden" }}>
       {/* 顶部栏 */}
       <Header
         className="titlebar-drag-region"
@@ -101,7 +127,7 @@ export default function AppLayout(): React.JSX.Element {
       </Header>
 
       {/* 下方：左侧菜单条 + 主内容 */}
-      <Layout hasSider>
+      <Layout hasSider style={{ flex: 1, minHeight: 0 }}>
         {/* 左侧图标菜单条 */}
         <Sider width={44} theme={isDark ? "dark" : "light"}>
           <div
@@ -138,7 +164,7 @@ export default function AppLayout(): React.JSX.Element {
         </Sider>
 
         {/* 主内容区 */}
-        <Content style={{ padding: 16, overflow: "auto" }}>
+        <Content style={{ padding: 16, overflow: "auto", minHeight: 0 }}>
           <Outlet />
         </Content>
       </Layout>
