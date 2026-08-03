@@ -1,5 +1,5 @@
-import { Tree, theme } from 'antd';
-import type { DataNode } from 'antd/es/tree';
+import { Tree, theme } from "antd";
+import type { DataNode } from "antd/es/tree";
 import {
   DesktopOutlined,
   FolderOutlined,
@@ -7,9 +7,9 @@ import {
   EditOutlined,
   DeleteOutlined,
   LinkOutlined,
-} from '@ant-design/icons';
-import { useState, useCallback, useMemo } from 'react';
-import type { hoststore } from '@wailsjs/go/models';
+} from "@ant-design/icons";
+import { useState, useCallback, useMemo } from "react";
+import type { hoststore } from "@wailsjs/go/models";
 
 type TreeNode = hoststore.TreeNode;
 
@@ -37,31 +37,74 @@ interface ContextMenuProps {
   onTest: () => void;
 }
 
-function ContextMenu({ node, x, y, onClose, onAddHost, onAddFolder, onEdit, onDelete, onTest }: ContextMenuProps): React.JSX.Element {
+function ContextMenu({
+  node,
+  x,
+  y,
+  onClose,
+  onAddHost,
+  onAddFolder,
+  onEdit,
+  onDelete,
+  onTest,
+}: ContextMenuProps): React.JSX.Element {
   const { token } = theme.useToken();
-  const items = node.nodeType === 'folder'
-    ? [
-        { key: 'add-folder', icon: <PlusOutlined />, label: '新建子目录', onClick: onAddFolder },
-        { key: 'add-host', icon: <PlusOutlined />, label: '新建主机', onClick: onAddHost },
-        { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true, onClick: onDelete },
-      ]
-    : [
-        { key: 'connect', icon: <LinkOutlined />, label: '连接', onClick: onTest },
-        { key: 'edit', icon: <EditOutlined />, label: '编辑', onClick: onEdit },
-        { key: 'delete', icon: <DeleteOutlined />, label: '删除', danger: true, onClick: onDelete },
-      ];
+  const items =
+    node.nodeType === "folder"
+      ? [
+          {
+            key: "add-folder",
+            icon: <PlusOutlined />,
+            label: "新建子目录",
+            onClick: onAddFolder,
+          },
+          {
+            key: "add-host",
+            icon: <PlusOutlined />,
+            label: "新建主机",
+            onClick: onAddHost,
+          },
+          {
+            key: "delete",
+            icon: <DeleteOutlined />,
+            label: "删除",
+            danger: true,
+            onClick: onDelete,
+          },
+        ]
+      : [
+          {
+            key: "connect",
+            icon: <LinkOutlined />,
+            label: "连接",
+            onClick: onTest,
+          },
+          {
+            key: "edit",
+            icon: <EditOutlined />,
+            label: "编辑",
+            onClick: onEdit,
+          },
+          {
+            key: "delete",
+            icon: <DeleteOutlined />,
+            label: "删除",
+            danger: true,
+            onClick: onDelete,
+          },
+        ];
 
   return (
     <div
       style={{
-        position: 'fixed',
+        position: "fixed",
         left: x,
         top: y,
         zIndex: 9999,
         background: token.colorBgElevated,
         borderRadius: token.borderRadiusLG,
         boxShadow: token.boxShadowSecondary,
-        padding: '4px 0',
+        padding: "4px 0",
         minWidth: 140,
       }}
       onClick={onClose}
@@ -70,8 +113,8 @@ function ContextMenu({ node, x, y, onClose, onAddHost, onAddFolder, onEdit, onDe
         <div
           key={item.key}
           style={{
-            padding: '6px 16px',
-            cursor: 'pointer',
+            padding: "6px 16px",
+            cursor: "pointer",
             fontSize: 13,
             color: item.danger ? token.colorError : token.colorText,
           }}
@@ -96,7 +139,11 @@ export default function HostList({
   onTest,
 }: HostListProps): React.JSX.Element {
   const { token } = theme.useToken();
-  const [contextMenu, setContextMenu] = useState<{ node: TreeNode; x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    node: TreeNode;
+    x: number;
+    y: number;
+  } | null>(null);
 
   // 扩展的 DataNode 类型，携带原始数据
   interface TreeNodeData extends DataNode {
@@ -109,60 +156,81 @@ export default function HostList({
       nodes.map((n) => ({
         key: n.id,
         title: n.name,
-        isLeaf: n.nodeType === 'host',
-        icon: n.nodeType === 'folder' ? <FolderOutlined /> : <DesktopOutlined />,
-        children: n.children && n.children.length > 0 ? convert(n.children) : undefined,
+        isLeaf: n.nodeType === "host",
+        icon:
+          n.nodeType === "folder" ? <FolderOutlined /> : <DesktopOutlined />,
+        children:
+          n.children && n.children.length > 0 ? convert(n.children) : undefined,
         data: n,
       }));
     return convert(treeData);
   }, [treeData]);
 
-  const handleRightClick = useCallback(({ event, node }: { event: React.MouseEvent; node: TreeNodeData }) => {
-    event.preventDefault();
-    if (node.data) {
-      setContextMenu({ node: node.data, x: event.clientX, y: event.clientY });
-    }
-  }, []);
+  const handleRightClick = useCallback(
+    ({ event, node }: { event: React.MouseEvent; node: TreeNodeData }) => {
+      event.preventDefault();
+      if (node.data) {
+        setContextMenu({ node: node.data, x: event.clientX, y: event.clientY });
+      }
+    },
+    [],
+  );
 
-  const handleSelect = useCallback((_keys: React.Key[], info: { node: TreeNodeData }) => {
-    if (info.node.data?.nodeType === 'host') {
-      onSelect(info.node.data);
-    }
-  }, [onSelect]);
+  const handleSelect = useCallback(
+    (_keys: React.Key[], info: { node: TreeNodeData }) => {
+      if (info.node.data?.nodeType === "host") {
+        onSelect(info.node.data);
+      }
+    },
+    [onSelect],
+  );
 
-  const handleDoubleClick = useCallback((_event: React.MouseEvent, node: TreeNodeData) => {
-    if (node.data?.nodeType === 'host') {
-      onDoubleClick(node.data);
-    }
-  }, [onDoubleClick]);
+  const handleDoubleClick = useCallback(
+    (_event: React.MouseEvent, node: TreeNodeData) => {
+      if (node.data?.nodeType === "host") {
+        onDoubleClick(node.data);
+      }
+    },
+    [onDoubleClick],
+  );
 
   return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
         borderRight: `1px solid ${token.colorBorderSecondary}`,
       }}
     >
       {/* 标题栏 */}
       <div
         style={{
-          padding: '8px 8px 4px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          padding: "8px 8px 4px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           borderBottom: `1px solid ${token.colorBorderSecondary}`,
         }}
       >
-        <span style={{ fontSize: 12, fontWeight: 600, color: token.colorTextSecondary }}>
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 600,
+            color: token.colorTextSecondary,
+          }}
+        >
           主机
         </span>
-        <div style={{ display: 'flex', gap: 4 }}>
+        <div style={{ display: "flex", gap: 4 }}>
           <span
-            style={{ cursor: 'pointer', fontSize: 14, color: token.colorTextSecondary }}
+            style={{
+              cursor: "pointer",
+              fontSize: 14,
+              color: token.colorTextSecondary,
+            }}
             title="新建目录"
-            onClick={() => onAddFolder('')}
+            onClick={() => onAddFolder("")}
           >
             <PlusOutlined />
           </span>
@@ -170,9 +238,16 @@ export default function HostList({
       </div>
 
       {/* 树形列表 */}
-      <div style={{ flex: 1, overflow: 'auto', padding: '4px 0' }}>
+      <div style={{ flex: 1, overflow: "auto", padding: "4px" }}>
         {treeNodes.length === 0 ? (
-          <div style={{ padding: 16, textAlign: 'center', color: token.colorTextSecondary, fontSize: 12 }}>
+          <div
+            style={{
+              padding: 16,
+              textAlign: "center",
+              color: token.colorTextSecondary,
+              fontSize: 12,
+            }}
+          >
             右键点击此处添加目录或主机
           </div>
         ) : (
@@ -184,7 +259,7 @@ export default function HostList({
             onSelect={handleSelect}
             onDoubleClick={handleDoubleClick}
             onRightClick={handleRightClick}
-            style={{ background: 'transparent' }}
+            style={{ background: "transparent" }}
           />
         )}
       </div>
@@ -196,11 +271,26 @@ export default function HostList({
           x={contextMenu.x}
           y={contextMenu.y}
           onClose={() => setContextMenu(null)}
-          onAddHost={() => { onAddHost(contextMenu.node.id); setContextMenu(null); }}
-          onAddFolder={() => { onAddFolder(contextMenu.node.id); setContextMenu(null); }}
-          onEdit={() => { onEditHost(contextMenu.node); setContextMenu(null); }}
-          onDelete={() => { onDelete(contextMenu.node); setContextMenu(null); }}
-          onTest={() => { onTest(contextMenu.node); setContextMenu(null); }}
+          onAddHost={() => {
+            onAddHost(contextMenu.node.id);
+            setContextMenu(null);
+          }}
+          onAddFolder={() => {
+            onAddFolder(contextMenu.node.id);
+            setContextMenu(null);
+          }}
+          onEdit={() => {
+            onEditHost(contextMenu.node);
+            setContextMenu(null);
+          }}
+          onDelete={() => {
+            onDelete(contextMenu.node);
+            setContextMenu(null);
+          }}
+          onTest={() => {
+            onTest(contextMenu.node);
+            setContextMenu(null);
+          }}
         />
       )}
     </div>

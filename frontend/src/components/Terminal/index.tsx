@@ -1,4 +1,4 @@
-import { Button, Tooltip, theme, Spin, Input, type InputRef } from 'antd';
+import { Button, Tooltip, theme, Spin, Input, type InputRef } from "antd";
 import {
   ClearOutlined,
   CopyOutlined,
@@ -9,16 +9,20 @@ import {
   CloseOutlined,
   ZoomInOutlined,
   ZoomOutOutlined,
-} from '@ant-design/icons';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Terminal as XTerm } from '@xterm/xterm';
-import { FitAddon } from '@xterm/addon-fit';
-import { SearchAddon } from '@xterm/addon-search';
-import { WebLinksAddon } from '@xterm/addon-web-links';
-import { WebglAddon } from '@xterm/addon-webgl';
-import '@xterm/xterm/css/xterm.css';
-import { ClipboardGetText, ClipboardSetText } from '@wailsjs/runtime/runtime';
-import { terminalTheme } from '@/theme';
+} from "@ant-design/icons";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Terminal as XTerm } from "@xterm/xterm";
+import { CanvasAddon } from "@xterm/addon-canvas";
+import { FitAddon } from "@xterm/addon-fit";
+import { LigaturesAddon } from "@xterm/addon-ligatures";
+import { SearchAddon } from "@xterm/addon-search";
+import { SerializeAddon } from "@xterm/addon-serialize";
+import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { WebLinksAddon } from "@xterm/addon-web-links";
+import { WebglAddon } from "@xterm/addon-webgl";
+import "@xterm/xterm/css/xterm.css";
+import { ClipboardGetText, ClipboardSetText } from "@wailsjs/runtime/runtime";
+import { terminalTheme } from "@/theme";
 
 interface TerminalProps {
   isDark: boolean;
@@ -70,14 +74,14 @@ function TerminalContextMenu({
   return (
     <div
       style={{
-        position: 'fixed',
+        position: "fixed",
         left: x,
         top: y,
         zIndex: 9999,
         background: colorBgElevated,
         borderRadius: borderRadiusLG,
         boxShadow: boxShadowSecondary,
-        padding: '4px 0',
+        padding: "4px 0",
         minWidth: 140,
       }}
       onClick={onClose}
@@ -86,8 +90,8 @@ function TerminalContextMenu({
         <div
           key={item.key}
           style={{
-            padding: '6px 16px',
-            cursor: 'pointer',
+            padding: "6px 16px",
+            cursor: "pointer",
             fontSize: 13,
             color: colorText,
           }}
@@ -118,12 +122,19 @@ export default function Terminal({
   const xtermRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
+  const canvasRef = useRef<CanvasAddon | null>(null);
+  const ligaturesRef = useRef<LigaturesAddon | null>(null);
+  const serializeRef = useRef<SerializeAddon | null>(null);
+  const unicodeRef = useRef<Unicode11Addon | null>(null);
   const searchInputRef = useRef<InputRef>(null);
   const [dims, setDims] = useState({ cols: 80, rows: 24 });
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchText, setSearchText] = useState('');
+  const [searchText, setSearchText] = useState("");
   const [fontSize, setFontSize] = useState(DEFAULT_FONT_SIZE);
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+  } | null>(null);
 
   // 用 ref 保存最新回调，避免 effect 只初始化一次导致闭包过期
   const onDataRef = useRef(onData);
@@ -151,7 +162,8 @@ export default function Terminal({
     const xterm = new XTerm({
       theme: terminalTheme(isDark),
       fontSize,
-      fontFamily: '"Cascadia Code", "Fira Code", "Consolas", "Monaco", monospace',
+      fontFamily:
+        '"Cascadia Code", "Fira Code", "Consolas", "Monaco", monospace',
       cursorBlink: true,
       scrollback: 10000,
       convertEol: true,
@@ -161,15 +173,41 @@ export default function Terminal({
     xterm.loadAddon(fit);
     // 可点击链接（URL/文件路径）
     xterm.loadAddon(new WebLinksAddon());
-    // WebGL 加速渲染（失败则回退到默认 canvas 渲染器）
+    // Unicode 11 支持（更完整的 emoji/生僻字）
+    try {
+      const unicode = new Unicode11Addon();
+      xterm.loadAddon(unicode);
+      unicodeRef.current = unicode;
+    } catch {
+      // 忽略：部分环境或字体不支持
+    }
+    // 字体连字（Fira Code / Cascadia Code 支持）
+    try {
+      const ligatures = new LigaturesAddon();
+      xterm.loadAddon(ligatures);
+      ligaturesRef.current = ligatures;
+    } catch {
+      // 忽略：字体或环境不支持
+    }
+    // WebGL 加速渲染（失败则回退到 Canvas 渲染器）
     try {
       xterm.loadAddon(new WebglAddon());
     } catch {
-      // 忽略：部分环境不支持 WebGL
+      try {
+        const canvas = new CanvasAddon();
+        xterm.loadAddon(canvas);
+        canvasRef.current = canvas;
+      } catch {
+        // 再失败则使用默认 DOM 渲染器
+      }
     }
     const search = new SearchAddon();
     xterm.loadAddon(search);
     searchRef.current = search;
+    // 序列化（导出终端内容）
+    const serialize = new SerializeAddon();
+    xterm.loadAddon(serialize);
+    serializeRef.current = serialize;
     xterm.open(containerRef.current);
     fit.fit();
     xtermRef.current = xterm;
@@ -198,28 +236,28 @@ export default function Terminal({
     // Ctrl+F 打开搜索、Esc 关闭；Ctrl++/-/0 缩放字体；用 attachCustomKeyEventHandler 拦截，避免发给远程 shell。
     xterm.attachCustomKeyEventHandler((e) => {
       const isModifier = e.ctrlKey || e.metaKey;
-      if (isModifier && e.key.toLowerCase() === 'f') {
+      if (isModifier && e.key.toLowerCase() === "f") {
         e.preventDefault();
         setSearchOpen(true);
         setTimeout(() => searchInputRef.current?.focus(), 0);
         return false; // 阻止 xterm 处理
       }
-      if (isModifier && (e.key === '+' || e.key === '=')) {
+      if (isModifier && (e.key === "+" || e.key === "=")) {
         e.preventDefault();
         handleZoomIn();
         return false;
       }
-      if (isModifier && e.key === '-') {
+      if (isModifier && e.key === "-") {
         e.preventDefault();
         handleZoomOut();
         return false;
       }
-      if (isModifier && e.key === '0') {
+      if (isModifier && e.key === "0") {
         e.preventDefault();
         handleZoomReset();
         return false;
       }
-      if (e.key === 'Escape') {
+      if (e.key === "Escape") {
         setSearchOpen(false);
         setContextMenu(null);
         return false;
@@ -234,6 +272,10 @@ export default function Terminal({
       xtermRef.current = null;
       fitRef.current = null;
       searchRef.current = null;
+      canvasRef.current = null;
+      ligaturesRef.current = null;
+      serializeRef.current = null;
+      unicodeRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -274,7 +316,9 @@ export default function Terminal({
   const prevConnectedRef = useRef(false);
   useEffect(() => {
     if (prevConnectedRef.current && !connected && !reconnecting) {
-      xtermRef.current?.write('\x1b[90m\r\n[会话已断开] 双击主机重新连接\x1b[0m\r\n');
+      xtermRef.current?.write(
+        "\x1b[90m\r\n[会话已断开] 双击主机重新连接\x1b[0m\r\n",
+      );
     }
     prevConnectedRef.current = connected;
   }, [connected, reconnecting]);
@@ -287,9 +331,9 @@ export default function Terminal({
       e.preventDefault();
       setContextMenu({ x: e.clientX, y: e.clientY });
     };
-    container.addEventListener('contextmenu', handleContextMenu);
+    container.addEventListener("contextmenu", handleContextMenu);
     return () => {
-      container.removeEventListener('contextmenu', handleContextMenu);
+      container.removeEventListener("contextmenu", handleContextMenu);
     };
   }, []);
 
@@ -306,9 +350,9 @@ export default function Terminal({
         handleZoomOut();
       }
     };
-    container.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener("wheel", handleWheel, { passive: false });
     return () => {
-      container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener("wheel", handleWheel);
     };
   }, [handleZoomIn, handleZoomOut]);
 
@@ -341,63 +385,72 @@ export default function Terminal({
 
   const handleSearchClose = useCallback((): void => {
     setSearchOpen(false);
-    setSearchText('');
+    setSearchText("");
     searchRef.current?.clearDecorations();
   }, []);
 
   const contextMenuItems: ContextMenuItem[] = [
-    { key: 'copy', label: '复制', onClick: handleCopy },
-    { key: 'paste', label: '粘贴', onClick: handlePaste },
-    { key: 'select-all', label: '全选', onClick: handleSelectAll },
-    { key: 'clear', label: '清空', onClick: handleClear },
+    { key: "copy", label: "复制", onClick: handleCopy },
+    { key: "paste", label: "粘贴", onClick: handlePaste },
+    { key: "select-all", label: "全选", onClick: handleSelectAll },
+    { key: "clear", label: "清空", onClick: handleClear },
   ];
 
-  const statusDot = connecting ? '⏳' : connected ? '🟢' : '⚪';
+  const statusDot = connecting ? "⏳" : connected ? "🟢" : "⚪";
   const statusText = connecting
-    ? '连接中'
+    ? "连接中"
     : reconnecting
       ? `重连中 (${reconnectCount}/${MAX_RECONNECT_RETRIES})`
       : connected
-        ? '已连接'
-        : '未连接';
+        ? "已连接"
+        : "未连接";
 
   return (
     <div
       style={{
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        position: 'relative',
+        display: "flex",
+        flexDirection: "column",
+        height: "100%",
+        position: "relative",
         borderRadius: 8,
         border: `1px solid ${token.colorBorderSecondary}`,
-        overflow: 'hidden',
+        overflow: "hidden",
         background: terminalTheme(isDark).background,
+        marginLeft: 5,
       }}
     >
       {/* 标题栏 */}
       <div
         style={{
-          padding: '4px 10px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          padding: "4px 10px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
           borderBottom: `1px solid ${token.colorBorderSecondary}`,
           flexShrink: 0,
           background: token.colorBgElevated,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
-          <span style={{ fontSize: 11, color: token.colorTextSecondary, whiteSpace: 'nowrap' }}>
+        <div
+          style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}
+        >
+          <span
+            style={{
+              fontSize: 11,
+              color: token.colorTextSecondary,
+              whiteSpace: "nowrap",
+            }}
+          >
             终端
           </span>
-          <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
-            {hostName || '未选择主机'}
+          <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
+            {hostName || "未选择主机"}
           </span>
           <span
             style={{
               fontSize: 11,
               color: connected ? token.colorSuccess : token.colorTextSecondary,
-              whiteSpace: 'nowrap',
+              whiteSpace: "nowrap",
             }}
           >
             {statusDot} {statusText}
@@ -408,9 +461,9 @@ export default function Terminal({
                 style={{
                   fontSize: 11,
                   color: token.colorTextTertiary,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
                 }}
               >
                 {hostAddr}
@@ -419,7 +472,7 @@ export default function Terminal({
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
           <Tooltip title="放大 (Ctrl++)">
             <Button
               type="text"
@@ -450,10 +503,20 @@ export default function Terminal({
             />
           </Tooltip>
           <Tooltip title="清空">
-            <Button type="text" size="small" icon={<ClearOutlined />} onClick={handleClear} />
+            <Button
+              type="text"
+              size="small"
+              icon={<ClearOutlined />}
+              onClick={handleClear}
+            />
           </Tooltip>
           <Tooltip title="复制选中内容">
-            <Button type="text" size="small" icon={<CopyOutlined />} onClick={handleCopy} />
+            <Button
+              type="text"
+              size="small"
+              icon={<CopyOutlined />}
+              onClick={handleCopy}
+            />
           </Tooltip>
           {connected && (
             <Tooltip title="断开连接">
@@ -473,10 +536,10 @@ export default function Terminal({
       {searchOpen && (
         <div
           style={{
-            display: 'flex',
-            alignItems: 'center',
+            display: "flex",
+            alignItems: "center",
             gap: 6,
-            padding: '4px 10px',
+            padding: "4px 10px",
             borderBottom: `1px solid ${token.colorBorderSecondary}`,
             background: token.colorBgElevated,
             flexShrink: 0,
@@ -497,7 +560,7 @@ export default function Terminal({
               }
             }}
             onKeyDown={(e): void => {
-              if (e.key === 'Enter') {
+              if (e.key === "Enter") {
                 e.preventDefault();
                 searchRef.current?.findNext(searchText);
               }
@@ -531,24 +594,31 @@ export default function Terminal({
       )}
 
       {/* xterm 容器 + 连接遮罩 */}
-      <div style={{ flex: 1, position: 'relative', minHeight: 0, overflow: 'hidden' }}>
+      <div
+        style={{
+          flex: 1,
+          position: "relative",
+          minHeight: 0,
+          overflow: "hidden",
+        }}
+      >
         <div
           ref={containerRef}
-          style={{ width: '100%', height: '100%', padding: '4px 0' }}
+          style={{ width: "100%", height: "100%", padding: "4px" }}
         />
         {(connecting || reconnecting) && (
           <div
             style={{
-              position: 'absolute',
+              position: "absolute",
               inset: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              background: 'var(--antd-color-bg-elevated)',
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "var(--antd-color-bg-elevated)",
               zIndex: 10,
             }}
           >
-            <Spin tip={reconnecting ? '连接断开，正在重连...' : '连接中...'} />
+            <Spin tip={reconnecting ? "连接断开，正在重连..." : "连接中..."} />
           </div>
         )}
       </div>
@@ -556,9 +626,9 @@ export default function Terminal({
       {/* 底部状态栏 */}
       <div
         style={{
-          padding: '4px 10px',
-          display: 'flex',
-          alignItems: 'center',
+          padding: "4px 10px",
+          display: "flex",
+          alignItems: "center",
           gap: 16,
           borderTop: `1px solid ${token.colorBorderSecondary}`,
           flexShrink: 0,
@@ -568,9 +638,11 @@ export default function Terminal({
         }}
       >
         <span>{statusText}</span>
-        <span>{dims.cols}×{dims.rows}</span>
+        <span>
+          {dims.cols}×{dims.rows}
+        </span>
         <span>字号 {fontSize}</span>
-        <span style={{ marginLeft: 'auto' }}>{hostAddr || '未连接'}</span>
+        <span style={{ marginLeft: "auto" }}>{hostAddr || "未连接"}</span>
       </div>
 
       {/* 右键上下文菜单 */}

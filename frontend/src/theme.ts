@@ -60,5 +60,13 @@ export function terminalTheme(isDark: boolean): ITheme {
     magenta: '#bc3fbc',
     cyan: '#11a8cd',
     white: '#e5e5e5',
+    brightBlack: '#666666',
+    brightRed: '#f14c4c',
+    brightGreen: '#23d18b',
+    brightYellow: '#f5f543',
+    brightBlue: '#3b8eea',
+    brightMagenta: '#d670d6',
+    brightCyan: '#29b8db',
+    brightWhite: '#ffffff',
   };
 }
