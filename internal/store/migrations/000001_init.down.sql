@@ -1,0 +1,8 @@
+DROP TRIGGER IF EXISTS commands_ad;
+DROP TRIGGER IF EXISTS commands_ai;
+DROP TABLE IF EXISTS commands_fts;
+DROP TABLE IF EXISTS commands;
+DROP TABLE IF EXISTS messages;
+DROP TABLE IF EXISTS conversations;
+DROP TABLE IF EXISTS ai_config;
+DROP TABLE IF EXISTS hosts;

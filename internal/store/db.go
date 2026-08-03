@@ -1,9 +1,14 @@
 package store
 
 import (
+	"embed"
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/golang-migrate/migrate/v4"
+	migratesqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -13,6 +18,9 @@ import (
 
 	"ops-mate/internal/store/crypto"
 )
+
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
 // DB 持有 GORM 实例与主密钥，供各子包 store 共享。
 type DB struct {
@@ -40,14 +48,39 @@ func Open() (*DB, error) {
 	if err := gormDB.Exec(`PRAGMA foreign_keys = ON;`).Error; err != nil {
 		return nil, err
 	}
-	if err := gormDB.Exec(schemaSQL).Error; err != nil {
-		return nil, fmt.Errorf("apply schema: %w", err)
+	if err := runMigrations(gormDB); err != nil {
+		return nil, fmt.Errorf("run migrations: %w", err)
 	}
 	key, err := crypto.MasterKey(dir)
 	if err != nil {
 		return nil, fmt.Errorf("master key: %w", err)
 	}
 	return &DB{gorm: gormDB, key: key}, nil
+}
+
+// runMigrations 用 golang-migrate 执行版本化迁移（embedded SQL）。
+// 迁移文件在 internal/store/migrations/，按 000001_init.up.sql 等版本号顺序执行。
+func runMigrations(gormDB *gorm.DB) error {
+	raw, err := gormDB.DB()
+	if err != nil {
+		return err
+	}
+	source, err := iofs.New(migrationsFS, "migrations")
+	if err != nil {
+		return fmt.Errorf("migration source: %w", err)
+	}
+	driver, err := migratesqlite.WithInstance(raw, &migratesqlite.Config{})
+	if err != nil {
+		return fmt.Errorf("migration driver: %w", err)
+	}
+	m, err := migrate.NewWithInstance("iofs", source, "sqlite", driver)
+	if err != nil {
+		return fmt.Errorf("migrate init: %w", err)
+	}
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return err
+	}
+	return nil
 }
 
 func dataDir() (string, error) {

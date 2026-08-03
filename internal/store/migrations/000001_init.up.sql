@@ -1,17 +1,17 @@
-package store
+-- 初始 schema：主机/目录树、AI 配置、会话、消息、命令 + FTS 全文检索。
+-- 全部使用 IF NOT EXISTS，保证对已有库幂等（旧库通过手动迁移已补齐 node_type/parent_id）。
 
-const schemaSQL = `
 CREATE TABLE IF NOT EXISTS hosts (
-    id            TEXT PRIMARY KEY,
-    name          TEXT NOT NULL,
-    node_type     TEXT NOT NULL DEFAULT 'host',  -- 'folder' | 'host'
-    parent_id     TEXT,                           -- NULL = 根级
-    addr          TEXT,
-    port          INTEGER,
-    user          TEXT,
-    auth_encrypted BLOB,
-    auth_type     TEXT,
-    created_at    INTEGER NOT NULL
+    id             TEXT PRIMARY KEY,
+    name           TEXT NOT NULL,
+    node_type      TEXT NOT NULL DEFAULT 'host',  -- 'folder' | 'host'
+    parent_id      TEXT,                          -- NULL = 根级
+    addr           TEXT,
+    port           INTEGER,
+    user           TEXT,
+    auth_encrypted  BLOB,
+    auth_type      TEXT,
+    created_at     INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS ai_config (
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS commands (
     id         TEXT PRIMARY KEY,
     session_id TEXT NOT NULL,
     command    TEXT NOT NULL,
-    exit_code   INTEGER,
+    exit_code  INTEGER,
     output     TEXT,
     ts         INTEGER NOT NULL,
     FOREIGN KEY (session_id) REFERENCES conversations(id) ON DELETE CASCADE
@@ -62,4 +62,3 @@ END;
 CREATE TRIGGER IF NOT EXISTS commands_ad AFTER DELETE ON commands BEGIN
     DELETE FROM commands_fts WHERE rowid = old.rowid;
 END;
-`
