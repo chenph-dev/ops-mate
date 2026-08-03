@@ -11,7 +11,8 @@ import {
 import { useThemeToggle } from "@/context/ThemeContext";
 import {
   WindowMinimise,
-  WindowToggleMaximise,
+  WindowMaximise,
+  WindowUnmaximise,
   WindowIsMaximised,
   WindowGetSize,
   Quit,
@@ -74,8 +75,15 @@ export default function AppLayout(): React.JSX.Element {
   )?.path;
 
   const handleToggleMaximize = () => {
-    WindowToggleMaximise();
-    WindowIsMaximised().then(setIsMaximised);
+    // 基于当前状态乐观更新，不用立即查询（toggle 异步，查询会拿到旧值）
+    // 事件 wails:window:maximized/unmaximized 作为外部触发的补充
+    if (isMaximised) {
+      WindowUnmaximise();
+      setIsMaximised(false);
+    } else {
+      WindowMaximise();
+      setIsMaximised(true);
+    }
   };
 
   return (
