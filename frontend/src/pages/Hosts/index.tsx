@@ -23,7 +23,7 @@ export default function HostsPage(): React.JSX.Element {
   const [aiCollapsed, setAiCollapsed] = useState(true);
 
   const sessions = useSessions(selectedHost?.id ?? null);
-  const terminal = useTerminal();
+  const terminal = useTerminal(selectedHost?.id ?? null);
 
   // 页面卸载时关闭终端会话（terminal.close 是稳定引用，仅卸载时执行一次）
   useEffect(() => {
@@ -147,6 +147,8 @@ export default function HostsPage(): React.JSX.Element {
           isDark={isDark}
           connected={terminal.connected}
           connecting={terminal.connecting}
+          reconnecting={terminal.reconnecting}
+          reconnectCount={terminal.reconnectCount}
           hostName={selectedHost?.name ?? ''}
           hostAddr={
             selectedHost

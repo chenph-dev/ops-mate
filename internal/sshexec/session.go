@@ -12,6 +12,12 @@ import (
 // keepaliveInterval 心跳间隔：周期性向远端发送 keepalive 请求，检测静默断连。
 const keepaliveInterval = 30 * time.Second
 
+// keepaliveTimeout 单次 keepalive 探测超时。
+const keepaliveTimeout = 5 * time.Second
+
+// keepaliveMaxFailures 允许连续失败次数，超过后关闭会话。
+const keepaliveMaxFailures = 3
+
 // Session 一个持久化的交互式 SSH 会话（PTY + shell），用于真实终端。
 // 区别于 Executor（单命令、按行输出），Session 支持双向原始字节流。
 type Session struct {
@@ -75,10 +81,11 @@ func OpenSession(ctx context.Context, host Host, cols, rows int) (*Session, erro
 }
 
 // keepalive 周期性发送 SSH keepalive 请求，检测连接是否仍存活。
-// 连接失效（网络中断/服务端超时）时关闭会话，触发输出流结束 → terminal:closed 事件。
+// 连续失败 keepaliveMaxFailures 次后才关闭会话，避免单次网络抖动导致断开。
 func (s *Session) keepalive() {
 	ticker := time.NewTicker(keepaliveInterval)
 	defer ticker.Stop()
+	failures := 0
 	for range ticker.C {
 		s.mu.Lock()
 		closed := s.closed
@@ -86,8 +93,25 @@ func (s *Session) keepalive() {
 		if closed {
 			return
 		}
-		// 发送 keepalive 全局请求；连接失效时返回错误。
-		if _, _, err := s.client.SendRequest("keepalive@openssh.com", true, nil); err != nil {
+
+		ok := make(chan bool, 1)
+		go func() {
+			_, _, err := s.client.SendRequest("keepalive@openssh.com", true, nil)
+			ok <- err == nil
+		}()
+
+		select {
+		case success := <-ok:
+			if success {
+				failures = 0
+			} else {
+				failures++
+			}
+		case <-time.After(keepaliveTimeout):
+			failures++
+		}
+
+		if failures >= keepaliveMaxFailures {
 			s.Close()
 			return
 		}
