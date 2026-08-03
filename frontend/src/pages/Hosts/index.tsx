@@ -3,7 +3,6 @@ import { App as AntdApp, Input } from 'antd';
 import type { hoststore } from '@wailsjs/go/models';
 
 type TreeNode = hoststore.TreeNode;
-type HostInput = hoststore.HostInput;
 import { useHosts } from '@/hooks/useHosts';
 import { useSessions } from '@/hooks/useSessions';
 import { useWailsEvents } from '@/hooks/useWailsEvents';
@@ -17,7 +16,7 @@ import AIPanel from '@/components/AIPanel';
 export default function HostsPage(): React.JSX.Element {
   const { message, modal } = AntdApp.useApp();
   const { isDark } = useThemeToggle();
-  const { tree, addHost, removeHost, testConnection, createFolder, deleteNode } = useHosts();
+  const { tree, addHost, testConnection, createFolder, deleteNode } = useHosts();
   const [selectedHost, setSelectedHost] = useState<TreeNode | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formParentId, setFormParentId] = useState('');
@@ -31,6 +30,7 @@ export default function HostsPage(): React.JSX.Element {
     return () => {
       terminal.close();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [terminal.close]);
 
   // Wails 事件处理
@@ -55,7 +55,7 @@ export default function HostsPage(): React.JSX.Element {
     [sessions],
   );
 
-  const onState = useCallback((event: { data: unknown }) => {
+  const onState = useCallback(() => {
     // 状态变化可通过 terminal hook 处理
   }, []);
 
@@ -85,7 +85,8 @@ export default function HostsPage(): React.JSX.Element {
     setFormOpen(true);
   }, []);
 
-  const handleEditHost = useCallback((host: TreeNode) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleEditHost = useCallback((_host: TreeNode) => {
     message.info('编辑功能待实现');
   }, [message]);
 
@@ -97,7 +98,8 @@ export default function HostsPage(): React.JSX.Element {
     });
   }, [deleteNode, modal]);
 
-  const handleTest = useCallback(async (host: TreeNode) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleTest = useCallback(async (_host: TreeNode) => {
     message.info('请编辑主机以测试连接（需要密码/密钥）');
   }, [message]);
 

@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ListHosts,
   SaveHost,
-  DeleteHost,
   TestConnection,
   CreateFolder,
   ListTree,
@@ -11,11 +9,20 @@ import {
 } from '@wailsjs/go/handler/HostsHandler';
 import type { hoststore } from '@wailsjs/go/models';
 
-type HostMeta = hoststore.HostMeta;
 type HostInput = hoststore.HostInput;
 type TreeNode = hoststore.TreeNode;
 
-export function useHosts() {
+export function useHosts(): {
+  tree: TreeNode[];
+  loading: boolean;
+  refresh: () => Promise<void>;
+  addHost: (input: HostInput) => Promise<string | void>;
+  removeHost: (id: string) => Promise<void>;
+  testConnection: (input: HostInput) => Promise<boolean>;
+  createFolder: (name: string, parentId: string) => Promise<string | void>;
+  moveNode: (nodeId: string, newParentId: string) => Promise<void>;
+  deleteNode: (nodeId: string) => Promise<void>;
+} {
   const [tree, setTree] = useState<TreeNode[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -29,9 +36,20 @@ export function useHosts() {
     }
   }, []);
 
+  // 初始加载：在 effect 中直接请求数据，不触发 loading 状态，避免同步 setState 导致级联渲染
   useEffect(() => {
-    refresh();
-  }, [refresh]);
+    let cancelled = false;
+    const load = async (): Promise<void> => {
+      const treeData = await ListTree();
+      if (!cancelled) {
+        setTree(treeData);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const addHost = useCallback(async (input: HostInput) => {
     const id = await SaveHost(input);

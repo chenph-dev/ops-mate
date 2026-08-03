@@ -3,7 +3,6 @@ import type { ItemType, MenuItemType } from 'antd/es/menu/interface';
 import {
   DesktopOutlined,
   CloudServerOutlined,
-  SettingOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
 
@@ -16,7 +15,7 @@ export interface RouteItem {
   hideInMenu?: boolean;
 }
 
-const lazyPage = (loader: () => Promise<{ default: ComponentType }>) =>
+const lazyPage = (loader: () => Promise<{ default: ComponentType }>): ComponentType =>
   lazy(loader);
 
 export const routes: RouteItem[] = [

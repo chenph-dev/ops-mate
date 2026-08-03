@@ -1,6 +1,6 @@
 import { Button, Input, Spin, Tooltip } from 'antd';
 import { MessageOutlined, CompressOutlined, SendOutlined } from '@ant-design/icons';
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { convstore } from '@wailsjs/go/models';
 import type { CommandSuggestion } from '@/hooks/useSessions';
 import CommandCard from '@/components/AIChat/CommandCard';
@@ -29,7 +29,7 @@ export default function AIPanel({
   onSendMessage,
   onApprove,
   onReject,
-}: AIPanelProps) {
+}: AIPanelProps): React.JSX.Element {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const msgRef = useRef<HTMLDivElement>(null);
@@ -40,7 +40,7 @@ export default function AIPanel({
     }
   }, [messages, pendingCommand]);
 
-  const handleSend = async () => {
+  const handleSend = async (): Promise<void> => {
     const text = input.trim();
     if (!text || sending) return;
     setInput('');
@@ -52,7 +52,7 @@ export default function AIPanel({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();

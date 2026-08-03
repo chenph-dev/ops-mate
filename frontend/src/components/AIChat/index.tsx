@@ -1,4 +1,4 @@
-import { Button, Input, Spin, Tooltip, Dropdown, theme } from "antd";
+import { Button, Input, Spin, Tooltip, theme } from "antd";
 import { PlusOutlined, DeleteOutlined, SendOutlined } from "@ant-design/icons";
 import { useEffect, useRef, useState } from "react";
 import type { convstore } from "@wailsjs/go/models";
@@ -48,7 +48,7 @@ export default function AIChat({
     }
   }, [messages, pendingCommand]);
 
-  const handleSend = async () => {
+  const handleSend = async (): Promise<void> => {
     const text = input.trim();
     if (!text || sending) return;
     setInput("");
@@ -60,7 +60,7 @@ export default function AIChat({
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent): void => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSend();

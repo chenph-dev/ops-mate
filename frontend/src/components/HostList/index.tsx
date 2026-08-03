@@ -1,15 +1,14 @@
-import { Tree, Dropdown, Modal, Input, message, theme } from 'antd';
-import type { DataNode, EventDataNode } from 'antd/es/tree';
+import { Tree, theme } from 'antd';
+import type { DataNode } from 'antd/es/tree';
 import {
   DesktopOutlined,
   FolderOutlined,
-  FolderOpenOutlined,
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   LinkOutlined,
 } from '@ant-design/icons';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import type { hoststore } from '@wailsjs/go/models';
 
 type TreeNode = hoststore.TreeNode;
@@ -38,7 +37,7 @@ interface ContextMenuProps {
   onTest: () => void;
 }
 
-function ContextMenu({ node, x, y, onClose, onAddHost, onAddFolder, onEdit, onDelete, onTest }: ContextMenuProps) {
+function ContextMenu({ node, x, y, onClose, onAddHost, onAddFolder, onEdit, onDelete, onTest }: ContextMenuProps): React.JSX.Element {
   const { token } = theme.useToken();
   const items = node.nodeType === 'folder'
     ? [
@@ -95,7 +94,7 @@ export default function HostList({
   onEditHost,
   onDelete,
   onTest,
-}: HostListProps) {
+}: HostListProps): React.JSX.Element {
   const { token } = theme.useToken();
   const [contextMenu, setContextMenu] = useState<{ node: TreeNode; x: number; y: number } | null>(null);
 
@@ -105,18 +104,18 @@ export default function HostList({
   }
 
   // 转换为 antd Tree 的 DataNode 格式
-  const toDataNode = useCallback((nodes: TreeNode[]): TreeNodeData[] => {
-    return nodes.map((n) => ({
-      key: n.id,
-      title: n.name,
-      isLeaf: n.nodeType === 'host',
-      icon: n.nodeType === 'folder' ? <FolderOutlined /> : <DesktopOutlined />,
-      children: n.children && n.children.length > 0 ? toDataNode(n.children) : undefined,
-      data: n,
-    }));
-  }, []);
-
-  const treeNodes = toDataNode(treeData);
+  const treeNodes = useMemo<TreeNodeData[]>(() => {
+    const convert = (nodes: TreeNode[]): TreeNodeData[] =>
+      nodes.map((n) => ({
+        key: n.id,
+        title: n.name,
+        isLeaf: n.nodeType === 'host',
+        icon: n.nodeType === 'folder' ? <FolderOutlined /> : <DesktopOutlined />,
+        children: n.children && n.children.length > 0 ? convert(n.children) : undefined,
+        data: n,
+      }));
+    return convert(treeData);
+  }, [treeData]);
 
   const handleRightClick = useCallback(({ event, node }: { event: React.MouseEvent; node: TreeNodeData }) => {
     event.preventDefault();

@@ -3,7 +3,7 @@ import { GithubOutlined } from '@ant-design/icons';
 
 const { Title, Paragraph, Text, Link } = Typography;
 
-export default function About() {
+export default function About(): React.JSX.Element {
   return (
     <div style={{ maxWidth: 560, margin: '0 auto' }}>
       <Title level={4}>关于 ops-mate</Title>

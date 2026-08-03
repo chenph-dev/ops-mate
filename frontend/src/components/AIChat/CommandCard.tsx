@@ -8,7 +8,7 @@ interface CommandCardProps {
   onReject: () => void;
 }
 
-export default function CommandCard({ command, onApprove, onReject }: CommandCardProps) {
+export default function CommandCard({ command, onApprove, onReject }: CommandCardProps): React.JSX.Element {
   const { token } = theme.useToken();
   const isHighRisk = command.assessedRisk === 'high' || command.risk === 'high';
 

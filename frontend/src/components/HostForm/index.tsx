@@ -33,7 +33,7 @@ export default function HostForm({
   const [submitting, setSubmitting] = useState(false);
   const [testing, setTesting] = useState(false);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (): Promise<void> => {
     const values = await form.validateFields();
     setSubmitting(true);
     try {
@@ -47,7 +47,7 @@ export default function HostForm({
     }
   };
 
-  const handleTest = async () => {
+  const handleTest = async (): Promise<void> => {
     const values = await form.validateFields();
     setTesting(true);
     try {

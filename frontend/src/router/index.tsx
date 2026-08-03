@@ -1,4 +1,4 @@
-import React, { Suspense } from "react";
+import { Suspense } from "react";
 import { createHashRouter, Navigate, type RouteObject } from "react-router-dom";
 import { Spin } from "antd";
 import AppLayout from "@/components/AppLayout";

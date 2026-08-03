@@ -34,13 +34,13 @@ export default function AppLayout(): React.JSX.Element {
   // 必须通过 Wails 原生 API WindowGetSize 读取真实窗口高度
   const [winHeight, setWinHeight] = useState(() => window.innerHeight);
 
-  const refreshWindowHeight = useCallback(() => {
+  const refreshWindowHeight = useCallback((): void => {
     WindowGetSize().then((size) => setWinHeight(size.h));
   }, []);
 
   useEffect(() => {
     // 浏览器 resize 兜底：window.innerHeight 连续更新，作为 Wails 事件的补充
-    const onResize = () => setWinHeight(window.innerHeight);
+    const onResize = (): void => setWinHeight(window.innerHeight);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -74,7 +74,7 @@ export default function AppLayout(): React.JSX.Element {
     location.pathname.startsWith(r.path),
   )?.path;
 
-  const handleToggleMaximize = () => {
+  const handleToggleMaximize = (): void => {
     // 基于当前状态乐观更新，不用立即查询（toggle 异步，查询会拿到旧值）
     // 事件 wails:window:maximized/unmaximized 作为外部触发的补充
     if (isMaximised) {
@@ -190,7 +190,7 @@ function WindowButton({
   onClick: () => void;
   isDanger?: boolean;
   title?: string;
-}) {
+}): React.JSX.Element {
   return (
     <Button
       type="text"

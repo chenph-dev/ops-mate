@@ -16,9 +16,8 @@ const providers = [
   { label: '智谱 AI', value: 'zhipu' },
 ];
 
-export default function ConfigPage() {
+export default function ConfigPage(): React.JSX.Element {
   const [form] = Form.useForm<AIConfig>();
-  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -27,7 +26,7 @@ export default function ConfigPage() {
     }).catch(() => {});
   }, [form]);
 
-  const handleSave = async () => {
+  const handleSave = async (): Promise<void> => {
     const values = await form.validateFields();
     setSaving(true);
     try {

@@ -26,7 +26,24 @@ export interface WailsEvent {
   data: unknown;
 }
 
-export function useSessions(hostId: string | null) {
+export function useSessions(hostId: string | null): {
+  conversations: Conversation[];
+  activeSession: string | null;
+  messages: Message[];
+  pendingCommand: CommandSuggestion | null;
+  sessionState: string | null;
+  refreshConversations: () => Promise<void>;
+  loadMessages: (sessionId: string) => Promise<void>;
+  selectSession: (sessionId: string) => Promise<void>;
+  createSession: (title: string) => Promise<string | void>;
+  sendMessage: (text: string) => Promise<void>;
+  approve: (command: string) => Promise<void>;
+  reject: () => Promise<void>;
+  cancel: () => Promise<void>;
+  removeConversation: (sessionId: string) => Promise<void>;
+  handleEvent: (event: WailsEvent) => void;
+  setPendingCommand: React.Dispatch<React.SetStateAction<CommandSuggestion | null>>;
+} {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeSession, setActiveSession] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);

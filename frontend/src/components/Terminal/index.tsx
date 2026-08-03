@@ -40,7 +40,7 @@ export default function Terminal({
   onResize,
   setOutputHandler,
   onDisconnect,
-}: TerminalProps) {
+}: TerminalProps): React.JSX.Element {
   const { token } = theme.useToken();
   const containerRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
@@ -53,8 +53,10 @@ export default function Terminal({
   // 用 ref 保存最新回调，避免 effect 只初始化一次导致闭包过期
   const onDataRef = useRef(onData);
   const onResizeRef = useRef(onResize);
-  onDataRef.current = onData;
-  onResizeRef.current = onResize;
+  useEffect(() => {
+    onDataRef.current = onData;
+    onResizeRef.current = onResize;
+  });
 
   // 初始化 xterm
   useEffect(() => {
@@ -159,14 +161,14 @@ export default function Terminal({
     prevConnectedRef.current = connected;
   }, [connected]);
 
-  const handleClear = () => xtermRef.current?.clear();
+  const handleClear = (): void => xtermRef.current?.clear();
 
-  const handleCopy = async () => {
+  const handleCopy = async (): Promise<void> => {
     const sel = xtermRef.current?.getSelection();
     if (sel) await ClipboardSetText(sel);
   };
 
-  const handleSearchClose = () => {
+  const handleSearchClose = (): void => {
     setSearchOpen(false);
     setSearchText('');
     searchRef.current?.clearDecorations();

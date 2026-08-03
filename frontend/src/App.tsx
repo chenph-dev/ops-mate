@@ -8,10 +8,10 @@ import { buildTheme } from '@/theme';
 
 type AlgorithmFn = typeof antdTheme.darkAlgorithm;
 
-export default function App() {
+export default function App(): React.JSX.Element {
   const [algorithm, setAlgorithm] = useState<AlgorithmFn>(() => antdTheme.darkAlgorithm);
 
-  const toggleAlgorithm = () => {
+  const toggleAlgorithm = (): void => {
     setAlgorithm((prev: AlgorithmFn) =>
       prev === antdTheme.darkAlgorithm
         ? antdTheme.defaultAlgorithm

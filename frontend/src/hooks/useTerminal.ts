@@ -37,7 +37,15 @@ interface TerminalClosedEvent {
  * 真实 SSH 交互终端 hook。
  * 管理会话生命周期，输出经 Wails 事件推送，由 setOutputHandler 注册的回调写入 xterm。
  */
-export function useTerminal() {
+export function useTerminal(): {
+  connected: boolean;
+  connecting: boolean;
+  open: (hostID: string) => Promise<void>;
+  close: () => Promise<void>;
+  sendData: (data: string) => void;
+  resize: (cols: number, rows: number) => void;
+  setOutputHandler: (cb: (data: Uint8Array) => void) => void;
+} {
   const [connected, setConnected] = useState(false);
   const [connecting, setConnecting] = useState(false);
   const sessionIdRef = useRef<string | null>(null);

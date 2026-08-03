@@ -1,5 +1,4 @@
 import { createContext, useContext } from "react";
-import type { ThemeConfig } from "antd";
 
 interface ThemeContextValue {
   isDark: boolean;
@@ -11,4 +10,4 @@ export const ThemeContext = createContext<ThemeContextValue>({
   toggleTheme: () => {},
 });
 
-export const useThemeToggle = () => useContext(ThemeContext);
+export const useThemeToggle = (): ThemeContextValue => useContext(ThemeContext);
