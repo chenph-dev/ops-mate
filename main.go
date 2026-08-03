@@ -58,6 +58,7 @@ func main() {
 			handler.NewHostsHandler(hostsStore),
 			handler.NewAIConfigHandler(cfgStore),
 			handler.NewSessionsHandler(hostsStore, convStore, sessionManager),
+			handler.NewTerminalHandler(hostsStore),
 		},
 	})
 

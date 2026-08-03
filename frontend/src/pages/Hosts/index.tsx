@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { App as AntdApp, Input } from 'antd';
 import type { hoststore } from '@wailsjs/go/models';
 
@@ -8,7 +8,7 @@ import { useHosts } from '@/hooks/useHosts';
 import { useSessions } from '@/hooks/useSessions';
 import { useWailsEvents } from '@/hooks/useWailsEvents';
 import { useThemeToggle } from '@/context/ThemeContext';
-import { useTerminal, type TerminalEntry } from '@/hooks/useTerminal';
+import { useTerminal } from '@/hooks/useTerminal';
 import HostList from '@/components/HostList';
 import HostForm from '@/components/HostForm';
 import Terminal from '@/components/Terminal';
@@ -24,7 +24,14 @@ export default function HostsPage(): React.JSX.Element {
   const [aiCollapsed, setAiCollapsed] = useState(true);
 
   const sessions = useSessions(selectedHost?.id ?? null);
-  const terminal = useTerminal(selectedHost?.id ?? null);
+  const terminal = useTerminal();
+
+  // 页面卸载时关闭终端会话（terminal.close 是稳定引用，仅卸载时执行一次）
+  useEffect(() => {
+    return () => {
+      terminal.close();
+    };
+  }, [terminal.close]);
 
   // Wails 事件处理
   const onCommand = useCallback(
@@ -96,12 +103,16 @@ export default function HostsPage(): React.JSX.Element {
 
   const handleSelect = useCallback((node: TreeNode) => {
     setSelectedHost(node);
-    terminal.clearEntries();
-  }, [terminal]);
+  }, []);
 
-  const handleTerminalCommand = useCallback((command: string) => {
-    terminal.runCommand(command);
-  }, [terminal]);
+  const handleDoubleClick = useCallback(async (node: TreeNode) => {
+    setSelectedHost(node);
+    try {
+      await terminal.open(node.id);
+    } catch (err) {
+      message.error(`连接失败: ${err}`);
+    }
+  }, [terminal, message]);
 
   return (
     <div
@@ -119,6 +130,7 @@ export default function HostsPage(): React.JSX.Element {
         treeData={tree}
         selectedId={selectedHost?.id ?? null}
         onSelect={handleSelect}
+        onDoubleClick={handleDoubleClick}
         onAddHost={handleAddHost}
         onAddFolder={handleAddFolder}
         onEditHost={handleEditHost}
@@ -130,11 +142,19 @@ export default function HostsPage(): React.JSX.Element {
       <div style={{ position: 'relative', height: '100%' }}>
         {/* 终端区域：占满整个右侧 */}
         <Terminal
-          entries={terminal.entries}
           isDark={isDark}
-          interactive={true}
-          hostConnected={!!selectedHost}
-          onCommand={handleTerminalCommand}
+          connected={terminal.connected}
+          connecting={terminal.connecting}
+          hostName={selectedHost?.name ?? ''}
+          hostAddr={
+            selectedHost
+              ? `${selectedHost.user}@${selectedHost.addr}:${selectedHost.port}`
+              : ''
+          }
+          onData={terminal.sendData}
+          onResize={terminal.resize}
+          setOutputHandler={terminal.setOutputHandler}
+          onDisconnect={() => terminal.close()}
         />
 
         {/* AI 面板：悬浮在终端之上 */}

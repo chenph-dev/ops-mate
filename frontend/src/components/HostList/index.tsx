@@ -18,6 +18,7 @@ interface HostListProps {
   treeData: TreeNode[];
   selectedId: string | null;
   onSelect: (host: TreeNode) => void;
+  onDoubleClick: (host: TreeNode) => void;
   onAddHost: (parentId: string) => void;
   onAddFolder: (parentId: string) => void;
   onEditHost: (host: TreeNode) => void;
@@ -88,6 +89,7 @@ export default function HostList({
   treeData,
   selectedId,
   onSelect,
+  onDoubleClick,
   onAddHost,
   onAddFolder,
   onEditHost,
@@ -128,6 +130,12 @@ export default function HostList({
       onSelect(info.node.data);
     }
   }, [onSelect]);
+
+  const handleDoubleClick = useCallback((_event: React.MouseEvent, node: TreeNodeData) => {
+    if (node.data?.nodeType === 'host') {
+      onDoubleClick(node.data);
+    }
+  }, [onDoubleClick]);
 
   return (
     <div
@@ -175,6 +183,7 @@ export default function HostList({
             selectedKeys={selectedId ? [selectedId] : []}
             treeData={treeNodes}
             onSelect={handleSelect}
+            onDoubleClick={handleDoubleClick}
             onRightClick={handleRightClick}
             style={{ background: 'transparent' }}
           />
