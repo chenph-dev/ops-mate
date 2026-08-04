@@ -27,6 +27,9 @@ type convMessage struct {
 	Role       string  `gorm:"column:role"`
 	Content    string  `gorm:"column:content"`
 	ToolResult *string `gorm:"column:tool_result"`
+	ToolCalls  *string `gorm:"column:tool_calls"`
+	ToolCallID *string `gorm:"column:tool_call_id"`
+	ToolName   *string `gorm:"column:tool_name"`
 	Ts         int64   `gorm:"column:ts"`
 }
 
@@ -60,6 +63,9 @@ type Message struct {
 	Role       string `json:"role"`
 	Content    string `json:"content"`
 	ToolResult string `json:"toolResult"`
+	ToolCalls  string `json:"toolCalls"`
+	ToolCallID string `json:"toolCallId"`
+	ToolName   string `json:"toolName"`
 	Ts         int64  `json:"ts"`
 }
 
@@ -101,18 +107,32 @@ func (s *ConvStore) ListConversations(hostID string) ([]Conversation, error) {
 	return out, nil
 }
 
-func (s *ConvStore) AppendMessage(sessionID, role, content, toolResult string) error {
+// SaveMessage 落库一条消息（含 tool calling 字段），并刷新会话 updated_at。
+func (s *ConvStore) SaveMessage(m Message) error {
 	err := s.app.GORM().Create(&convMessage{
-		ID: crypto.NewID(), SessionID: sessionID, Role: role,
-		Content: content, ToolResult: strPtr(toolResult),
-		Ts: time.Now().Unix(),
+		ID: crypto.NewID(), SessionID: m.SessionID, Role: m.Role,
+		Content: m.Content, ToolResult: strPtr(m.ToolResult),
+		ToolCalls: strPtr(m.ToolCalls), ToolCallID: strPtr(m.ToolCallID),
+		ToolName: strPtr(m.ToolName), Ts: time.Now().Unix(),
 	}).Error
 	if err != nil {
 		return err
 	}
 	return s.app.GORM().Model(&convConversation{}).
-		Where("id = ?", sessionID).
+		Where("id = ?", m.SessionID).
 		Update("updated_at", time.Now().Unix()).Error
+}
+
+// GetConversation 按 ID 取会话。
+func (s *ConvStore) GetConversation(id string) (Conversation, error) {
+	var c convConversation
+	if err := s.app.GORM().First(&c, "id = ?", id).Error; err != nil {
+		return Conversation{}, err
+	}
+	return Conversation{
+		ID: c.ID, HostID: c.HostID, Title: c.Title,
+		CreatedAt: c.CreatedAt, UpdatedAt: c.UpdatedAt,
+	}, nil
 }
 
 func (s *ConvStore) LoadMessages(sessionID string) ([]Message, error) {
@@ -125,7 +145,8 @@ func (s *ConvStore) LoadMessages(sessionID string) ([]Message, error) {
 		out = append(out, Message{
 			ID: m.ID, SessionID: m.SessionID, Role: m.Role,
 			Content: m.Content, ToolResult: strDeref(m.ToolResult),
-			Ts: m.Ts,
+			ToolCalls: strDeref(m.ToolCalls), ToolCallID: strDeref(m.ToolCallID),
+			ToolName: strDeref(m.ToolName), Ts: m.Ts,
 		})
 	}
 	return out, nil
