@@ -103,6 +103,23 @@ func TestStreamingChatModel_ToolCallChunksNotEmitted(t *testing.T) {
 	}
 }
 
+func TestStreamingChatModel_NilChunkSkipped(t *testing.T) {
+	base := &fakeStreamModel{chunks: []*schema.Message{
+		{Role: schema.Assistant, Content: "a"},
+		nil,
+		{Role: schema.Assistant, Content: "b"},
+	}}
+	rec := &emitRecorder{}
+	w := NewStreamingChatModel(base, "s1", rec.emit, nil)
+	got, err := w.Generate(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if got.Content != "ab" {
+		t.Errorf("nil chunk 应被跳过且内容正常累积，得到 %q", got.Content)
+	}
+}
+
 func TestStreamingChatModel_StreamPassthrough(t *testing.T) {
 	base := &fakeStreamModel{chunks: []*schema.Message{{Role: schema.Assistant, Content: "x"}}}
 	w := NewStreamingChatModel(base, "s1", nil, nil)

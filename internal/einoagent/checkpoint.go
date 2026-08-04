@@ -6,7 +6,7 @@ import (
 )
 
 // memCheckpointStore 是内存版 eino CheckPointStore。
-// 每会话一个实例，checkpointID 用 sessionID。
+// 每 Graph 一个实例，按 sessionID 建键（一个实例可承载多个会话的 checkpoint）。
 // 同时实现 CheckPointDeleter，支持轮次结束后清理。
 // 局限：应用重启后审批中断态丢失（未批准命令作废），设计文档已声明可接受。
 type memCheckpointStore struct {

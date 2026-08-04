@@ -15,8 +15,14 @@ import (
 // 因此回灌循环的完整历史（用户消息 + assistant 提议 + tool 结果）
 // 必须由状态显式累积——这与 eino 官方 flow/agent/react 的做法一致。
 // 状态会随 checkpoint 持久化/恢复，Resume 时中断点之前的消息不丢。
+// 注册见下方 init——eino checkpoint 序列化要求显式注册自定义类型。
 type agentState struct {
 	Messages []*schema.Message
+}
+
+func init() {
+	// checkpoint 序列化要求 state 类型注册（否则 Interrupt 时 marshal 报 unknown type）。
+	schema.RegisterName[*agentState]("ops_mate_agent_state")
 }
 
 // BuildAgentGraph 构建 ops-mate Agent 的 eino Graph。
@@ -27,10 +33,11 @@ type agentState struct {
 //	  消息有 ToolCalls → tools(ToolsNode) → llm（回灌循环）
 //	  无 ToolCalls → finish(Lambda，取 state 累积的完整消息) → END
 //
-// 注意两点（由 eino v0.10.0-alpha.13 API 决定）：
+// 注意三点（由 eino v0.10.0-alpha.13 API 决定）：
 //  1. 分支条件接收 *schema.Message（ChatModelNode 的输出类型），不是 []*schema.Message；
 //  2. llm 输出 *schema.Message 与 Graph 输出 []*schema.Message 类型不同构，
 //     不能直连 END，须经 finish 节点从 state 取出完整消息序列。
+//  3. Resume 调用（带 compose.ResumeWithData 的 ctx）时，Invoke 的 input 参数被 eino 忽略——执行由恢复的 checkpoint 驱动，调用方不要指望通过 resume 调用传入新用户消息。
 //
 // 审批在 SSHTool 内部以 tool.Interrupt 实现；
 // Resume 依赖 checkpoint，故编译选项必须带 WithCheckPointStore，
@@ -74,7 +81,7 @@ func BuildAgentGraph(
 	// finish：从 state 取完整消息序列作为 Graph 输出。
 	finish := compose.InvokableLambda(func(ctx context.Context, _ *schema.Message) ([]*schema.Message, error) {
 		var msgs []*schema.Message
-		if err := compose.ProcessState[*agentState](ctx, func(ctx context.Context, s *agentState) error {
+		if err := compose.ProcessState(ctx, func(ctx context.Context, s *agentState) error {
 			msgs = s.Messages
 			return nil
 		}); err != nil {
