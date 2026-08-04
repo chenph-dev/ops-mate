@@ -52,6 +52,9 @@ func (m *StreamingChatModel) Generate(ctx context.Context, input []*schema.Messa
 		if err != nil {
 			return nil, err
 		}
+		if chunk == nil {
+			continue
+		}
 		if chunk.Content != "" && m.emit != nil {
 			m.emit(m.sessionID, "ai:text", map[string]any{"delta": chunk.Content})
 		}
@@ -71,7 +74,7 @@ func (m *StreamingChatModel) Generate(ctx context.Context, input []*schema.Messa
 	return full, nil
 }
 
-// Stream 透传给底层模型（Graph Invoke 模式下不会走到这里）。
+// Stream 透传给底层模型。契约：调用方必须使用 Graph Invoke 模式（本包装层只在 Generate 中发事件/回调）；Stream 模式不会触发 emit 与 onAssistant。
 func (m *StreamingChatModel) Stream(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.StreamReader[*schema.Message], error) {
 	return m.base.Stream(ctx, input, opts...)
 }
