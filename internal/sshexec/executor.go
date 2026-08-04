@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 
 	"golang.org/x/crypto/ssh"
 )
@@ -67,7 +68,9 @@ func (e *Executor) Exec(ctx context.Context, command string) (<-chan Line, error
 	out := make(chan Line, 32)
 	go func() {
 		defer client.Close()
+		var wg sync.WaitGroup
 		pipe := func(r io.Reader, stream string) {
+			defer wg.Done()
 			sc := bufio.NewScanner(r)
 			for sc.Scan() {
 				select {
@@ -76,17 +79,30 @@ func (e *Executor) Exec(ctx context.Context, command string) (<-chan Line, error
 					return
 				}
 			}
+			if err := sc.Err(); err != nil {
+				return
+			}
 		}
+		wg.Add(2)
 		go pipe(stdout, "stdout")
-		pipe(stderr, "stderr")
-		if err := sess.Wait(); err != nil {
+		go pipe(stderr, "stderr")
+
+		// 等待远端进程结束，或上下文取消时直接结束。
+		waitDone := make(chan error, 1)
+		go func() {
+			waitDone <- sess.Wait()
+		}()
+		select {
+		case err := <-waitDone:
 			if exitErr, ok := err.(*ssh.ExitError); ok {
 				select {
 				case out <- Line{Stream: "exit", Text: fmt.Sprintf("exit_code=%d", exitErr.ExitStatus())}:
 				default:
 				}
 			}
+		case <-ctx.Done():
 		}
+		wg.Wait()
 		close(out)
 	}()
 	return out, nil

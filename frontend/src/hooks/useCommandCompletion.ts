@@ -59,15 +59,13 @@ function getCursorPixelPosition(xterm: XTerm): { x: number; y: number } | null {
   if (!element) return null;
 
   const screen = element.querySelector(".xterm-screen") as HTMLElement | null;
-  const rows = element.querySelector(".xterm-rows") as HTMLElement | null;
-  if (!screen || !rows) return null;
+  if (!screen) return null;
 
   const screenRect = screen.getBoundingClientRect();
-  const rowsRect = rows.getBoundingClientRect();
   if (xterm.cols === 0 || xterm.rows === 0) return null;
 
   const cellWidth = screenRect.width / xterm.cols;
-  const cellHeight = rowsRect.height / xterm.rows;
+  const cellHeight = screenRect.height / xterm.rows;
   const { cursorX, cursorY } = xterm.buffer.active;
 
   return {
