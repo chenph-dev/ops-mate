@@ -72,7 +72,7 @@ func HistoryToEino(msgs []convstore.Message) ([]*schema.Message, error) {
 			if m.ToolCalls != "" {
 				tcs, err := parseToolCallsJSON(m.ToolCalls)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("message %s: %w", m.ID, err)
 				}
 				msg.ToolCalls = tcs
 			}
