@@ -10,6 +10,7 @@ func TestAssessRisk(t *testing.T) {
 		{"ls -la", ""},
 		{"top -bn1", ""},
 		{"rm -rf /", "high"},
+		{"rm -rf /*", "high"},
 		{"mkfs.ext4 /dev/sda1", "high"},
 		{"dd if=/dev/zero of=/dev/sdb", "high"},
 		{"shutdown -h now", "high"},

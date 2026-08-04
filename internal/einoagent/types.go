@@ -11,12 +11,12 @@ import (
 
 // dangerPatterns 匹配即返回 "high" 风险等级。
 var dangerPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`rm\s+-[a-zA-Z]*r[a-zA-Z]*f?.*\s/\s`),  // rm -rf ... /
-	regexp.MustCompile(`rm\s+-[a-zA-Z]*r[a-zA-Z]*f?\s+/\s*$`), // rm -rf /
+	regexp.MustCompile(`rm\s+-[a-zA-Z]*r[a-zA-Z]*f?.*\s/\s`),       // rm -rf ... /
+	regexp.MustCompile(`rm\s+-[a-zA-Z]*r[a-zA-Z]*f?\s+/(\*|\s*$)`), // rm -rf / 或 rm -rf /*
 	regexp.MustCompile(`\bmkfs\b`),
 	regexp.MustCompile(`\bdd\b.*\bof=/dev/`),
 	regexp.MustCompile(`\b(shutdown|poweroff|halt|reboot)\b`),
-	regexp.MustCompile(`>\s*/dev/(sd|nvme|hd|vd)`),   // 重定向到块设备
+	regexp.MustCompile(`>\s*/dev/(sd|nvme|hd|vd)`),    // 重定向到块设备
 	regexp.MustCompile(`:\(\)\s*\{\s*:\|:&\s*\}\s*;`), // fork bomb
 }
 

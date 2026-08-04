@@ -18,8 +18,7 @@ import (
 //   - "claude" : Anthropic Claude，需 APIKey
 //   - "openai" / "deepseek" / "dashscope" / "zhipu" 等：通过 OpenAI 兼容接口
 //
-// 返回的 model.ToolCallingChatModel 实现了 Stream/Generate，可直接用于 eino Graph，
-// 也可通过 LLMAdapter 适配为 einoagent.LLMClient 接口。
+// 返回的 model.ToolCallingChatModel 实现了 Stream/Generate，可直接用于 eino Graph。
 func NewChatModel(ctx context.Context, cfg configstore.AIConfig) (model.ToolCallingChatModel, error) {
 	switch cfg.Provider {
 	case "ollama":
