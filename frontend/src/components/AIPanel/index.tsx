@@ -24,6 +24,7 @@ export interface AIPanelProps {
   lastError: string | null;
   runningCommand: string | null;
   runElapsed: number;
+  runOutput: string;
   hostName: string;
   collapsed: boolean;
   onRefreshConversations: () => Promise<void>;
@@ -51,6 +52,7 @@ export default function AIPanel({
   lastError,
   runningCommand,
   runElapsed,
+  runOutput,
   hostName,
   collapsed,
   onRefreshConversations,
@@ -237,6 +239,7 @@ export default function AIPanel({
         cfgLoading={cfgLoading}
         runningCommand={runningCommand}
         runElapsed={runElapsed}
+        runOutput={runOutput}
         onApprove={onApprove}
         onReject={onReject}
         onSelectSuggestion={(text) => {

@@ -227,6 +227,7 @@ export default function HostsPage(): React.JSX.Element {
           lastError={sessions.lastError}
           runningCommand={sessions.runningCommand}
           runElapsed={sessions.runElapsed}
+          runOutput={sessions.runOutput}
           hostName={selectedHost?.name ?? ''}
           collapsed={aiCollapsed}
           onRefreshConversations={sessions.refreshConversations}

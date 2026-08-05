@@ -64,6 +64,7 @@ export function useSessions(hostId: string | null): {
   lastError: string | null;
   runningCommand: string | null;
   runElapsed: number;
+  runOutput: string;
   attach: () => Promise<void>;
   refreshConversations: () => Promise<void>;
   switchConversation: (sid: string) => Promise<void>;
@@ -88,6 +89,8 @@ export function useSessions(hostId: string | null): {
   const [runningCommand, setRunningCommand] = useState<string | null>(null);
   const [runStartAt, setRunStartAt] = useState<number | null>(null);
   const [runElapsed, setRunElapsed] = useState(0);
+  // 执行中的实时输出增量（run:output 累积，run:result 后由完整 tool 消息接管）
+  const [runOutput, setRunOutput] = useState('');
 
   const sessionRef = useRef<string | null>(null);
   // 命令轮次标记：每次 ai:command 递增。resync 完成时若 epoch 未变（期间没有新命令提议），
@@ -129,6 +132,7 @@ export function useSessions(hostId: string | null): {
       // 同步完成即无进行中的命令（切换会话 / 命令结束 / 回到 Idle）
       setRunningCommand(null);
       setRunStartAt(null);
+      setRunOutput('');
     } catch {
       // DB 重同步失败不阻断 UI；下一事件会再次尝试
     }
@@ -318,13 +322,21 @@ export function useSessions(hostId: string | null): {
         setRunningCommand(d.command);
         setRunStartAt(Date.now());
         setRunElapsed(0);
+        setRunOutput('');
       }
+    });
+
+    const offRunOutput = EventsOn('run:output', (raw: AgentEvent) => {
+      if (!isMine(raw)) return;
+      const d = raw.data as { delta?: string };
+      if (d?.delta) setRunOutput((prev) => prev + d.delta);
     });
 
     const offRunResult = EventsOn('run:result', (raw: AgentEvent) => {
       if (!isMine(raw) || !sessionRef.current) return;
       setRunningCommand(null);
       setRunStartAt(null);
+      setRunOutput('');
       void resync(sessionRef.current);
     });
 
@@ -348,6 +360,7 @@ export function useSessions(hostId: string | null): {
       offText();
       offCommand();
       offRunStart();
+      offRunOutput();
       offRunResult();
       offError();
       offState();
@@ -365,6 +378,7 @@ export function useSessions(hostId: string | null): {
     lastError,
     runningCommand,
     runElapsed,
+    runOutput,
     attach,
     refreshConversations,
     switchConversation,

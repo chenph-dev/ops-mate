@@ -1,7 +1,8 @@
 import { useEffect, useRef } from "react";
 import { Button, Spin } from "antd";
-import { SettingOutlined } from "@ant-design/icons";
+import { CopyOutlined, SettingOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
+import { ClipboardSetText } from "@wailsjs/runtime/runtime";
 import CommandCard from "@/components/CommandCard";
 import MarkdownContent from "@/components/MarkdownContent";
 import type {
@@ -30,6 +31,7 @@ interface MessageListProps {
   cfgLoading: boolean;
   runningCommand: string | null;
   runElapsed: number;
+  runOutput: string;
   onApprove: (command: string) => Promise<void>;
   onReject: () => Promise<void>;
   onSelectSuggestion: (text: string) => void;
@@ -81,6 +83,7 @@ export default function MessageList({
   cfgLoading,
   runningCommand,
   runElapsed,
+  runOutput,
   onApprove,
   onReject,
   onSelectSuggestion,
@@ -88,6 +91,18 @@ export default function MessageList({
 }: MessageListProps): React.JSX.Element {
   const navigate = useNavigate();
   const msgRef = useRef<HTMLDivElement>(null);
+  const runOutputRef = useRef<HTMLDivElement>(null);
+
+  const copyText = (text: string): void => {
+    void ClipboardSetText(text);
+  };
+
+  // 实时输出增量时，输出块内部自动滚动到底部（不影响用户上翻历史）
+  useEffect(() => {
+    if (runOutputRef.current) {
+      runOutputRef.current.scrollTop = runOutputRef.current.scrollHeight;
+    }
+  }, [runOutput]);
 
   useEffect(() => {
     if (msgRef.current) {
@@ -106,8 +121,17 @@ export default function MessageList({
             display: "flex",
             justifyContent: "flex-end",
             marginBottom: 6,
+            gap: 4,
+            alignItems: "center",
           }}
         >
+          <Button
+            type="text"
+            size="small"
+            icon={<CopyOutlined />}
+            title="复制消息"
+            onClick={() => copyText(msg.content)}
+          />
           <div
             style={{
               maxWidth: "85%",
@@ -147,6 +171,8 @@ export default function MessageList({
             display: "flex",
             justifyContent: "flex-start",
             marginBottom: 6,
+            gap: 4,
+            alignItems: "flex-start",
           }}
         >
           <div
@@ -160,6 +186,13 @@ export default function MessageList({
             {/* 已完成的助手消息：Markdown 渲染（表格/代码块/列表） */}
             <MarkdownContent content={msg.content} />
           </div>
+          <Button
+            type="text"
+            size="small"
+            icon={<CopyOutlined />}
+            title="复制消息"
+            onClick={() => copyText(msg.content)}
+          />
         </div>
       );
     }
@@ -326,41 +359,66 @@ export default function MessageList({
             </div>
           )}
 
-          {/* 执行中：命令正在运行，展示在消息流末尾 */}
+          {/* 执行中：命令正在运行，展示在消息流末尾（含实时输出增量） */}
           {runningCommand && (
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                marginTop: 6,
-              }}
-            >
-              <Spin size="small" />
-              <span
-                title={runningCommand}
+            <>
+              <div
                 style={{
-                  fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
-                  fontSize: 11,
-                  background: "rgba(0,0,0,0.25)",
-                  border: "1px solid var(--antd-color-border-secondary)",
-                  borderRadius: 4,
-                  padding: "2px 8px",
-                  color: "var(--antd-color-text-secondary)",
-                  maxWidth: "75%",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  marginTop: 6,
                 }}
               >
-                $ {runningCommand}
-              </span>
-              <span
-                style={{ fontSize: 11, color: "var(--antd-color-text-secondary)" }}
-              >
-                {runElapsed}s
-              </span>
-            </div>
+                <Spin size="small" />
+                <span
+                  title={runningCommand}
+                  style={{
+                    fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
+                    fontSize: 11,
+                    background: "rgba(0,0,0,0.25)",
+                    border: "1px solid var(--antd-color-border-secondary)",
+                    borderRadius: 4,
+                    padding: "2px 8px",
+                    color: "var(--antd-color-text-secondary)",
+                    maxWidth: "75%",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  $ {runningCommand}
+                </span>
+                <span
+                  style={{ fontSize: 11, color: "var(--antd-color-text-secondary)" }}
+                >
+                  {runElapsed}s
+                </span>
+              </div>
+              {/* 实时输出增量（run:output 累积），执行完成由完整 tool 消息接管 */}
+              {runOutput && (
+                <div
+                  ref={runOutputRef}
+                  style={{
+                    fontFamily:
+                      '"Cascadia Code", "Fira Code", "Consolas", monospace',
+                    fontSize: 11,
+                    background: "rgba(0,0,0,0.25)",
+                    border: "1px solid var(--antd-color-border-secondary)",
+                    borderRadius: 4,
+                    padding: "4px 8px",
+                    marginTop: 4,
+                    whiteSpace: "pre-wrap",
+                    wordBreak: "break-all",
+                    maxHeight: 160,
+                    overflow: "auto",
+                    color: "var(--antd-color-text)",
+                  }}
+                >
+                  {runOutput}
+                </div>
+              )}
+            </>
           )}
         </>
       )}

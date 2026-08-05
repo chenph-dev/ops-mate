@@ -192,7 +192,14 @@ func (t *SSHTool) execute(ctx context.Context, command string) (string, error) {
 		t.emit(t.sessionID, "run:start", map[string]any{"command": command})
 	}
 
-	output, exitCode, execErr := runCommand(ctx, t.executor, command)
+	// 边执行边把输出增量推给前端（run:output），命令完成前即可看到实时进度。
+	output, exitCode, execErr := runCommand(ctx, t.executor, command, func(delta string) {
+		if t.emit != nil {
+			t.emit(t.sessionID, "run:output", map[string]any{
+				"command": command, "delta": delta,
+			})
+		}
+	})
 	cancelled := ctx.Err() != nil
 	display := truncateForDisplay(output)
 	meta := toolMeta{
@@ -268,7 +275,7 @@ func (t *SSHTool) saveToolMessage(content, approvalStatus string, meta toolMeta)
 // runCommand 收集命令输出。返回：输出文本（截断至 displayOutputLimit）、退出码（-1 = 未知/失败/取消）、执行层错误。
 // sshexec 仅在非零退出时发 {Stream:"exit", Text:"exit_code=N"} 行。
 // 注意：超出上限后停止累积但必须继续排空通道（拿 exit 行 + 避免执行器管道协程阻塞）。
-func runCommand(ctx context.Context, ex sshexec.Exec, command string) (string, int, error) {
+func runCommand(ctx context.Context, ex sshexec.Exec, command string, onOutput func(string)) (string, int, error) {
 	if ex == nil {
 		return "", -1, fmt.Errorf("执行器未配置")
 	}
@@ -285,9 +292,13 @@ func runCommand(ctx context.Context, ex sshexec.Exec, command string) (string, i
 			}
 			continue
 		}
+		// 与累积截断一致：超过展示上限后停止收集与增量推送
 		if sb.Len() < displayOutputLimit {
 			sb.WriteString(ln.Text)
 			sb.WriteString("\n")
+			if onOutput != nil {
+				onOutput(ln.Text + "\n")
+			}
 		}
 	}
 	if ctx.Err() != nil {
