@@ -1,18 +1,17 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  EnsureSession,
   NewSession,
   SendMessage,
   ApproveCommand,
   RejectCommand,
   CancelRun,
-  ListConversations,
   LoadMessages,
-  DeleteConversation,
 } from '@wailsjs/go/handler/SessionsHandler';
+import { EventsOn } from '@wailsjs/runtime/runtime';
 import type { convstore } from '@wailsjs/go/models';
 
 type Message = convstore.Message;
-type Conversation = convstore.Conversation;
 
 export interface CommandSuggestion {
   command: string;
@@ -21,132 +20,162 @@ export interface CommandSuggestion {
   assessedRisk: string;
 }
 
-export interface WailsEvent {
+export type SessionState =
+  | 'Thinking'
+  | 'AwaitingApproval'
+  | 'Running'
+  | 'Idle'
+  | null;
+
+interface AgentEvent {
   sessionId: string;
   data: unknown;
 }
 
+/**
+ * 每主机单会话模型：
+ * - attach() 懒获取/创建会话并加载历史（DB 是历史唯一真相源）；
+ * - 事件驱动流式态（ai:text 累加到 streamingText）；
+ * - 关键节点（命令卡出现、执行完成、回到 Idle）后从 DB 重同步消息。
+ */
 export function useSessions(hostId: string | null): {
-  conversations: Conversation[];
   activeSession: string | null;
   messages: Message[];
+  streamingText: string;
   pendingCommand: CommandSuggestion | null;
-  sessionState: string | null;
-  refreshConversations: () => Promise<void>;
-  loadMessages: (sessionId: string) => Promise<void>;
-  selectSession: (sessionId: string) => Promise<void>;
-  createSession: (title: string) => Promise<string | void>;
+  sessionState: SessionState;
+  lastError: string | null;
+  attach: () => Promise<void>;
+  newConversation: () => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
   approve: (command: string) => Promise<void>;
   reject: () => Promise<void>;
   cancel: () => Promise<void>;
-  removeConversation: (sessionId: string) => Promise<void>;
-  handleEvent: (event: WailsEvent) => void;
-  setPendingCommand: React.Dispatch<React.SetStateAction<CommandSuggestion | null>>;
 } {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeSession, setActiveSession] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [streamingText, setStreamingText] = useState('');
   const [pendingCommand, setPendingCommand] = useState<CommandSuggestion | null>(null);
-  const [sessionState, setSessionState] = useState<string | null>(null);
+  const [sessionState, setSessionState] = useState<SessionState>(null);
+  const [lastError, setLastError] = useState<string | null>(null);
 
-  const refreshConversations = useCallback(async () => {
-    if (!hostId) return;
-    const list = await ListConversations(hostId);
-    setConversations(list);
-  }, [hostId]);
+  const sessionRef = useRef<string | null>(null);
+  sessionRef.current = activeSession;
 
-  const loadMessages = useCallback(async (sessionId: string) => {
-    const msgs = await LoadMessages(sessionId);
-    setMessages(msgs);
+  const resync = useCallback(async (sid: string): Promise<void> => {
+    try {
+      const msgs = await LoadMessages(sid);
+      setMessages(msgs ?? []);
+      setStreamingText('');
+    } catch {
+      // DB 重同步失败不阻断 UI；下一事件会再次尝试
+    }
   }, []);
 
-  const selectSession = useCallback(async (sessionId: string) => {
-    setActiveSession(sessionId);
-    setPendingCommand(null);
-    await loadMessages(sessionId);
-  }, [loadMessages]);
-
-  const createSession = useCallback(async (title: string) => {
+  /** 主机选中时调用：懒获取/创建会话并加载历史。 */
+  const attach = useCallback(async (): Promise<void> => {
     if (!hostId) return;
-    const sid = await NewSession(hostId, title);
+    const sid = await EnsureSession(hostId);
+    setActiveSession(sid);
+    setPendingCommand(null);
+    setSessionState(null);
+    setLastError(null);
+    await resync(sid);
+  }, [hostId, resync]);
+
+  /** 新建对话：创建新 conversation 并切换（旧的留库）。 */
+  const newConversation = useCallback(async (): Promise<void> => {
+    if (!hostId) return;
+    const sid = await NewSession(hostId, `对话 ${new Date().toLocaleString()}`);
     setActiveSession(sid);
     setMessages([]);
+    setStreamingText('');
     setPendingCommand(null);
-    await refreshConversations();
-    return sid;
-  }, [hostId, refreshConversations]);
+    setSessionState(null);
+    setLastError(null);
+  }, [hostId]);
 
-  const sendMessage = useCallback(async (text: string) => {
+  const sendMessage = useCallback(async (text: string): Promise<void> => {
     if (!activeSession) return;
-    // 乐观添加用户消息
-    const userMsg: Message = {
-      id: `local-${Date.now()}`,
-      sessionId: activeSession,
-      role: 'user',
-      content: text,
-      toolResult: '',
-      ts: Date.now(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
+    setLastError(null);
     await SendMessage(activeSession, text);
   }, [activeSession]);
 
-  const approve = useCallback(async (command: string) => {
+  const approve = useCallback(async (command: string): Promise<void> => {
     if (!activeSession) return;
     setPendingCommand(null);
     await ApproveCommand(activeSession, command);
   }, [activeSession]);
 
-  const reject = useCallback(async () => {
+  const reject = useCallback(async (): Promise<void> => {
     if (!activeSession) return;
     setPendingCommand(null);
     await RejectCommand(activeSession);
   }, [activeSession]);
 
-  const cancel = useCallback(async () => {
+  const cancel = useCallback(async (): Promise<void> => {
     if (!activeSession) return;
     await CancelRun(activeSession);
   }, [activeSession]);
 
-  const removeConversation = useCallback(async (sessionId: string) => {
-    await DeleteConversation(sessionId);
-    if (activeSession === sessionId) {
-      setActiveSession(null);
-      setMessages([]);
-    }
-    await refreshConversations();
-  }, [activeSession, refreshConversations]);
+  // Wails 事件订阅（sessionId 过滤）
+  useEffect(() => {
+    const isMine = (e: AgentEvent): boolean => e.sessionId === sessionRef.current;
 
-  const handleEvent = useCallback((event: WailsEvent) => {
-    if (event.sessionId !== activeSession) return;
-    if (event.data && typeof event.data === 'object') {
-      const data = event.data as Record<string, unknown>;
-      if ('command' in data) {
-        setPendingCommand(data as unknown as CommandSuggestion);
+    const offText = EventsOn('ai:text', (raw: AgentEvent) => {
+      if (!isMine(raw)) return;
+      const d = raw.data as { delta?: string };
+      if (d?.delta) setStreamingText((prev) => prev + d.delta);
+    });
+
+    const offCommand = EventsOn('ai:command', (raw: AgentEvent) => {
+      if (!isMine(raw)) return;
+      setPendingCommand(raw.data as unknown as CommandSuggestion);
+      setStreamingText('');
+    });
+
+    const offRunResult = EventsOn('run:result', (raw: AgentEvent) => {
+      if (!isMine(raw) || !sessionRef.current) return;
+      void resync(sessionRef.current);
+    });
+
+    const offError = EventsOn('ai:error', (raw: AgentEvent) => {
+      if (!isMine(raw)) return;
+      const d = raw.data as { message?: string };
+      setLastError(d?.message ?? '未知错误');
+      setStreamingText('');
+    });
+
+    const offState = EventsOn('session:state', (raw: AgentEvent) => {
+      if (!isMine(raw)) return;
+      const st = raw.data as Exclude<SessionState, null>;
+      setSessionState(st);
+      if (st === 'Idle' && sessionRef.current) {
+        void resync(sessionRef.current);
       }
-      if ('data' in data && typeof data.data === 'string') {
-        setSessionState(data.data);
-      }
-    }
-  }, [activeSession]);
+    });
+
+    return () => {
+      offText();
+      offCommand();
+      offRunResult();
+      offError();
+      offState();
+    };
+  }, [resync]);
 
   return {
-    conversations,
     activeSession,
     messages,
+    streamingText,
     pendingCommand,
     sessionState,
-    refreshConversations,
-    loadMessages,
-    selectSession,
-    createSession,
+    lastError,
+    attach,
+    newConversation,
     sendMessage,
     approve,
     reject,
     cancel,
-    removeConversation,
-    handleEvent,
-    setPendingCommand,
   };
 }
