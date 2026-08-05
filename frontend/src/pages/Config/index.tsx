@@ -7,13 +7,11 @@ type AIConfig = configstore.AIConfig;
 
 const { Title, Paragraph } = Typography;
 
-const providers = [
-  { label: 'Ollama (本地)', value: 'ollama' },
-  { label: 'Claude (Anthropic)', value: 'claude' },
-  { label: 'OpenAI', value: 'openai' },
-  { label: 'DeepSeek', value: 'deepseek' },
-  { label: '通义千问 (DashScope)', value: 'dashscope' },
-  { label: '智谱 AI', value: 'zhipu' },
+// API 协议（provider 值直接对应后端 provider.go 的 NewChatModel 分支）。
+// 具体服务商（OpenAI/DeepSeek/通义/智谱/Ollama 等）通过 BaseURL + Model 区分。
+const protocols = [
+  { label: 'OpenAI 兼容', value: 'openai' },
+  { label: 'Anthropic', value: 'claude' },
 ];
 
 export default function ConfigPage(): React.JSX.Element {
@@ -48,20 +46,20 @@ export default function ConfigPage(): React.JSX.Element {
 
       <Card size="small">
         <Form form={form} layout="vertical" size="small">
-          <Form.Item name="provider" label="提供商" rules={[{ required: true, message: '请选择提供商' }]}>
-            <Select options={providers} placeholder="选择 AI 提供商" />
-          </Form.Item>
-
-          <Form.Item name="model" label="模型" rules={[{ required: true, message: '请输入模型名称' }]}>
-            <Input placeholder="claude-sonnet-5 / llama3 / gpt-4 ..." />
+          <Form.Item name="provider" label="API 协议" rules={[{ required: true, message: '请选择 API 协议' }]}>
+            <Select options={protocols} placeholder="选择 API 协议" />
           </Form.Item>
 
           <Form.Item name="baseURL" label="Base URL">
-            <Input placeholder="留空使用默认地址" />
+            <Input placeholder="完整地址（含 /v1），如 https://api.deepseek.com/v1；留空用默认" />
           </Form.Item>
 
           <Form.Item name="apiKey" label="API Key">
-            <Input.Password placeholder="输入 API Key（本地 Ollama 可留空）" />
+            <Input.Password placeholder="输入 API Key（本地服务可留空）" />
+          </Form.Item>
+
+          <Form.Item name="model" label="模型" rules={[{ required: true, message: '请输入模型名称' }]}>
+            <Input placeholder="如 claude-sonnet-5 / gpt-4o / deepseek-chat" />
           </Form.Item>
 
           <Form.Item>

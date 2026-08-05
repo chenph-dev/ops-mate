@@ -5,9 +5,12 @@ import {
   SendOutlined,
   PlusOutlined,
   StopOutlined,
+  SettingOutlined,
 } from "@ant-design/icons";
 import { useEffect, useRef, useState } from "react";
-import type { convstore } from "@wailsjs/go/models";
+import { useNavigate } from "react-router-dom";
+import type { convstore, configstore } from "@wailsjs/go/models";
+import { GetAIConfig } from "@wailsjs/go/handler/AIConfigHandler";
 import type { CommandSuggestion, SessionState } from "@/hooks/useSessions";
 import CommandCard from "@/components/CommandCard";
 
@@ -74,12 +77,38 @@ export default function AIPanel({
   onCancel,
   onNewConversation,
 }: AIPanelProps): React.JSX.Element {
+  const navigate = useNavigate();
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [aiCfg, setAiCfg] = useState<configstore.AIConfig | null>(null);
+  const [cfgLoading, setCfgLoading] = useState(true);
   const msgRef = useRef<HTMLDivElement>(null);
 
+  const configured = !!aiCfg && !!aiCfg.provider && !!aiCfg.model;
   const busy = sessionState === "Thinking" || sessionState === "Running";
-  const inputDisabled = busy || sessionState === "AwaitingApproval";
+  const inputDisabled =
+    busy || sessionState === "AwaitingApproval" || !configured;
+
+  // 展开抽屉时拉取 AI 配置：已配置在标题显示模型；未配置给出提醒与跳转。
+  // 从「AI 配置」页保存后返回本页，AIPanel 重新挂载，collapsed 回到初始态，
+  // 再次展开即拉到最新配置（热更新）。
+  useEffect(() => {
+    if (collapsed) return;
+    let alive = true;
+    GetAIConfig()
+      .then((cfg) => {
+        if (alive) setAiCfg(cfg ?? null);
+      })
+      .catch(() => {
+        if (alive) setAiCfg(null);
+      })
+      .finally(() => {
+        if (alive) setCfgLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [collapsed]);
 
   useEffect(() => {
     if (msgRef.current) {
@@ -138,7 +167,14 @@ export default function AIPanel({
   const renderMessage = (msg: Message): React.JSX.Element => {
     if (msg.role === "user") {
       return (
-        <div key={msg.id} style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+        <div
+          key={msg.id}
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: 6,
+          }}
+        >
           <div
             style={{
               maxWidth: "85%",
@@ -162,12 +198,17 @@ export default function AIPanel({
       const suggested = parseToolCallCommand(msg);
       if (suggested) {
         // 历史命令提议（回放模式，无操作按钮）
-        return (
-          <CommandCard key={msg.id} command={suggested} history />
-        );
+        return <CommandCard key={msg.id} command={suggested} history />;
       }
       return (
-        <div key={msg.id} style={{ display: "flex", justifyContent: "flex-start", marginBottom: 6 }}>
+        <div
+          key={msg.id}
+          style={{
+            display: "flex",
+            justifyContent: "flex-start",
+            marginBottom: 6,
+          }}
+        >
           <div
             style={{
               maxWidth: "85%",
@@ -218,7 +259,7 @@ export default function AIPanel({
       style={{
         position: "absolute",
         bottom: 0,
-        left: 0,
+        left: 5,
         right: 0,
         height: 360,
         display: "flex",
@@ -245,9 +286,24 @@ export default function AIPanel({
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <MessageOutlined style={{ color: "var(--antd-color-primary)" }} />
           <span style={{ fontSize: 12, fontWeight: 600 }}>AI 助手</span>
-          <span style={{ fontSize: 11, color: "var(--antd-color-text-secondary)" }}>
+          <span
+            style={{ fontSize: 11, color: "var(--antd-color-text-secondary)" }}
+          >
             · {hostName}
           </span>
+          {configured && aiCfg?.model && (
+            <span
+              style={{
+                fontSize: 11,
+                color: "var(--antd-color-text-secondary)",
+              }}
+            >
+              · {aiCfg.model}
+            </span>
+          )}
+          {!configured && !cfgLoading && (
+            <Tag color="error">未配置</Tag>
+          )}
           {stateMeta && <Tag color={stateMeta.color}>{stateMeta.text}</Tag>}
         </div>
         <div style={{ display: "flex", gap: 4 }}>
@@ -286,7 +342,43 @@ export default function AIPanel({
         ref={msgRef}
         style={{ flex: 1, overflow: "auto", padding: "8px 12px" }}
       >
-        {messages.length === 0 && !streamingText && !pendingCommand ? (
+        {!configured && !cfgLoading ? (
+          // 未配置 AI：引导去配置页
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              height: "100%",
+              gap: 12,
+              padding: 24,
+            }}
+          >
+            <div
+              style={{
+                fontSize: 12,
+                color: "var(--antd-color-text-secondary)",
+                textAlign: "center",
+              }}
+            >
+              尚未配置 AI 后端。请在「AI 配置」页设置
+              API 协议、Base URL、API Key 与模型。
+            </div>
+            <Button
+              type="primary"
+              size="small"
+              icon={<SettingOutlined />}
+              onClick={() => navigate("/config")}
+            >
+              前往配置
+            </Button>
+          </div>
+        ) : cfgLoading ? (
+          <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
+            <Spin size="small" />
+          </div>
+        ) : messages.length === 0 && !streamingText && !pendingCommand ? (
           <div
             style={{
               color: "var(--antd-color-text-secondary)",
@@ -303,7 +395,13 @@ export default function AIPanel({
 
             {/* 流式气泡 */}
             {streamingText && (
-              <div style={{ display: "flex", justifyContent: "flex-start", marginBottom: 6 }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-start",
+                  marginBottom: 6,
+                }}
+              >
                 <div
                   style={{
                     maxWidth: "85%",
@@ -371,7 +469,11 @@ export default function AIPanel({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={
-            inputDisabled ? "等待本轮对话结束..." : "输入问题..."
+            !configured
+              ? "请先配置 AI 后端"
+              : inputDisabled
+                ? "等待本轮对话结束..."
+                : "输入问题..."
           }
           autoSize={{ minRows: 1, maxRows: 3 }}
           style={{ fontSize: 12 }}
