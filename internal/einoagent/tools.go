@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -95,17 +96,20 @@ func (t *SSHTool) InvokableRun(ctx context.Context, argsJSON string, opts ...too
 		Command string `json:"command"`
 		Why     string `json:"why"`
 	}
+	// 契约：永不返回 error——坏参数也转为文本回灌模型，避免整轮对话失败。
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
-		return "", err
+		return "命令参数解析失败：" + err.Error() + "。请重新以 JSON 格式提议命令。", nil
 	}
 
 	risk := AssessRisk(args.Command)
+	// AssessedRisk 是守卫的原始判定（"" = 干净）；Risk 是展示标签（"" 归一为 "low"）。
+	riskLabel := risk
+	if riskLabel == "" {
+		riskLabel = "low"
+	}
 	info := commandInfo{
 		Command: args.Command, Why: args.Why,
-		Risk: risk, AssessedRisk: risk,
-	}
-	if info.Risk == "" {
-		info.Risk = "low"
+		Risk: riskLabel, AssessedRisk: risk,
 	}
 
 	wasInterrupted, _, _ := tool.GetInterruptState[commandInfo](ctx)
@@ -123,8 +127,30 @@ func (t *SSHTool) InvokableRun(ctx context.Context, argsJSON string, opts ...too
 		// 不是本次审批目标（或无数据）：重新中断，让 Resume 信号传播到正确位置。
 		return "", tool.Interrupt(ctx, info)
 	}
+	// 协议约定：resume 数据为保留字 "rejected" 表示拒绝，其余字符串视为（可能被用户编辑过的）待执行命令。
 	if data == "rejected" {
-		return "用户拒绝了这条命令，未执行。请不要重复提议同一条命令，换其他方案或向用户询问更多信息。", nil
+		content := "用户拒绝了这条命令，未执行。请不要重复提议同一条命令，换其他方案或向用户询问更多信息。"
+		if t.convs != nil {
+			// 拒绝也必须落库 tool 消息，否则 assistant 的 tool_calls 没有配对结果，
+			// 历史回放时模型会拒绝整个会话。
+			toolCallID := ""
+			if tc := t.holder.Get(); tc != nil {
+				toolCallID = tc.ID
+			}
+			if err := t.convs.SaveMessage(convstore.Message{
+				SessionID:  t.sessionID,
+				Role:       RoleTool,
+				Content:    content,
+				ToolCallID: toolCallID,
+				ToolName:   "execute_command",
+			}); err != nil {
+				log.Printf("einoagent: save rejected tool message: %v", err)
+			}
+		}
+		return content, nil
+	}
+	if strings.TrimSpace(data) == "" {
+		return "批准数据为空，命令未执行。请重新提议命令。", nil
 	}
 	// data = 批准后的最终命令（用户可能编辑过）
 	return t.execute(ctx, data)
@@ -168,26 +194,32 @@ func (t *SSHTool) execute(ctx context.Context, command string) (string, error) {
 		}
 	}
 
+	// 落库保留较完整输出（≤64KB 展示截断），回灌模型用 8KB 截断——历史回放时模型看到的 tool 结果可能比原轮次更多，属预期。
 	if t.convs != nil {
 		toolCallID := ""
 		if tc := t.holder.Get(); tc != nil {
 			toolCallID = tc.ID
 		}
-		_ = t.convs.SaveMessage(convstore.Message{
+		if err := t.convs.SaveMessage(convstore.Message{
 			SessionID:  t.sessionID,
 			Role:       RoleTool,
 			Content:    content,
 			ToolCallID: toolCallID,
 			ToolName:   "execute_command",
-		})
-		_ = t.convs.SaveCommand(t.sessionID, command, exitCode, display)
+		}); err != nil {
+			log.Printf("einoagent: save tool message: %v", err)
+		}
+		if err := t.convs.SaveCommand(t.sessionID, command, exitCode, display); err != nil {
+			log.Printf("einoagent: save command record: %v", err)
+		}
 	}
 
 	return truncateForModel(content), nil
 }
 
-// runCommand 收集命令输出。返回：输出文本、退出码（-1 = 未知/失败/取消）、执行层错误。
+// runCommand 收集命令输出。返回：输出文本（截断至 displayOutputLimit）、退出码（-1 = 未知/失败/取消）、执行层错误。
 // sshexec 仅在非零退出时发 {Stream:"exit", Text:"exit_code=N"} 行。
+// 注意：超出上限后停止累积但必须继续排空通道（拿 exit 行 + 避免执行器管道协程阻塞）。
 func runCommand(ctx context.Context, ex sshexec.Exec, command string) (string, int, error) {
 	if ex == nil {
 		return "", -1, fmt.Errorf("执行器未配置")
@@ -205,13 +237,26 @@ func runCommand(ctx context.Context, ex sshexec.Exec, command string) (string, i
 			}
 			continue
 		}
-		sb.WriteString(ln.Text)
-		sb.WriteString("\n")
+		if sb.Len() < displayOutputLimit {
+			sb.WriteString(ln.Text)
+			sb.WriteString("\n")
+		}
 	}
 	if ctx.Err() != nil {
 		return sb.String(), -1, nil
 	}
 	return sb.String(), exitCode, nil
+}
+
+// runeSafeCut 把字节下标回退到 rune 边界，避免截断多字节字符。
+func runeSafeCut(s string, n int) int {
+	if n >= len(s) {
+		return len(s)
+	}
+	for n > 0 && s[n]&0xC0 == 0x80 {
+		n--
+	}
+	return n
 }
 
 // truncateForModel 回灌模型截断：保留头尾各一半，中间省略。
@@ -220,9 +265,9 @@ func truncateForModel(s string) string {
 		return s
 	}
 	half := modelOutputLimit / 2
-	return s[:half] +
+	return s[:runeSafeCut(s, half)] +
 		"\n...[输出过长，已省略 " + strconv.Itoa(len(s)-modelOutputLimit) + " 字节]...\n" +
-		s[len(s)-half:]
+		s[runeSafeCut(s, len(s)-half):]
 }
 
 // truncateForDisplay 展示/落库截断：保留头部。
@@ -230,5 +275,5 @@ func truncateForDisplay(s string) string {
 	if len(s) <= displayOutputLimit {
 		return s
 	}
-	return s[:displayOutputLimit] + "\n...[输出过长，已截断]"
+	return s[:runeSafeCut(s, displayOutputLimit)] + "\n...[输出过长，已截断]"
 }

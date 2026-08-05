@@ -5,6 +5,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"unicode/utf8"
 
 	"github.com/cloudwego/eino/schema"
 
@@ -162,6 +163,23 @@ func TestSSHTool_ExecutePersistsAndEmits(t *testing.T) {
 		!strings.Contains(msgs[0].Content, "file1") {
 		t.Errorf("tool 消息落库错误: %+v", msgs)
 	}
+
+	// 执行前后应分别推送 run:start 与 run:result 事件
+	rec.mu.Lock()
+	events := append([]string(nil), rec.events...)
+	rec.mu.Unlock()
+	var sawStart, sawResult bool
+	for _, e := range events {
+		switch e {
+		case "run:start":
+			sawStart = true
+		case "run:result":
+			sawResult = true
+		}
+	}
+	if !sawStart || !sawResult {
+		t.Errorf("期望 run:start 与 run:result 事件，得到 %v", events)
+	}
 }
 
 func TestSSHTool_ExecErrorFedBackAsText(t *testing.T) {
@@ -175,3 +193,36 @@ func TestSSHTool_ExecErrorFedBackAsText(t *testing.T) {
 		t.Errorf("执行失败应回灌提示文本: %q", result)
 	}
 }
+
+func TestSSHTool_BadArgsReturnsTextNotError(t *testing.T) {
+	tool := NewSSHTool("s1", &fakeExec{}, (&emitRecorder{}).emit, nil, newToolCallHolder())
+	got, err := tool.InvokableRun(context.Background(), "{bad json")
+	if err != nil {
+		t.Fatalf("坏 JSON 不应返回 error: %v", err)
+	}
+	if !strings.Contains(got, "参数解析失败") {
+		t.Errorf("期望参数解析失败提示，得到 %q", got)
+	}
+}
+
+func TestTruncateForModel_RuneSafe(t *testing.T) {
+	big := strings.Repeat("中", 10000) // 30000 bytes
+	got := truncateForModel(big)
+	if !utf8.ValidString(got) {
+		t.Error("截断结果不是合法 UTF-8（切断了多字节字符）")
+	}
+	if !strings.Contains(got, "省略") {
+		t.Error("应包含省略标记")
+	}
+}
+
+func TestTruncateForDisplay_RuneSafe(t *testing.T) {
+	big := strings.Repeat("文", 40000) // 120000 bytes > 64KB
+	got := truncateForDisplay(big)
+	if !utf8.ValidString(got) {
+		t.Error("展示截断结果不是合法 UTF-8")
+	}
+}
+
+// 注：rejected 落库分支与空批准数据守卫都需要图执行上下文（tool.Resume）才能触发，
+// 工具层无法直接测试，由 Task 7 的图级测试覆盖。

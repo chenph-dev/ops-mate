@@ -101,6 +101,8 @@ func (e *Executor) Exec(ctx context.Context, command string) (<-chan Line, error
 				}
 			}
 		case <-ctx.Done():
+			// 立即关闭会话，使阻塞在管道读取上的协程解除，out 通道才能关闭。
+			sess.Close()
 		}
 		wg.Wait()
 		close(out)
