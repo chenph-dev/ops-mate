@@ -225,4 +225,6 @@ func TestTruncateForDisplay_RuneSafe(t *testing.T) {
 }
 
 // 注：rejected 落库分支与空批准数据守卫都需要图执行上下文（tool.Resume）才能触发，
-// 工具层无法直接测试，由 Task 7 的图级测试覆盖。
+// 工具层无法直接测试。空批准数据守卫由 Task 7 的图级测试
+// （TestApprovalFlow_ApproveWithEmptyCommandGuarded）覆盖；
+// rejected 路径的 DB 落库由 Task 8 的会话测试（TestSessionManager_RejectFlow）覆盖。

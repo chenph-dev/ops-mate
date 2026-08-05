@@ -152,6 +152,9 @@ func TestApprovalFlow_ResumeDoesNotRecallModelBeforeInterrupt(t *testing.T) {
 		t.Fatalf("期望中断: %v", err)
 	}
 	callsBeforeResume := m.calls
+	if callsBeforeResume != 1 {
+		t.Fatalf("中断前模型应恰好被调用 1 次，实际 %d", callsBeforeResume)
+	}
 
 	resumeCtx := compose.ResumeWithData(context.Background(), info.InterruptContexts[0].ID, "uptime")
 	if _, err := g.Invoke(resumeCtx, input, compose.WithCheckPointID("s3")); err != nil {
