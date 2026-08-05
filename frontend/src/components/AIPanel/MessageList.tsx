@@ -33,6 +33,7 @@ interface MessageListProps {
   onApprove: (command: string) => Promise<void>;
   onReject: () => Promise<void>;
   onSelectSuggestion: (text: string) => void;
+  onRunInTerminal: (command: string) => void;
 }
 
 /** 从 assistant 消息的 toolCalls JSON 解析出命令建议，并据相邻 tool 消息推断审批状态。 */
@@ -83,6 +84,7 @@ export default function MessageList({
   onApprove,
   onReject,
   onSelectSuggestion,
+  onRunInTerminal,
 }: MessageListProps): React.JSX.Element {
   const navigate = useNavigate();
   const msgRef = useRef<HTMLDivElement>(null);
@@ -298,6 +300,7 @@ export default function MessageList({
               status={commandStatus ?? "pending"}
               onApprove={(cmd) => void onApprove(cmd)}
               onReject={() => void onReject()}
+              onRunInTerminal={onRunInTerminal}
             />
           )}
 

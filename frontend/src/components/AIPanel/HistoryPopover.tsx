@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Button, Popconfirm, Popover, Tooltip } from "antd";
-import { DeleteOutlined, HistoryOutlined } from "@ant-design/icons";
+import { App as AntdApp, Button, Input, Popconfirm, Popover, Tooltip } from "antd";
+import { DeleteOutlined, EditOutlined, HistoryOutlined } from "@ant-design/icons";
 import type { convstore } from "@wailsjs/go/models";
 
 interface HistoryPopoverProps {
@@ -8,23 +8,45 @@ interface HistoryPopoverProps {
   activeSession: string | null;
   onSwitchConversation: (sid: string) => Promise<void>;
   onDeleteConversation: (sid: string) => Promise<void>;
+  onRenameConversation: (sid: string, title: string) => Promise<void>;
   onRefreshConversations: () => Promise<void>;
 }
 
-/** 历史对话气泡菜单：点击工具栏图标弹出会话列表，支持切换与删除。 */
+/** 历史对话气泡菜单：点击工具栏图标弹出会话列表，支持切换、重命名与删除。 */
 export default function HistoryPopover({
   conversations,
   activeSession,
   onSwitchConversation,
   onDeleteConversation,
+  onRenameConversation,
   onRefreshConversations,
 }: HistoryPopoverProps): React.JSX.Element {
+  const { modal } = AntdApp.useApp();
   const [open, setOpen] = useState(false);
 
   const handleOpenChange = (next: boolean): void => {
     setOpen(next);
     // 每次打开都拉一次最新会话列表
     if (next) void onRefreshConversations();
+  };
+
+  const handleRename = (conv: convstore.Conversation): void => {
+    let title = conv.title;
+    modal.confirm({
+      title: "重命名会话",
+      content: (
+        <Input
+          autoFocus
+          defaultValue={conv.title}
+          onChange={(e) => (title = e.target.value)}
+        />
+      ),
+      onOk: async () => {
+        const name = title.trim();
+        if (!name) return;
+        await onRenameConversation(conv.id, name);
+      },
+    });
   };
 
   return (
@@ -89,6 +111,16 @@ export default function HistoryPopover({
                     {new Date(conv.updatedAt * 1000).toLocaleString()}
                   </div>
                 </div>
+                <Button
+                  type="text"
+                  size="small"
+                  icon={<EditOutlined />}
+                  title="重命名"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRename(conv);
+                  }}
+                />
                 <Popconfirm
                   title="删除该对话？此操作不可恢复。"
                   onConfirm={(e) => {

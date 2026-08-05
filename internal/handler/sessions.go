@@ -46,6 +46,16 @@ func (h *SessionsHandler) CancelRun(sid string) error {
 	return h.sessionManager.CancelRun(sid)
 }
 
+// ClearMessages 清空会话全部消息（输入框快捷命令 /clear）。
+func (h *SessionsHandler) ClearMessages(sid string) error {
+	return h.sessionManager.ClearMessages(sid)
+}
+
+// RenameConversation 重命名会话标题（历史菜单手动重命名）。
+func (h *SessionsHandler) RenameConversation(sid, title string) error {
+	return h.convs.RenameConversation(sid, title)
+}
+
 func (h *SessionsHandler) ListConversations(hostID string) ([]convstore.Conversation, error) {
 	return h.convs.ListConversations(hostID)
 }

@@ -192,6 +192,18 @@ func (s *ConvStore) DeleteConversation(id string) error {
 	return s.app.GORM().Delete(&convConversation{}, "id = ?", id).Error
 }
 
+// ClearMessages 清空指定会话的全部消息（保留会话本身，快捷命令 /clear）。
+func (s *ConvStore) ClearMessages(sessionID string) error {
+	return s.app.GORM().Where("session_id = ?", sessionID).Delete(&convMessage{}).Error
+}
+
+// RenameConversation 更新会话标题（历史菜单手动重命名）。
+func (s *ConvStore) RenameConversation(id, title string) error {
+	return s.app.GORM().Model(&convConversation{}).
+		Where("id = ?", id).
+		Update("title", title).Error
+}
+
 func strPtr(s string) *string {
 	if s == "" {
 		return nil

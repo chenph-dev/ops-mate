@@ -20,6 +20,7 @@ interface PanelHeaderProps {
   activeSession: string | null;
   onSwitchConversation: (sid: string) => Promise<void>;
   onDeleteConversation: (sid: string) => Promise<void>;
+  onRenameConversation: (sid: string, title: string) => Promise<void>;
   onRefreshConversations: () => Promise<void>;
   onCancel: () => Promise<void>;
   onNewConversation: () => Promise<void>;
@@ -38,6 +39,7 @@ export default function PanelHeader({
   activeSession,
   onSwitchConversation,
   onDeleteConversation,
+  onRenameConversation,
   onRefreshConversations,
   onCancel,
   onNewConversation,
@@ -95,6 +97,7 @@ export default function PanelHeader({
           activeSession={activeSession}
           onSwitchConversation={onSwitchConversation}
           onDeleteConversation={onDeleteConversation}
+          onRenameConversation={onRenameConversation}
           onRefreshConversations={onRefreshConversations}
         />
         <Tooltip title="新建对话">

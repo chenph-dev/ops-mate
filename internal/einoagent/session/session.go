@@ -330,6 +330,25 @@ func (m *SessionManager) CancelRun(sid string) error {
 	return nil
 }
 
+// ClearMessages 清空会话的全部消息（保留会话，快捷命令 /clear）。
+// 仅 Idle 态可执行；同时清理 checkpoint 与待执行 tool_call 队列，
+// 避免残留状态混入后续轮次。
+func (m *SessionManager) ClearMessages(sid string) error {
+	s, err := m.sessionFor(sid)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if s.state != stIdle {
+		s.mu.Unlock()
+		return fmt.Errorf("会话进行中（%s），请等待本轮结束", s.state)
+	}
+	s.mu.Unlock()
+	_ = s.checkpoints.Delete(context.Background(), sid)
+	s.toolCalls.Reset()
+	return m.convs.ClearMessages(sid)
+}
+
 // DeleteSession 删除会话（含运行时与 DB 记录）。
 func (m *SessionManager) DeleteSession(sid string) error {
 	m.mu.Lock()

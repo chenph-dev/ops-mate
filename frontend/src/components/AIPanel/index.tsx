@@ -29,8 +29,11 @@ export interface AIPanelProps {
   onRefreshConversations: () => Promise<void>;
   onSwitchConversation: (sid: string) => Promise<void>;
   onDeleteConversation: (sid: string) => Promise<void>;
+  onRenameConversation: (sid: string, title: string) => Promise<void>;
   onToggleCollapse: () => void;
   onSendMessage: (text: string) => Promise<void>;
+  onClearMessages: () => Promise<void>;
+  onRunInTerminal: (command: string) => void;
   onApprove: (command: string) => Promise<void>;
   onReject: () => Promise<void>;
   onCancel: () => Promise<void>;
@@ -53,8 +56,11 @@ export default function AIPanel({
   onRefreshConversations,
   onSwitchConversation,
   onDeleteConversation,
+  onRenameConversation,
   onToggleCollapse,
   onSendMessage,
+  onClearMessages,
+  onRunInTerminal,
   onApprove,
   onReject,
   onCancel,
@@ -129,6 +135,15 @@ export default function AIPanel({
     const text = input.trim();
     if (!text || sending || inputDisabled) return;
     setInput("");
+    // 斜杠快捷命令：不发给模型
+    if (text === "/clear") {
+      await onClearMessages();
+      return;
+    }
+    if (text === "/new") {
+      await onNewConversation();
+      return;
+    }
     setSending(true);
     try {
       await onSendMessage(text);
@@ -142,6 +157,13 @@ export default function AIPanel({
       e.preventDefault();
       void handleSend();
     }
+  };
+
+  // 斜杠命令菜单项点击：清空输入并直接执行对应快捷命令。
+  const handleSlashCommand = (cmd: string): void => {
+    setInput("");
+    if (cmd === "/clear") void onClearMessages();
+    else if (cmd === "/new") void onNewConversation();
   };
 
   // 折叠态：入口已移到终端右上角工具栏（TerminalHeader 的 AI 开关按钮），
@@ -198,6 +220,7 @@ export default function AIPanel({
         activeSession={activeSession}
         onSwitchConversation={onSwitchConversation}
         onDeleteConversation={onDeleteConversation}
+        onRenameConversation={onRenameConversation}
         onRefreshConversations={onRefreshConversations}
         onCancel={onCancel}
         onNewConversation={onNewConversation}
@@ -220,6 +243,7 @@ export default function AIPanel({
           setInput(text);
           requestAnimationFrame(() => inputRef.current?.focus());
         }}
+        onRunInTerminal={onRunInTerminal}
       />
       <PanelInput
         ref={inputRef}
@@ -230,6 +254,7 @@ export default function AIPanel({
         onInputChange={setInput}
         onSend={handleSend}
         onKeyDown={handleKeyDown}
+        onSlashCommand={handleSlashCommand}
       />
     </div>
   );

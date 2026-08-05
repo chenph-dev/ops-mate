@@ -6,9 +6,11 @@ import {
   ApproveCommand,
   RejectCommand,
   CancelRun,
+  ClearMessages,
   LoadMessages,
   ListConversations,
   DeleteConversation,
+  RenameConversation,
 } from '@wailsjs/go/handler/SessionsHandler';
 import { EventsOn } from '@wailsjs/runtime/runtime';
 import type { convstore } from '@wailsjs/go/models';
@@ -66,8 +68,10 @@ export function useSessions(hostId: string | null): {
   refreshConversations: () => Promise<void>;
   switchConversation: (sid: string) => Promise<void>;
   deleteConversation: (sid: string) => Promise<void>;
+  renameConversation: (sid: string, title: string) => Promise<void>;
   newConversation: () => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
+  clearMessages: () => Promise<void>;
   approve: (command: string) => Promise<void>;
   reject: () => Promise<void>;
   cancel: () => Promise<void>;
@@ -190,6 +194,34 @@ export function useSessions(hostId: string | null): {
     setSessionState(null);
     setLastError(null);
   }, [hostId]);
+
+  /** 重命名会话（历史菜单手动改名）。 */
+  const renameConversation = useCallback(async (sid: string, title: string): Promise<void> => {
+    try {
+      await RenameConversation(sid, title);
+      await refreshConversations();
+    } catch {
+      // 重命名失败不影响主流程
+    }
+  }, [refreshConversations]);
+
+  /** 清空当前会话全部消息（快捷命令 /clear）。 */
+  const clearMessages = useCallback(async (): Promise<void> => {
+    if (!activeSession) return;
+    try {
+      await ClearMessages(activeSession);
+      setMessages([]);
+      setStreamingText('');
+      setPendingCommand(null);
+      setCommandStatus(null);
+      setSessionState(null);
+      setLastError(null);
+      setRunningCommand(null);
+      setRunStartAt(null);
+    } catch (e) {
+      setLastError(typeof e === 'string' ? e : '清空会话失败');
+    }
+  }, [activeSession]);
 
   const sendMessage = useCallback(async (text: string): Promise<void> => {
     if (!activeSession) return;
@@ -337,8 +369,10 @@ export function useSessions(hostId: string | null): {
     refreshConversations,
     switchConversation,
     deleteConversation,
+    renameConversation,
     newConversation,
     sendMessage,
+    clearMessages,
     approve,
     reject,
     cancel,

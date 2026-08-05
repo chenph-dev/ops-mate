@@ -56,6 +56,20 @@ export default function HostsPage(): React.JSX.Element {
   const sessions = useSessions(selectedHost?.id ?? null);
   const terminal = useTerminal(selectedHost?.id ?? null);
 
+  // 审批卡「在终端执行」：把 AI 提议的命令直接发到右侧终端并回车执行。
+  const runInTerminal = useCallback(
+    (cmd: string): void => {
+      if (!terminal.connected) {
+        message.info('终端未连接，请先双击主机打开终端');
+        return;
+      }
+      terminal.sendData(cmd + '\r');
+    },
+    // terminal 对象每次 render 重建，但 connected/sendData 各自稳定，逐项声明依赖
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [terminal.connected, terminal.sendData, message],
+  );
+
   // 页面卸载时关闭终端会话（terminal.close 是稳定引用，仅卸载时执行一次）
   useEffect(() => {
     return () => {
@@ -218,8 +232,11 @@ export default function HostsPage(): React.JSX.Element {
           onRefreshConversations={sessions.refreshConversations}
           onSwitchConversation={sessions.switchConversation}
           onDeleteConversation={sessions.deleteConversation}
+          onRenameConversation={sessions.renameConversation}
           onToggleCollapse={() => setAiCollapsed(!aiCollapsed)}
           onSendMessage={sessions.sendMessage}
+          onClearMessages={sessions.clearMessages}
+          onRunInTerminal={runInTerminal}
           onApprove={sessions.approve}
           onReject={sessions.reject}
           onCancel={sessions.cancel}

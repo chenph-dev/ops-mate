@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, Tag, Input, Tooltip, theme } from "antd";
-import { EditOutlined } from "@ant-design/icons";
+import { CodeOutlined, EditOutlined } from "@ant-design/icons";
 import type { ApprovalStatus, CommandSuggestion } from "@/hooks/useSessions";
 import { isHighRiskCommand } from "./risk";
 
@@ -14,6 +14,8 @@ interface CommandCardProps {
   status?: ApprovalStatus;
   onApprove?: (command: string) => void;
   onReject?: () => void;
+  /** 一键把命令发到右侧终端执行 */
+  onRunInTerminal?: (command: string) => void;
 }
 
 const STATUS_META: Record<ApprovalStatus, { text: string; color: string }> = {
@@ -30,6 +32,7 @@ export default function CommandCard({
   status,
   onApprove,
   onReject,
+  onRunInTerminal,
 }: CommandCardProps): React.JSX.Element {
   const { token } = theme.useToken();
   const [editing, setEditing] = useState(false);
@@ -135,6 +138,16 @@ export default function CommandCard({
             marginTop: 6,
           }}
         >
+          {onRunInTerminal && (
+            <Tooltip title="在右侧终端执行">
+              <Button
+                size="small"
+                icon={<CodeOutlined />}
+                onClick={() => onRunInTerminal(draft)}
+                disabled={busy}
+              />
+            </Tooltip>
+          )}
           <Tooltip title={editing ? "完成编辑" : "修改命令"}>
             <Button
               size="small"
