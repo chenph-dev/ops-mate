@@ -179,6 +179,9 @@ func TestSessionManager_RejectFlow(t *testing.T) {
 	if toolMsg.ToolCallID == "" || !strings.Contains(toolMsg.Content, "拒绝") {
 		t.Errorf("拒绝 tool 消息缺配对或内容错误: %+v", *toolMsg)
 	}
+	if toolMsg.ApprovalStatus != "rejected" {
+		t.Errorf("拒绝 tool 消息 approval_status 应为 rejected: %+v", *toolMsg)
+	}
 }
 
 func TestSessionManager_SendDuringApprovalRejected(t *testing.T) {

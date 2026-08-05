@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/cloudwego/eino/components/model"
@@ -362,6 +363,9 @@ func (m *SessionManager) run(s *agentSession, ctx context.Context, input []*sche
 		}
 		s.state = stIdle
 		s.interruptID = ""
+		// 非中断错误也清理 checkpoint：若残留，下一轮 Invoke 会从上一轮
+		// 中断/失败点恢复，导致 state 消息翻倍错乱。
+		_ = s.checkpoints.Delete(ctx, s.id)
 		if errors.Is(err, context.Canceled) {
 			m.emitError(s.id, "本次执行已取消")
 		} else {
@@ -436,8 +440,8 @@ func (m *SessionManager) onAssistant(s *agentSession) func(msg *schema.Message) 
 			Content:   msg.Content,
 			ToolCalls: ToolCallsToJSON(msg.ToolCalls),
 		})
-		if len(msg.ToolCalls) > 0 {
-			s.toolCalls.Set(&msg.ToolCalls[0])
+		for i := range msg.ToolCalls {
+			s.toolCalls.Add(&msg.ToolCalls[i])
 		}
 	}
 }
@@ -458,11 +462,14 @@ func (m *SessionManager) buildInput(s *agentSession, userText string) ([]*schema
 
 	// FTS5 记忆注入（失败不阻断主流程）
 	if recall, err := m.mem.Recall(s.hostID, userText); err == nil && len(recall.PastCommands) > 0 {
-		note := "该主机过去执行过的相关命令记录（供参考）：\n"
+		var note strings.Builder
+		note.WriteString("该主机过去执行过的相关命令记录（供参考）：\n")
 		for _, c := range recall.PastCommands {
-			note += "- " + c.Command + "\n"
+			note.WriteString("- ")
+			note.WriteString(c.Command)
+			note.WriteString("\n")
 		}
-		input = append(input, schema.UserMessage(note))
+		input = append(input, schema.UserMessage(note.String()))
 	}
 
 	input = append(input, msgs...)

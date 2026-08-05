@@ -31,26 +31,35 @@ type commandInfo struct {
 	AssessedRisk string `json:"assessedRisk"`
 }
 
-// toolCallHolder 保存当前待执行的 tool call，
+// toolCallHolder 按先进先出保存待执行的 tool call 队列，
 // 供 SSHTool 落库 tool 消息时配对 tool_call_id。
-// 由 StreamingChatModel 的 onAssistant 回调写入。
+// 由 StreamingChatModel 的 onAssistant 回调写入（一次模型回复可含多个 tool_calls）。
+// ToolsNode 按 tool_calls 顺序逐个执行（ExecuteSequentially），审批/恢复也逐个进行，
+// 因此 Take() 取出的顺序与工具执行顺序一致，保证每个 tool 消息配对正确的 tool_call_id。
 type toolCallHolder struct {
-	mu sync.Mutex
-	tc *schema.ToolCall
+	mu  sync.Mutex
+	tcs []*schema.ToolCall
 }
 
 func newToolCallHolder() *toolCallHolder { return &toolCallHolder{} }
 
-func (h *toolCallHolder) Set(tc *schema.ToolCall) {
-	h.mu.Lock()
-	h.tc = tc
-	h.mu.Unlock()
-}
-
-func (h *toolCallHolder) Get() *schema.ToolCall {
+// Add 追加一个待执行的 tool call。
+func (h *toolCallHolder) Add(tc *schema.ToolCall) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	return h.tc
+	h.tcs = append(h.tcs, tc)
+}
+
+// Take 弹出并返回队首的 tool call；队列为空返回 nil。
+func (h *toolCallHolder) Take() *schema.ToolCall {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if len(h.tcs) == 0 {
+		return nil
+	}
+	tc := h.tcs[0]
+	h.tcs = h.tcs[1:]
+	return tc
 }
 
 // SSHTool 把 SSH 执行器包装为 eino InvokableTool。
@@ -133,24 +142,17 @@ func (t *SSHTool) InvokableRun(ctx context.Context, argsJSON string, opts ...too
 		if t.convs != nil {
 			// 拒绝也必须落库 tool 消息，否则 assistant 的 tool_calls 没有配对结果，
 			// 历史回放时模型会拒绝整个会话。
-			toolCallID := ""
-			if tc := t.holder.Get(); tc != nil {
-				toolCallID = tc.ID
-			}
-			if err := t.convs.SaveMessage(convstore.Message{
-				SessionID:  t.sessionID,
-				Role:       RoleTool,
-				Content:    content,
-				ToolCallID: toolCallID,
-				ToolName:   "execute_command",
-			}); err != nil {
-				log.Printf("einoagent: save rejected tool message: %v", err)
-			}
+			t.saveToolMessage(content, "rejected")
 		}
 		return content, nil
 	}
 	if strings.TrimSpace(data) == "" {
-		return "批准数据为空，命令未执行。请重新提议命令。", nil
+		// 批准数据为空同样落库配对结果，避免产生孤立 tool_calls。
+		content := "批准数据为空，命令未执行。请重新提议命令。"
+		if t.convs != nil {
+			t.saveToolMessage(content, "rejected")
+		}
+		return content, nil
 	}
 	// data = 批准后的最终命令（用户可能编辑过）
 	return t.execute(ctx, data)
@@ -196,25 +198,34 @@ func (t *SSHTool) execute(ctx context.Context, command string) (string, error) {
 
 	// 落库保留较完整输出（≤64KB 展示截断），回灌模型用 8KB 截断——历史回放时模型看到的 tool 结果可能比原轮次更多，属预期。
 	if t.convs != nil {
-		toolCallID := ""
-		if tc := t.holder.Get(); tc != nil {
-			toolCallID = tc.ID
-		}
-		if err := t.convs.SaveMessage(convstore.Message{
-			SessionID:  t.sessionID,
-			Role:       RoleTool,
-			Content:    content,
-			ToolCallID: toolCallID,
-			ToolName:   "execute_command",
-		}); err != nil {
-			log.Printf("einoagent: save tool message: %v", err)
-		}
+		t.saveToolMessage(content, "approved")
 		if err := t.convs.SaveCommand(t.sessionID, command, exitCode, display); err != nil {
 			log.Printf("einoagent: save command record: %v", err)
 		}
 	}
 
 	return truncateForModel(content), nil
+}
+
+// saveToolMessage 落库一条 tool 消息，配对当前 Take 出的 tool call，
+// 并记录审批状态（"approved" 已批准执行 / "rejected" 已拒绝）。
+// 批准执行、拒绝、空批准数据等所有结束审批的路径都必须调用，
+// 否则 assistant 的 tool_calls 在历史中孤立，模型端会拒绝整个请求。
+func (t *SSHTool) saveToolMessage(content, approvalStatus string) {
+	toolCallID := ""
+	if tc := t.holder.Take(); tc != nil {
+		toolCallID = tc.ID
+	}
+	if err := t.convs.SaveMessage(convstore.Message{
+		SessionID:      t.sessionID,
+		Role:           RoleTool,
+		Content:        content,
+		ToolCallID:     toolCallID,
+		ToolName:       "execute_command",
+		ApprovalStatus: approvalStatus,
+	}); err != nil {
+		log.Printf("einoagent: save tool message: %v", err)
+	}
 }
 
 // runCommand 收集命令输出。返回：输出文本（截断至 displayOutputLimit）、退出码（-1 = 未知/失败/取消）、执行层错误。

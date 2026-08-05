@@ -73,3 +73,63 @@ func TestHistoryToEino_BadToolCallsJSON(t *testing.T) {
 		t.Error("期望损坏的 tool_calls JSON 返回错误")
 	}
 }
+
+func TestHistoryToEino_OrphanToolCallsStripped(t *testing.T) {
+	// 审批中断后会话被放弃：assistant 提议命令但未执行，历史遗留孤立 tool_use。
+	// 必须剥离，否则模型端以 "tool_use without tool_result" 拒绝整个请求（400）。
+	msgs := []convstore.Message{
+		{Role: RoleUser, Content: "看看"},
+		{Role: RoleAssistant, Content: "", ToolCalls: `[{"id":"call_orphan","name":"execute_command","arguments":"{\"command\":\"top -bn1\"}"}]`},
+		{Role: RoleUser, Content: "算了"},
+	}
+	out, err := HistoryToEino(msgs)
+	if err != nil {
+		t.Fatalf("HistoryToEino: %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("孤立 tool_use 应被剥离（期望 2 条），得到 %d: %+v", len(out), out)
+	}
+	for _, m := range out {
+		if len(m.ToolCalls) > 0 {
+			t.Errorf("不应存在任何 tool_calls: %+v", m.ToolCalls)
+		}
+	}
+}
+
+func TestHistoryToEino_PartialToolCallsMatched(t *testing.T) {
+	// 多 tool_calls 只执行了第一个：未配对的第二个 tool_call 必须被剥离。
+	msgs := []convstore.Message{
+		{Role: RoleUser, Content: "查一下"},
+		{Role: RoleAssistant, Content: "", ToolCalls: `[{"id":"c1","name":"execute_command","arguments":"{\"command\":\"ls\"}"},{"id":"c2","name":"execute_command","arguments":"{\"command\":\"pwd\"}"}]`},
+		{Role: RoleTool, Content: "file1", ToolCallID: "c1", ToolName: "execute_command"},
+		{Role: RoleAssistant, Content: "总结"},
+	}
+	out, err := HistoryToEino(msgs)
+	if err != nil {
+		t.Fatalf("HistoryToEino: %v", err)
+	}
+	if len(out) != 4 {
+		t.Fatalf("期望 4 条，得到 %d: %+v", len(out), out)
+	}
+	if len(out[1].ToolCalls) != 1 || out[1].ToolCalls[0].ID != "c1" {
+		t.Errorf("未配对的 tool_call 应被剥离，assistant 只保留 c1: %+v", out[1].ToolCalls)
+	}
+	if out[2].Role != schema.Tool || out[2].ToolCallID != "c1" {
+		t.Errorf("tool 消息配对错误: %+v", out[2])
+	}
+}
+
+func TestHistoryToEino_OrphanToolResultDropped(t *testing.T) {
+	// 无 assistant tool_use 的孤立 tool_result：模型不接受，应丢弃。
+	msgs := []convstore.Message{
+		{Role: RoleUser, Content: "hi"},
+		{Role: RoleTool, Content: "孤立结果", ToolCallID: "ghost", ToolName: "execute_command"},
+	}
+	out, err := HistoryToEino(msgs)
+	if err != nil {
+		t.Fatalf("HistoryToEino: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("孤立 tool_result 应被丢弃（期望 1 条），得到 %d: %+v", len(out), out)
+	}
+}

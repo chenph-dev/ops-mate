@@ -33,7 +33,7 @@ func approvalFixture(t *testing.T, modelResponses []*schema.Message, execLines [
 	// 模拟 SessionManager 的 onAssistant：记录 holder（集成测试只关心命令执行）
 	wrapped := NewStreamingChatModel(m, "s1", rec.emit, func(msg *schema.Message) {
 		if len(msg.ToolCalls) > 0 {
-			holder.Set(&msg.ToolCalls[0])
+			holder.Add(&msg.ToolCalls[0])
 		}
 	})
 	g, err := BuildAgentGraph(ctx, wrapped, toolsNode, newMemCheckpointStore())
@@ -137,7 +137,7 @@ func TestApprovalFlow_ResumeDoesNotRecallModelBeforeInterrupt(t *testing.T) {
 	}}
 	wrapped := NewStreamingChatModel(m, "s1", rec.emit, func(msg *schema.Message) {
 		if len(msg.ToolCalls) > 0 {
-			holder.Set(&msg.ToolCalls[0])
+			holder.Add(&msg.ToolCalls[0])
 		}
 	})
 	g, err := BuildAgentGraph(ctx, wrapped, toolsNode, newMemCheckpointStore())

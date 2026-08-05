@@ -146,7 +146,7 @@ func TestSSHTool_ExecutePersistsAndEmits(t *testing.T) {
 	}}
 	rec := &emitRecorder{}
 	holder := newToolCallHolder()
-	holder.Set(&schema.ToolCall{ID: "call_9", Function: schema.FunctionCall{Name: "execute_command"}})
+	holder.Add(&schema.ToolCall{ID: "call_9", Function: schema.FunctionCall{Name: "execute_command"}})
 	tool := NewSSHTool(sid, ex, rec.emit, convs, holder)
 
 	result, err := tool.execute(context.Background(), "ls")
@@ -160,6 +160,7 @@ func TestSSHTool_ExecutePersistsAndEmits(t *testing.T) {
 	msgs, _ := convs.LoadMessages(sid)
 	if len(msgs) != 1 || msgs[0].Role != "tool" ||
 		msgs[0].ToolCallID != "call_9" || msgs[0].ToolName != "execute_command" ||
+		msgs[0].ApprovalStatus != "approved" ||
 		!strings.Contains(msgs[0].Content, "file1") {
 		t.Errorf("tool 消息落库错误: %+v", msgs)
 	}

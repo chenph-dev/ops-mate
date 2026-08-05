@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button, Tag, Divider, Input, Tooltip, theme } from "antd";
 import { WarningOutlined, EditOutlined } from "@ant-design/icons";
-import type { CommandSuggestion } from "@/hooks/useSessions";
+import type { ApprovalStatus, CommandSuggestion } from "@/hooks/useSessions";
 
 interface CommandCardProps {
   command: CommandSuggestion;
@@ -9,20 +9,31 @@ interface CommandCardProps {
   busy?: boolean;
   /** 历史回放模式：只展示，无操作按钮 */
   history?: boolean;
+  /** 用户审批状态：待审批 / 已批准 / 已拒绝 */
+  status?: ApprovalStatus;
   onApprove?: (command: string) => void;
   onReject?: () => void;
 }
+
+const STATUS_META: Record<ApprovalStatus, { text: string; color: string }> = {
+  pending: { text: "待审批", color: "processing" },
+  approved: { text: "已批准", color: "success" },
+  rejected: { text: "已拒绝", color: "error" },
+};
 
 export default function CommandCard({
   command,
   busy,
   history,
+  status,
   onApprove,
   onReject,
 }: CommandCardProps): React.JSX.Element {
   const { token } = theme.useToken();
   const isHighRisk =
     command.assessedRisk === "high" || command.risk === "high";
+  // 已批准/已拒绝后不再可操作（执行中或结果已定）
+  const done = status === "approved" || status === "rejected";
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(command.command);
   const [confirming, setConfirming] = useState(false);
@@ -60,6 +71,14 @@ export default function CommandCard({
         <span style={{ fontWeight: 600, fontSize: 13 }}>
           {isHighRisk ? "⚠️ AI 提议执行高风险命令" : "AI 提议执行命令"}
         </span>
+        {status && (
+          <Tag
+            color={STATUS_META[status].color}
+            style={{ marginLeft: "auto" }}
+          >
+            {STATUS_META[status].text}
+          </Tag>
+        )}
       </div>
 
       {editing && !history ? (
@@ -96,7 +115,7 @@ export default function CommandCard({
         </div>
       </div>
 
-      {!history && (
+      {!history && !done && (
         <>
           <Divider style={{ margin: "8px 0" }} />
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>

@@ -1,4 +1,13 @@
-import { Button, Input, Spin, Tag, Tooltip } from "antd";
+import {
+  Button,
+  Drawer,
+  Input,
+  List,
+  Popconfirm,
+  Spin,
+  Tag,
+  Tooltip,
+} from "antd";
 import {
   MessageOutlined,
   CompressOutlined,
@@ -6,24 +15,37 @@ import {
   PlusOutlined,
   StopOutlined,
   SettingOutlined,
+  HistoryOutlined,
+  HolderOutlined,
+  DeleteOutlined,
 } from "@ant-design/icons";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { convstore, configstore } from "@wailsjs/go/models";
 import { GetAIConfig } from "@wailsjs/go/handler/AIConfigHandler";
-import type { CommandSuggestion, SessionState } from "@/hooks/useSessions";
+import type {
+  ApprovalStatus,
+  CommandSuggestion,
+  SessionState,
+} from "@/hooks/useSessions";
 import CommandCard from "@/components/CommandCard";
 
 type Message = convstore.Message;
 
 interface AIPanelProps {
+  activeSession: string | null;
   messages: Message[];
+  conversations: convstore.Conversation[];
   streamingText: string;
   pendingCommand: CommandSuggestion | null;
+  commandStatus: ApprovalStatus | null;
   sessionState: SessionState;
   lastError: string | null;
   hostName: string;
   collapsed: boolean;
+  onRefreshConversations: () => Promise<void>;
+  onSwitchConversation: (sid: string) => Promise<void>;
+  onDeleteConversation: (sid: string) => Promise<void>;
   onToggleCollapse: () => void;
   onSendMessage: (text: string) => Promise<void>;
   onApprove: (command: string) => Promise<void>;
@@ -32,11 +54,15 @@ interface AIPanelProps {
   onNewConversation: () => Promise<void>;
 }
 
-/** 从 assistant 消息的 toolCalls JSON 解析出命令建议（历史回放用）。 */
-function parseToolCallCommand(msg: Message): CommandSuggestion | null {
+/** 从 assistant 消息的 toolCalls JSON 解析出命令建议，并据相邻 tool 消息推断审批状态。 */
+function parseToolCallCommand(
+  msg: Message,
+  nextMsg?: Message,
+): (CommandSuggestion & { status: ApprovalStatus }) | null {
   if (!msg.toolCalls) return null;
   try {
     const calls = JSON.parse(msg.toolCalls) as Array<{
+      id?: string;
       arguments: string;
     }>;
     if (calls.length === 0) return null;
@@ -45,11 +71,17 @@ function parseToolCallCommand(msg: Message): CommandSuggestion | null {
       why?: string;
     };
     if (!args.command) return null;
+    // 有相邻且同 ID 的 tool 消息 = 该命令已被处理过；审批状态直接读落库字段。
+    let status: ApprovalStatus = "pending";
+    if (nextMsg?.role === "tool" && nextMsg.toolCallId === calls[0].id) {
+      status = nextMsg.approvalStatus === "rejected" ? "rejected" : "approved";
+    }
     return {
       command: args.command,
       why: args.why ?? "",
       risk: "",
       assessedRisk: "",
+      status,
     };
   } catch {
     return null;
@@ -63,13 +95,19 @@ const STATE_LABEL: Record<string, { text: string; color: string }> = {
 };
 
 export default function AIPanel({
+  activeSession,
   messages,
+  conversations,
   streamingText,
   pendingCommand,
+  commandStatus,
   sessionState,
   lastError,
   hostName,
   collapsed,
+  onRefreshConversations,
+  onSwitchConversation,
+  onDeleteConversation,
   onToggleCollapse,
   onSendMessage,
   onApprove,
@@ -82,7 +120,41 @@ export default function AIPanel({
   const [sending, setSending] = useState(false);
   const [aiCfg, setAiCfg] = useState<configstore.AIConfig | null>(null);
   const [cfgLoading, setCfgLoading] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [resizeHover, setResizeHover] = useState(false);
+  const [panelHeight, setPanelHeight] = useState<number>(() => {
+    const saved = Number(localStorage.getItem("ai-panel-height"));
+    return saved >= 160 && saved <= 800 ? saved : 360;
+  });
   const msgRef = useRef<HTMLDivElement>(null);
+  const resizeRef = useRef<{ startY: number; startH: number } | null>(null);
+
+  // 顶部手柄拖动调整高度：mousedown 挂 window 监听，mouseup 移除，实时持久化。
+  const onResizeStart = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>): void => {
+      e.preventDefault();
+      resizeRef.current = { startY: e.clientY, startH: panelHeight };
+      const onMove = (ev: MouseEvent): void => {
+        const r = resizeRef.current;
+        if (!r) return;
+        // bottom 定位：向上拖动（clientY 减小）增加高度
+        const next = Math.min(
+          Math.max(r.startH + (r.startY - ev.clientY), 160),
+          window.innerHeight - 160,
+        );
+        setPanelHeight(next);
+        localStorage.setItem("ai-panel-height", String(next));
+      };
+      const onUp = (): void => {
+        resizeRef.current = null;
+        window.removeEventListener("mousemove", onMove);
+        window.removeEventListener("mouseup", onUp);
+      };
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onUp);
+    },
+    [panelHeight],
+  );
 
   const configured = !!aiCfg && !!aiCfg.provider && !!aiCfg.model;
   const busy = sessionState === "Thinking" || sessionState === "Running";
@@ -164,7 +236,7 @@ export default function AIPanel({
     );
   }
 
-  const renderMessage = (msg: Message): React.JSX.Element => {
+  const renderMessage = (msg: Message, index: number): React.JSX.Element => {
     if (msg.role === "user") {
       return (
         <div
@@ -195,10 +267,17 @@ export default function AIPanel({
     }
 
     if (msg.role === "assistant") {
-      const suggested = parseToolCallCommand(msg);
+      const suggested = parseToolCallCommand(msg, messages[index + 1]);
       if (suggested) {
-        // 历史命令提议（回放模式，无操作按钮）
-        return <CommandCard key={msg.id} command={suggested} history />;
+        // 历史命令提议（回放模式，无操作按钮，显示审批状态）
+        return (
+          <CommandCard
+            key={msg.id}
+            command={suggested}
+            history
+            status={suggested.status}
+          />
+        );
       }
       return (
         <div
@@ -261,7 +340,7 @@ export default function AIPanel({
         bottom: 0,
         left: 5,
         right: 0,
-        height: 360,
+        height: panelHeight,
         display: "flex",
         flexDirection: "column",
         background: "var(--antd-color-bg-elevated)",
@@ -272,8 +351,12 @@ export default function AIPanel({
         borderTopRightRadius: 8,
       }}
     >
-      {/* 标题栏 */}
+      {/* 标题栏（整体作为拖拽区，grip 图标提示可拖动，不额外占高度） */}
       <div
+        onMouseDown={onResizeStart}
+        onMouseEnter={() => setResizeHover(true)}
+        onMouseLeave={() => setResizeHover(false)}
+        title="拖动调整高度"
         style={{
           padding: "6px 10px",
           display: "flex",
@@ -281,9 +364,19 @@ export default function AIPanel({
           justifyContent: "space-between",
           borderBottom: "1px solid var(--antd-color-border-secondary)",
           flexShrink: 0,
+          cursor: "ns-resize",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <HolderOutlined
+            style={{
+              fontSize: 11,
+              color: resizeHover
+                ? "var(--antd-color-text)"
+                : "var(--antd-color-text-quaternary)",
+              transition: "color 0.2s",
+            }}
+          />
           <MessageOutlined style={{ color: "var(--antd-color-primary)" }} />
           <span style={{ fontSize: 12, fontWeight: 600 }}>AI 助手</span>
           <span
@@ -306,7 +399,10 @@ export default function AIPanel({
           )}
           {stateMeta && <Tag color={stateMeta.color}>{stateMeta.text}</Tag>}
         </div>
-        <div style={{ display: "flex", gap: 4 }}>
+        <div
+          style={{ display: "flex", gap: 4 }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           {sessionState === "Running" && (
             <Tooltip title="取消执行">
               <Button
@@ -318,6 +414,17 @@ export default function AIPanel({
               />
             </Tooltip>
           )}
+          <Tooltip title="历史对话">
+            <Button
+              type="text"
+              size="small"
+              icon={<HistoryOutlined />}
+              onClick={() => {
+                setHistoryOpen(true);
+                void onRefreshConversations();
+              }}
+            />
+          </Tooltip>
           <Tooltip title="新建对话">
             <Button
               type="text"
@@ -391,7 +498,7 @@ export default function AIPanel({
           </div>
         ) : (
           <>
-            {messages.map(renderMessage)}
+            {messages.map((msg, index) => renderMessage(msg, index))}
 
             {/* 流式气泡 */}
             {streamingText && (
@@ -425,7 +532,8 @@ export default function AIPanel({
             {pendingCommand && (
               <CommandCard
                 command={pendingCommand}
-                busy={false}
+                busy={commandStatus === "approved"}
+                status={commandStatus ?? "pending"}
                 onApprove={(cmd) => void onApprove(cmd)}
                 onReject={() => void onReject()}
               />
@@ -488,6 +596,61 @@ export default function AIPanel({
           loading={sending}
         />
       </div>
+
+      {/* 历史对话面板 */}
+      <Drawer
+        title="历史对话"
+        placement="right"
+        width={300}
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+      >
+        <List
+          dataSource={conversations}
+          locale={{ emptyText: "暂无历史对话" }}
+          renderItem={(conv) => (
+            <List.Item
+              style={{ cursor: "pointer", paddingLeft: 4, paddingRight: 4 }}
+              onClick={() => {
+                setHistoryOpen(false);
+                void onSwitchConversation(conv.id);
+              }}
+              actions={[
+                <Popconfirm
+                  key="delete"
+                  title="删除该对话？此操作不可恢复。"
+                  onConfirm={(e) => {
+                    e?.stopPropagation();
+                    void onDeleteConversation(conv.id);
+                  }}
+                >
+                  <Button
+                    type="text"
+                    size="small"
+                    danger
+                    icon={<DeleteOutlined />}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </Popconfirm>,
+              ]}
+            >
+              <List.Item.Meta
+                title={
+                  <span style={{ fontSize: 13 }}>
+                    {activeSession === conv.id ? "当前 · " : ""}
+                    {conv.title}
+                  </span>
+                }
+                description={
+                  <span style={{ fontSize: 11 }}>
+                    {new Date(conv.updatedAt * 1000).toLocaleString()}
+                  </span>
+                }
+              />
+            </List.Item>
+          )}
+        />
+      </Drawer>
     </div>
   );
 }

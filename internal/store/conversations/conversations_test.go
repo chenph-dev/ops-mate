@@ -2,8 +2,10 @@ package convstore
 
 import (
 	"testing"
+	"time"
 
 	"ops-mate/internal/store"
+	"ops-mate/internal/store/crypto"
 	hoststore "ops-mate/internal/store/hosts"
 )
 
@@ -98,6 +100,74 @@ func TestGetConversation(t *testing.T) {
 	}
 	if _, err := convs.GetConversation("不存在"); err == nil {
 		t.Error("期望不存在的会话返回错误")
+	}
+}
+
+func TestSaveMessage_ApprovalStatusRoundTrip(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	app, _ := store.Open()
+	defer closeDB(app)
+
+	convs := NewConvStore(app)
+	hosts := hoststore.NewHostsStore(app)
+	hostID, _ := hosts.SaveHost(hoststore.HostInput{Name: "h", Addr: "1.1.1.1", Port: 22, User: "u", AuthType: "password", Secret: "x"})
+	sid, _ := convs.NewConversation(hostID, "t")
+
+	if err := convs.SaveMessage(Message{
+		SessionID: sid, Role: "tool", Content: "out",
+		ToolCallID: "c1", ToolName: "execute_command", ApprovalStatus: "rejected",
+	}); err != nil {
+		t.Fatalf("SaveMessage: %v", err)
+	}
+	msgs, err := convs.LoadMessages(sid)
+	if err != nil {
+		t.Fatalf("LoadMessages: %v", err)
+	}
+	if len(msgs) != 1 || msgs[0].ApprovalStatus != "rejected" {
+		t.Errorf("approval_status 往返失败: %+v", msgs)
+	}
+}
+
+func TestLoadMessages_SameTsOrderByInsert(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	app, _ := store.Open()
+	defer closeDB(app)
+	convs := NewConvStore(app)
+	hosts := hoststore.NewHostsStore(app)
+	hostID, _ := hosts.SaveHost(hoststore.HostInput{Name: "h", Addr: "1.1.1.1", Port: 22, User: "u", AuthType: "password", Secret: "x"})
+	sid, err := convs.NewConversation(hostID, "t")
+	if err != nil {
+		t.Fatalf("NewConversation: %v", err)
+	}
+
+	// 同秒落库多轮审批消息：user / assistant(tool_calls) / tool / assistant(final)。
+	// LoadMessages 必须按插入顺序返回，否则前端"assistant 命令卡后面紧跟 tool 结果"
+	// 的审批状态推断会落到 pending。
+	now := time.Now().Unix()
+	rows := []convMessage{
+		{ID: crypto.NewID(), SessionID: sid, Role: "user", Content: "查一下", Ts: now},
+		{ID: crypto.NewID(), SessionID: sid, Role: "assistant", Content: "", ToolCalls: strPtr(`[{"id":"c1","name":"execute_command","arguments":"{\"command\":\"ls\"}"}]`), Ts: now},
+		{ID: crypto.NewID(), SessionID: sid, Role: "tool", Content: "file1", ToolCallID: strPtr("c1"), ToolName: strPtr("execute_command"), Ts: now},
+		{ID: crypto.NewID(), SessionID: sid, Role: "assistant", Content: "完成", Ts: now},
+	}
+	for _, r := range rows {
+		if err := app.GORM().Create(&r).Error; err != nil {
+			t.Fatalf("insert: %v", err)
+		}
+	}
+
+	msgs, err := convs.LoadMessages(sid)
+	if err != nil {
+		t.Fatalf("LoadMessages: %v", err)
+	}
+	if len(msgs) != 4 {
+		t.Fatalf("期望 4 条，得到 %d: %+v", len(msgs), msgs)
+	}
+	if msgs[1].Role != "assistant" || msgs[1].ToolCalls == "" {
+		t.Errorf("第 2 条应为 assistant(tool_calls)，得到: role=%s toolCalls=%q", msgs[1].Role, msgs[1].ToolCalls)
+	}
+	if msgs[2].Role != "tool" || msgs[2].ToolCallID != "c1" {
+		t.Errorf("第 3 条应为配对 tool(c1)，得到: %+v", msgs[2])
 	}
 }
 

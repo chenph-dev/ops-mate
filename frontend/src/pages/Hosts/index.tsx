@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { App as AntdApp, Input } from 'antd';
 import type { hoststore } from '@wailsjs/go/models';
 
@@ -20,6 +20,38 @@ export default function HostsPage(): React.JSX.Element {
   const [formOpen, setFormOpen] = useState(false);
   const [formParentId, setFormParentId] = useState('');
   const [aiCollapsed, setAiCollapsed] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('hosts-sidebar-width'));
+    return saved >= 160 && saved <= 480 ? saved : 200;
+  });
+  const [sidebarResizeHover, setSidebarResizeHover] = useState(false);
+  const sidebarResizeRef = useRef<{ startX: number; startW: number } | null>(null);
+
+  // 分隔条左右拖动调整左侧主机列表宽度，实时持久化。
+  const onSidebarResize = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>): void => {
+      e.preventDefault();
+      sidebarResizeRef.current = { startX: e.clientX, startW: sidebarWidth };
+      const onMove = (ev: MouseEvent): void => {
+        const r = sidebarResizeRef.current;
+        if (!r) return;
+        const next = Math.min(
+          Math.max(r.startW + (ev.clientX - r.startX), 160),
+          480,
+        );
+        setSidebarWidth(next);
+        localStorage.setItem('hosts-sidebar-width', String(next));
+      };
+      const onUp = (): void => {
+        sidebarResizeRef.current = null;
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      };
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    [sidebarWidth],
+  );
 
   const sessions = useSessions(selectedHost?.id ?? null);
   const terminal = useTerminal(selectedHost?.id ?? null);
@@ -99,7 +131,8 @@ export default function HostsPage(): React.JSX.Element {
     <div
       style={{
         display: 'grid',
-        gridTemplateColumns: '20% 80%',
+        // 左侧主机列表固定宽度 + 分隔条 + 右侧自适应
+        gridTemplateColumns: `${sidebarWidth}px 5px minmax(0, 1fr)`,
         // 行高必须确定，否则子元素 height:100% 解析不到高度，会按内容撑开（终端残留最大化高度）
         gridTemplateRows: '100%',
         height: '100%',
@@ -117,6 +150,22 @@ export default function HostsPage(): React.JSX.Element {
         onEditHost={handleEditHost}
         onDelete={handleDelete}
         onTest={handleTest}
+      />
+
+      {/* 分隔条：左右拖动调整左侧宽度 */}
+      <div
+        onMouseDown={onSidebarResize}
+        onMouseEnter={() => setSidebarResizeHover(true)}
+        onMouseLeave={() => setSidebarResizeHover(false)}
+        title="拖动调整宽度"
+        style={{
+          cursor: 'col-resize',
+          background: sidebarResizeHover
+            ? 'var(--antd-color-primary)'
+            : 'transparent',
+          opacity: sidebarResizeHover ? 0.6 : 1,
+          transition: 'background 0.2s',
+        }}
       />
 
       {/* 右：终端 + AI 面板（悬浮） */}
@@ -143,13 +192,19 @@ export default function HostsPage(): React.JSX.Element {
 
         {/* AI 面板：悬浮在终端之上 */}
         <AIPanel
+          activeSession={sessions.activeSession}
           messages={sessions.messages}
+          conversations={sessions.conversations}
           streamingText={sessions.streamingText}
           pendingCommand={sessions.pendingCommand}
+          commandStatus={sessions.commandStatus}
           sessionState={sessions.sessionState}
           lastError={sessions.lastError}
           hostName={selectedHost?.name ?? ''}
           collapsed={aiCollapsed}
+          onRefreshConversations={sessions.refreshConversations}
+          onSwitchConversation={sessions.switchConversation}
+          onDeleteConversation={sessions.deleteConversation}
           onToggleCollapse={() => setAiCollapsed(!aiCollapsed)}
           onSendMessage={sessions.sendMessage}
           onApprove={sessions.approve}

@@ -22,15 +22,16 @@ func (convConversation) TableName() string { return "conversations" }
 
 // Message GORM 模型。
 type convMessage struct {
-	ID         string  `gorm:"column:id;primaryKey"`
-	SessionID  string  `gorm:"column:session_id"`
-	Role       string  `gorm:"column:role"`
-	Content    string  `gorm:"column:content"`
-	ToolResult *string `gorm:"column:tool_result"`
-	ToolCalls  *string `gorm:"column:tool_calls"`
-	ToolCallID *string `gorm:"column:tool_call_id"`
-	ToolName   *string `gorm:"column:tool_name"`
-	Ts         int64   `gorm:"column:ts"`
+	ID             string  `gorm:"column:id;primaryKey"`
+	SessionID      string  `gorm:"column:session_id"`
+	Role           string  `gorm:"column:role"`
+	Content        string  `gorm:"column:content"`
+	ToolResult     *string `gorm:"column:tool_result"`
+	ToolCalls      *string `gorm:"column:tool_calls"`
+	ToolCallID     *string `gorm:"column:tool_call_id"`
+	ToolName       *string `gorm:"column:tool_name"`
+	ApprovalStatus *string `gorm:"column:approval_status"`
+	Ts             int64   `gorm:"column:ts"`
 }
 
 func (convMessage) TableName() string { return "messages" }
@@ -58,15 +59,16 @@ type Conversation struct {
 
 // Message 一条对话消息（DTO）。
 type Message struct {
-	ID         string `json:"id"`
-	SessionID  string `json:"sessionId"`
-	Role       string `json:"role"`
-	Content    string `json:"content"`
-	ToolResult string `json:"toolResult"`
-	ToolCalls  string `json:"toolCalls"`
-	ToolCallID string `json:"toolCallId"`
-	ToolName   string `json:"toolName"`
-	Ts         int64  `json:"ts"`
+	ID             string `json:"id"`
+	SessionID      string `json:"sessionId"`
+	Role           string `json:"role"`
+	Content        string `json:"content"`
+	ToolResult     string `json:"toolResult"`
+	ToolCalls      string `json:"toolCalls"`
+	ToolCallID     string `json:"toolCallId"`
+	ToolName       string `json:"toolName"`
+	ApprovalStatus string `json:"approvalStatus"`
+	Ts             int64  `json:"ts"`
 }
 
 // ConvStore 提供对话/消息/命令操作。
@@ -113,7 +115,8 @@ func (s *ConvStore) SaveMessage(m Message) error {
 		ID: crypto.NewID(), SessionID: m.SessionID, Role: m.Role,
 		Content: m.Content, ToolResult: strPtr(m.ToolResult),
 		ToolCalls: strPtr(m.ToolCalls), ToolCallID: strPtr(m.ToolCallID),
-		ToolName: strPtr(m.ToolName), Ts: time.Now().Unix(),
+		ToolName: strPtr(m.ToolName), ApprovalStatus: strPtr(m.ApprovalStatus),
+		Ts: time.Now().Unix(),
 	}).Error
 	if err != nil {
 		return err
@@ -137,7 +140,9 @@ func (s *ConvStore) GetConversation(id string) (Conversation, error) {
 
 func (s *ConvStore) LoadMessages(sessionID string) ([]Message, error) {
 	var msgs []convMessage
-	if err := s.app.GORM().Where("session_id = ?", sessionID).Order("ts").Find(&msgs).Error; err != nil {
+	// ts 是秒级：同秒多条消息时用 rowid（插入顺序）作为次级排序，
+	// 保证 assistant(tool_calls) 与其 tool 结果的相对顺序稳定（审批状态推断依赖相邻关系）。
+	if err := s.app.GORM().Where("session_id = ?", sessionID).Order("ts").Order("rowid").Find(&msgs).Error; err != nil {
 		return nil, err
 	}
 	out := make([]Message, 0, len(msgs))
@@ -146,7 +151,8 @@ func (s *ConvStore) LoadMessages(sessionID string) ([]Message, error) {
 			ID: m.ID, SessionID: m.SessionID, Role: m.Role,
 			Content: m.Content, ToolResult: strDeref(m.ToolResult),
 			ToolCalls: strDeref(m.ToolCalls), ToolCallID: strDeref(m.ToolCallID),
-			ToolName: strDeref(m.ToolName), Ts: m.Ts,
+			ToolName: strDeref(m.ToolName), ApprovalStatus: strDeref(m.ApprovalStatus),
+			Ts: m.Ts,
 		})
 	}
 	return out, nil
