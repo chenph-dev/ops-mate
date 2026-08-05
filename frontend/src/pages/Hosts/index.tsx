@@ -5,7 +5,6 @@ import type { hoststore } from '@wailsjs/go/models';
 type TreeNode = hoststore.TreeNode;
 import { useHosts } from '@/hooks/useHosts';
 import { useSessions } from '@/hooks/useSessions';
-import { useWailsEvents } from '@/hooks/useWailsEvents';
 import { useThemeToggle } from '@/context/ThemeContext';
 import { useTerminal } from '@/hooks/useTerminal';
 import HostList from '@/components/HostList';
@@ -33,33 +32,13 @@ export default function HostsPage(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [terminal.close]);
 
-  // Wails 事件处理
-  const onCommand = useCallback(
-    (event: { data: unknown }) => {
-      if (event.data && typeof event.data === 'object') {
-        const d = event.data as Record<string, unknown>;
-        if ('command' in d) {
-          sessions.setPendingCommand(
-            d as unknown as Parameters<
-              typeof sessions.handleEvent
-            >[0]['data'] & {
-              command: string;
-              why: string;
-              risk: string;
-              assessedRisk: string;
-            },
-          );
-        }
-      }
-    },
-    [sessions],
-  );
-
-  const onState = useCallback(() => {
-    // 状态变化可通过 terminal hook 处理
-  }, []);
-
-  useWailsEvents(onCommand, onState);
+  // 选中主机时接入 AI 会话（懒创建 + 加载历史）
+  useEffect(() => {
+    if (selectedHost && selectedHost.nodeType === 'host') {
+      void sessions.attach();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedHost?.id]);
 
   const handleAddFolder = useCallback((parentId: string) => {
     let name = '';
@@ -165,14 +144,18 @@ export default function HostsPage(): React.JSX.Element {
         {/* AI 面板：悬浮在终端之上 */}
         <AIPanel
           messages={sessions.messages}
+          streamingText={sessions.streamingText}
           pendingCommand={sessions.pendingCommand}
           sessionState={sessions.sessionState}
+          lastError={sessions.lastError}
           hostName={selectedHost?.name ?? ''}
           collapsed={aiCollapsed}
           onToggleCollapse={() => setAiCollapsed(!aiCollapsed)}
           onSendMessage={sessions.sendMessage}
           onApprove={sessions.approve}
           onReject={sessions.reject}
+          onCancel={sessions.cancel}
+          onNewConversation={sessions.newConversation}
         />
       </div>
 

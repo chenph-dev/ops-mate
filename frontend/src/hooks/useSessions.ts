@@ -60,7 +60,11 @@ export function useSessions(hostId: string | null): {
   const [lastError, setLastError] = useState<string | null>(null);
 
   const sessionRef = useRef<string | null>(null);
-  sessionRef.current = activeSession;
+
+  // 保持 ref 与当前会话同步（react-hooks/refs：禁止在 render 期间写 ref）
+  useEffect(() => {
+    sessionRef.current = activeSession;
+  }, [activeSession]);
 
   const resync = useCallback(async (sid: string): Promise<void> => {
     try {
