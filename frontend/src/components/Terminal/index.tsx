@@ -1,16 +1,4 @@
-import { Button, Tooltip, theme, Spin, Input, type InputRef } from "antd";
-import {
-  ClearOutlined,
-  CopyOutlined,
-  DisconnectOutlined,
-  SearchOutlined,
-  UpOutlined,
-  DownOutlined,
-  CloseOutlined,
-  ZoomInOutlined,
-  ZoomOutOutlined,
-} from "@ant-design/icons";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { Spin, theme, type InputRef } from "antd";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { CanvasAddon } from "@xterm/addon-canvas";
 import { FitAddon } from "@xterm/addon-fit";
@@ -23,9 +11,14 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import "@xterm/xterm/css/xterm.css";
 import { ClipboardGetText, ClipboardSetText } from "@wailsjs/runtime/runtime";
 import { ListHostCommands } from "@wailsjs/go/handler/TerminalHandler";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { terminalTheme } from "@/theme";
 import { useCommandCompletion } from "@/hooks/useCommandCompletion";
 import CompletionPopup from "./CompletionPopup";
+import TerminalHeader from "./TerminalHeader";
+import SearchBar from "./SearchBar";
+import StatusBar from "./StatusBar";
+import TerminalContextMenu, { type ContextMenuItem } from "./TerminalContextMenu";
 
 interface TerminalProps {
   isDark: boolean;
@@ -47,66 +40,6 @@ const MIN_FONT_SIZE = 9;
 const MAX_FONT_SIZE = 24;
 // 与 useTerminal.ts 保持一致，用于状态栏显示重连计数上限
 const MAX_RECONNECT_RETRIES = 5;
-
-interface ContextMenuItem {
-  key: string;
-  label: string;
-  onClick: () => void;
-}
-
-interface ContextMenuProps {
-  x: number;
-  y: number;
-  items: ContextMenuItem[];
-  onClose: () => void;
-  colorBgElevated: string;
-  borderRadiusLG: number;
-  boxShadowSecondary: string;
-  colorText: string;
-}
-
-function TerminalContextMenu({
-  x,
-  y,
-  items,
-  onClose,
-  colorBgElevated,
-  borderRadiusLG,
-  boxShadowSecondary,
-  colorText,
-}: ContextMenuProps): React.JSX.Element {
-  return (
-    <div
-      style={{
-        position: "fixed",
-        left: x,
-        top: y,
-        zIndex: 9999,
-        background: colorBgElevated,
-        borderRadius: borderRadiusLG,
-        boxShadow: boxShadowSecondary,
-        padding: "4px 0",
-        minWidth: 140,
-      }}
-      onClick={onClose}
-    >
-      {items.map((item) => (
-        <div
-          key={item.key}
-          style={{
-            padding: "6px 16px",
-            cursor: "pointer",
-            fontSize: 13,
-            color: colorText,
-          }}
-          onClick={item.onClick}
-        >
-          {item.label}
-        </div>
-      ))}
-    </div>
-  );
-}
 
 export default function Terminal({
   isDark,
@@ -425,6 +358,26 @@ export default function Terminal({
     setContextMenu(null);
   }, []);
 
+  const handleSearchChange = useCallback(
+    (value: string): void => {
+      setSearchText(value);
+      if (value) {
+        searchRef.current?.findNext(value);
+      } else {
+        searchRef.current?.clearDecorations();
+      }
+    },
+    [],
+  );
+
+  const handleSearchNext = useCallback((): void => {
+    searchRef.current?.findNext(searchText);
+  }, [searchText]);
+
+  const handleSearchPrev = useCallback((): void => {
+    searchRef.current?.findPrevious(searchText);
+  }, [searchText]);
+
   const handleSearchClose = useCallback((): void => {
     setSearchOpen(false);
     setSearchText("");
@@ -461,178 +414,36 @@ export default function Terminal({
         marginLeft: 5,
       }}
     >
-      {/* 标题栏 */}
-      <div
-        style={{
-          padding: "4px 10px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: `1px solid ${token.colorBorderSecondary}`,
-          flexShrink: 0,
-          background: token.colorBgElevated,
+      <TerminalHeader
+        hostName={hostName}
+        hostAddr={hostAddr}
+        statusDot={statusDot}
+        statusText={statusText}
+        connected={connected}
+        fontSize={fontSize}
+        maxFontSize={MAX_FONT_SIZE}
+        minFontSize={MIN_FONT_SIZE}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onSearch={(): void => {
+          setSearchOpen(true);
+          setTimeout(() => searchInputRef.current?.focus(), 0);
         }}
-      >
-        <div
-          style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}
-        >
-          <span
-            style={{
-              fontSize: 11,
-              color: token.colorTextSecondary,
-              whiteSpace: "nowrap",
-            }}
-          >
-            终端
-          </span>
-          <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
-            {hostName || "未选择主机"}
-          </span>
-          <span
-            style={{
-              fontSize: 11,
-              color: connected ? token.colorSuccess : token.colorTextSecondary,
-              whiteSpace: "nowrap",
-            }}
-          >
-            {statusDot} {statusText}
-          </span>
-          {hostAddr && (
-            <Tooltip title={hostAddr}>
-              <span
-                style={{
-                  fontSize: 11,
-                  color: token.colorTextTertiary,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {hostAddr}
-              </span>
-            </Tooltip>
-          )}
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <Tooltip title="放大 (Ctrl++)">
-            <Button
-              type="text"
-              size="small"
-              icon={<ZoomInOutlined />}
-              onClick={handleZoomIn}
-              disabled={fontSize >= MAX_FONT_SIZE}
-            />
-          </Tooltip>
-          <Tooltip title="缩小 (Ctrl+-)">
-            <Button
-              type="text"
-              size="small"
-              icon={<ZoomOutOutlined />}
-              onClick={handleZoomOut}
-              disabled={fontSize <= MIN_FONT_SIZE}
-            />
-          </Tooltip>
-          <Tooltip title="搜索 (Ctrl+F)">
-            <Button
-              type="text"
-              size="small"
-              icon={<SearchOutlined />}
-              onClick={(): void => {
-                setSearchOpen(true);
-                setTimeout(() => searchInputRef.current?.focus(), 0);
-              }}
-            />
-          </Tooltip>
-          <Tooltip title="清空">
-            <Button
-              type="text"
-              size="small"
-              icon={<ClearOutlined />}
-              onClick={handleClear}
-            />
-          </Tooltip>
-          <Tooltip title="复制选中内容">
-            <Button
-              type="text"
-              size="small"
-              icon={<CopyOutlined />}
-              onClick={handleCopy}
-            />
-          </Tooltip>
-          {connected && (
-            <Tooltip title="断开连接">
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<DisconnectOutlined />}
-                onClick={onDisconnect}
-              />
-            </Tooltip>
-          )}
-        </div>
-      </div>
+        onClear={handleClear}
+        onCopy={handleCopy}
+        onDisconnect={onDisconnect}
+      />
 
       {/* 搜索栏 */}
       {searchOpen && (
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "4px 10px",
-            borderBottom: `1px solid ${token.colorBorderSecondary}`,
-            background: token.colorBgElevated,
-            flexShrink: 0,
-          }}
-        >
-          <Input
-            ref={searchInputRef}
-            size="small"
-            placeholder="搜索终端内容..."
-            value={searchText}
-            onChange={(e): void => {
-              const val = e.target.value;
-              setSearchText(val);
-              if (val) {
-                searchRef.current?.findNext(val);
-              } else {
-                searchRef.current?.clearDecorations();
-              }
-            }}
-            onKeyDown={(e): void => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                searchRef.current?.findNext(searchText);
-              }
-            }}
-            style={{ width: 200 }}
-            allowClear
-          />
-          <Button
-            type="text"
-            size="small"
-            icon={<DownOutlined />}
-            onClick={(): void => {
-              searchRef.current?.findNext(searchText);
-            }}
-          />
-          <Button
-            type="text"
-            size="small"
-            icon={<UpOutlined />}
-            onClick={(): void => {
-              searchRef.current?.findPrevious(searchText);
-            }}
-          />
-          <Button
-            type="text"
-            size="small"
-            icon={<CloseOutlined />}
-            onClick={handleSearchClose}
-          />
-        </div>
+        <SearchBar
+          searchText={searchText}
+          searchInputRef={searchInputRef}
+          onSearchChange={handleSearchChange}
+          onSearchNext={handleSearchNext}
+          onSearchPrev={handleSearchPrev}
+          onSearchClose={handleSearchClose}
+        />
       )}
 
       {/* xterm 容器 + 连接遮罩 */}
@@ -666,26 +477,12 @@ export default function Terminal({
       </div>
 
       {/* 底部状态栏 */}
-      <div
-        style={{
-          padding: "4px 10px",
-          display: "flex",
-          alignItems: "center",
-          gap: 16,
-          borderTop: `1px solid ${token.colorBorderSecondary}`,
-          flexShrink: 0,
-          fontSize: 11,
-          color: token.colorTextTertiary,
-          background: token.colorBgElevated,
-        }}
-      >
-        <span>{statusText}</span>
-        <span>
-          {dims.cols}×{dims.rows}
-        </span>
-        <span>字号 {fontSize}</span>
-        <span style={{ marginLeft: "auto" }}>{hostAddr || "未连接"}</span>
-      </div>
+      <StatusBar
+        statusText={statusText}
+        dims={dims}
+        fontSize={fontSize}
+        hostAddr={hostAddr}
+      />
 
       {/* 右键上下文菜单 */}
       {contextMenu && (

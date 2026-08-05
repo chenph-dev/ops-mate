@@ -1,38 +1,20 @@
-import {
-  Button,
-  Drawer,
-  Input,
-  List,
-  Popconfirm,
-  Spin,
-  Tag,
-  Tooltip,
-} from "antd";
-import {
-  MessageOutlined,
-  CompressOutlined,
-  SendOutlined,
-  PlusOutlined,
-  StopOutlined,
-  SettingOutlined,
-  HistoryOutlined,
-  HolderOutlined,
-  DeleteOutlined,
-} from "@ant-design/icons";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import type { convstore, configstore } from "@wailsjs/go/models";
+import { MessageOutlined } from "@ant-design/icons";
 import { GetAIConfig } from "@wailsjs/go/handler/AIConfigHandler";
+import type { configstore, convstore } from "@wailsjs/go/models";
 import type {
   ApprovalStatus,
   CommandSuggestion,
+  Message,
   SessionState,
-} from "@/hooks/useSessions";
-import CommandCard from "@/components/CommandCard";
+} from "./types";
+import { STATE_LABEL } from "./types";
+import PanelHeader from "./PanelHeader";
+import MessageList from "./MessageList";
+import PanelInput from "./PanelInput";
+import HistoryDrawer from "./HistoryDrawer";
 
-type Message = convstore.Message;
-
-interface AIPanelProps {
+export interface AIPanelProps {
   activeSession: string | null;
   messages: Message[];
   conversations: convstore.Conversation[];
@@ -52,96 +34,6 @@ interface AIPanelProps {
   onReject: () => Promise<void>;
   onCancel: () => Promise<void>;
   onNewConversation: () => Promise<void>;
-}
-
-/** 从 assistant 消息的 toolCalls JSON 解析出命令建议，并据相邻 tool 消息推断审批状态。 */
-function parseToolCallCommand(
-  msg: Message,
-  nextMsg?: Message,
-): (CommandSuggestion & { status: ApprovalStatus }) | null {
-  if (!msg.toolCalls) return null;
-  try {
-    const calls = JSON.parse(msg.toolCalls) as Array<{
-      id?: string;
-      arguments: string;
-    }>;
-    if (calls.length === 0) return null;
-    const args = JSON.parse(calls[0].arguments) as {
-      command?: string;
-      why?: string;
-    };
-    if (!args.command) return null;
-    // 有相邻且同 ID 的 tool 消息 = 该命令已被处理过；审批状态直接读落库字段。
-    let status: ApprovalStatus = "pending";
-    if (nextMsg?.role === "tool" && nextMsg.toolCallId === calls[0].id) {
-      status = nextMsg.approvalStatus === "rejected" ? "rejected" : "approved";
-    }
-    return {
-      command: args.command,
-      why: args.why ?? "",
-      risk: "",
-      assessedRisk: "",
-      status,
-    };
-  } catch {
-    return null;
-  }
-}
-
-const STATE_LABEL: Record<string, { text: string; color: string }> = {
-  Thinking: { text: "思考中", color: "blue" },
-  AwaitingApproval: { text: "等待审批", color: "orange" },
-  Running: { text: "执行中", color: "green" },
-};
-
-/** 命令执行输出块：默认折叠成一行标题，点击展开查看完整输出。 */
-function ToolOutputBlock({ content }: { content: string }): React.JSX.Element {
-  const [open, setOpen] = useState(false);
-  const lineCount = content.split("\n").filter((l) => l.trim() !== "").length;
-  return (
-    <div style={{ marginBottom: 6 }}>
-      <div
-        onClick={() => setOpen(!open)}
-        title={open ? "收起输出" : "展开输出"}
-        style={{
-          fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
-          fontSize: 11,
-          background: "rgba(0,0,0,0.25)",
-          border: "1px solid var(--antd-color-border-secondary)",
-          borderRadius: 4,
-          padding: "2px 8px",
-          cursor: "pointer",
-          color: "var(--antd-color-text-secondary)",
-          userSelect: "none",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-        }}
-      >
-        {open ? "▾" : "▸"} 命令输出（{lineCount} 行）
-      </div>
-      {open && (
-        <div
-          style={{
-            fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
-            fontSize: 11,
-            background: "rgba(0,0,0,0.25)",
-            border: "1px solid var(--antd-color-border-secondary)",
-            borderTop: "none",
-            borderRadius: "0 0 4px 4px",
-            padding: "6px 8px",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-all",
-            color: "var(--antd-color-text)",
-            maxHeight: 240,
-            overflow: "auto",
-          }}
-        >
-          {content}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default function AIPanel({
@@ -165,7 +57,6 @@ export default function AIPanel({
   onCancel,
   onNewConversation,
 }: AIPanelProps): React.JSX.Element {
-  const navigate = useNavigate();
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [aiCfg, setAiCfg] = useState<configstore.AIConfig | null>(null);
@@ -176,7 +67,6 @@ export default function AIPanel({
     const saved = Number(localStorage.getItem("ai-panel-height"));
     return saved >= 160 && saved <= 800 ? saved : 360;
   });
-  const msgRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<{ startY: number; startH: number } | null>(null);
 
   // 顶部手柄拖动调整高度：mousedown 挂 window 监听，mouseup 移除，实时持久化。
@@ -232,12 +122,6 @@ export default function AIPanel({
     };
   }, [collapsed]);
 
-  useEffect(() => {
-    if (msgRef.current) {
-      msgRef.current.scrollTop = msgRef.current.scrollHeight;
-    }
-  }, [messages, streamingText, pendingCommand]);
-
   const handleSend = async (): Promise<void> => {
     const text = input.trim();
     if (!text || sending || inputDisabled) return;
@@ -286,81 +170,6 @@ export default function AIPanel({
     );
   }
 
-  const renderMessage = (msg: Message, index: number): React.JSX.Element => {
-    if (msg.role === "user") {
-      return (
-        <div
-          key={msg.id}
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            marginBottom: 6,
-          }}
-        >
-          <div
-            style={{
-              maxWidth: "85%",
-              padding: "5px 10px",
-              borderRadius: 8,
-              fontSize: 12,
-              lineHeight: 1.5,
-              background: "var(--antd-color-primary)",
-              color: "#fff",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-all",
-            }}
-          >
-            {msg.content}
-          </div>
-        </div>
-      );
-    }
-
-    if (msg.role === "assistant") {
-      const suggested = parseToolCallCommand(msg, messages[index + 1]);
-      if (suggested) {
-        // 历史命令提议（回放模式，无操作按钮，显示审批状态）
-        return (
-          <CommandCard
-            key={msg.id}
-            command={suggested}
-            history
-            status={suggested.status}
-          />
-        );
-      }
-      return (
-        <div
-          key={msg.id}
-          style={{
-            display: "flex",
-            justifyContent: "flex-start",
-            marginBottom: 6,
-          }}
-        >
-          <div
-            style={{
-              maxWidth: "85%",
-              padding: "5px 10px",
-              borderRadius: 8,
-              fontSize: 12,
-              lineHeight: 1.5,
-              background: "var(--antd-color-fill-secondary)",
-              color: "var(--antd-color-text)",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-all",
-            }}
-          >
-            {msg.content}
-          </div>
-        </div>
-      );
-    }
-
-    // tool 消息：命令执行输出，默认折叠
-    return <ToolOutputBlock key={msg.id} content={msg.content} />;
-  };
-
   const stateMeta = sessionState ? STATE_LABEL[sessionState] : null;
 
   return (
@@ -381,311 +190,53 @@ export default function AIPanel({
         borderTopRightRadius: 8,
       }}
     >
-      {/* 标题栏（整体作为拖拽区，grip 图标提示可拖动，不额外占高度） */}
-      <div
-        onMouseDown={onResizeStart}
-        onMouseEnter={() => setResizeHover(true)}
-        onMouseLeave={() => setResizeHover(false)}
-        title="拖动调整高度"
-        style={{
-          padding: "6px 10px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          borderBottom: "1px solid var(--antd-color-border-secondary)",
-          flexShrink: 0,
-          cursor: "ns-resize",
+      <PanelHeader
+        hostName={hostName}
+        aiCfg={aiCfg}
+        configured={configured}
+        cfgLoading={cfgLoading}
+        stateMeta={stateMeta}
+        sessionState={sessionState}
+        resizeHover={resizeHover}
+        onResizeStart={onResizeStart}
+        onResizeHoverChange={setResizeHover}
+        onCancel={onCancel}
+        onOpenHistory={() => {
+          setHistoryOpen(true);
+          void onRefreshConversations();
         }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <HolderOutlined
-            style={{
-              fontSize: 11,
-              color: resizeHover
-                ? "var(--antd-color-text)"
-                : "var(--antd-color-text-quaternary)",
-              transition: "color 0.2s",
-            }}
-          />
-          <MessageOutlined style={{ color: "var(--antd-color-primary)" }} />
-          <span style={{ fontSize: 12, fontWeight: 600 }}>AI 助手</span>
-          <span
-            style={{ fontSize: 11, color: "var(--antd-color-text-secondary)" }}
-          >
-            · {hostName}
-          </span>
-          {configured && aiCfg?.model && (
-            <span
-              style={{
-                fontSize: 11,
-                color: "var(--antd-color-text-secondary)",
-              }}
-            >
-              · {aiCfg.model}
-            </span>
-          )}
-          {!configured && !cfgLoading && (
-            <Tag color="error">未配置</Tag>
-          )}
-          {stateMeta && <Tag color={stateMeta.color}>{stateMeta.text}</Tag>}
-        </div>
-        <div
-          style={{ display: "flex", gap: 4 }}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          {sessionState === "Running" && (
-            <Tooltip title="取消执行">
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<StopOutlined />}
-                onClick={() => void onCancel()}
-              />
-            </Tooltip>
-          )}
-          <Tooltip title="历史对话">
-            <Button
-              type="text"
-              size="small"
-              icon={<HistoryOutlined />}
-              onClick={() => {
-                setHistoryOpen(true);
-                void onRefreshConversations();
-              }}
-            />
-          </Tooltip>
-          <Tooltip title="新建对话">
-            <Button
-              type="text"
-              size="small"
-              icon={<PlusOutlined />}
-              onClick={() => void onNewConversation()}
-            />
-          </Tooltip>
-          <Tooltip title="收起">
-            <Button
-              type="text"
-              size="small"
-              icon={<CompressOutlined />}
-              onClick={onToggleCollapse}
-            />
-          </Tooltip>
-        </div>
-      </div>
-
-      {/* 消息区 */}
-      <div
-        ref={msgRef}
-        style={{ flex: 1, overflow: "auto", padding: "8px 12px" }}
-      >
-        {!configured && !cfgLoading ? (
-          // 未配置 AI：引导去配置页
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              gap: 12,
-              padding: 24,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 12,
-                color: "var(--antd-color-text-secondary)",
-                textAlign: "center",
-              }}
-            >
-              尚未配置 AI 后端。请在「AI 配置」页设置
-              API 协议、Base URL、API Key 与模型。
-            </div>
-            <Button
-              type="primary"
-              size="small"
-              icon={<SettingOutlined />}
-              onClick={() => navigate("/config")}
-            >
-              前往配置
-            </Button>
-          </div>
-        ) : cfgLoading ? (
-          <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
-            <Spin size="small" />
-          </div>
-        ) : messages.length === 0 && !streamingText && !pendingCommand ? (
-          <div
-            style={{
-              color: "var(--antd-color-text-secondary)",
-              fontSize: 12,
-              padding: 16,
-              textAlign: "center",
-            }}
-          >
-            发送消息开始对话...
-          </div>
-        ) : (
-          <>
-            {messages.map((msg, index) => renderMessage(msg, index))}
-
-            {/* 流式气泡 */}
-            {streamingText && (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-start",
-                  marginBottom: 6,
-                }}
-              >
-                <div
-                  style={{
-                    maxWidth: "85%",
-                    padding: "5px 10px",
-                    borderRadius: 8,
-                    fontSize: 12,
-                    lineHeight: 1.5,
-                    background: "var(--antd-color-fill-secondary)",
-                    color: "var(--antd-color-text)",
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-all",
-                  }}
-                >
-                  {streamingText}
-                  <span style={{ opacity: 0.6 }}>▌</span>
-                </div>
-              </div>
-            )}
-
-            {/* 审批卡 */}
-            {pendingCommand && (
-              <CommandCard
-                command={pendingCommand}
-                busy={commandStatus === "approved"}
-                status={commandStatus ?? "pending"}
-                onApprove={(cmd) => void onApprove(cmd)}
-                onReject={() => void onReject()}
-              />
-            )}
-
-            {/* 错误提示 */}
-            {lastError && (
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--antd-color-error)",
-                  padding: "4px 8px",
-                }}
-              >
-                {lastError}
-              </div>
-            )}
-
-            {busy && !streamingText && (
-              <div style={{ display: "flex", justifyContent: "flex-start" }}>
-                <Spin size="small" />
-              </div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* 输入区 */}
-      <div
-        style={{
-          padding: "6px 8px",
-          borderTop: "1px solid var(--antd-color-border-secondary)",
-          display: "flex",
-          gap: 6,
-          alignItems: "flex-end",
-          flexShrink: 0,
-        }}
-      >
-        <Input.TextArea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={
-            !configured
-              ? "请先配置 AI 后端"
-              : inputDisabled
-                ? "等待本轮对话结束..."
-                : "输入问题..."
-          }
-          autoSize={{ minRows: 1, maxRows: 3 }}
-          style={{ fontSize: 12 }}
-          disabled={inputDisabled}
-        />
-        <Button
-          type="primary"
-          size="small"
-          icon={<SendOutlined />}
-          onClick={() => void handleSend()}
-          disabled={!input.trim() || sending || inputDisabled}
-          loading={sending}
-        />
-      </div>
-
-      {/* 历史对话面板 */}
-      <Drawer
-        title="历史对话"
-        placement="right"
-        width={240}
+        onNewConversation={onNewConversation}
+        onToggleCollapse={onToggleCollapse}
+      />
+      <MessageList
+        messages={messages}
+        streamingText={streamingText}
+        pendingCommand={pendingCommand}
+        commandStatus={commandStatus}
+        lastError={lastError}
+        busy={busy}
+        configured={configured}
+        cfgLoading={cfgLoading}
+        onApprove={onApprove}
+        onReject={onReject}
+      />
+      <PanelInput
+        input={input}
+        sending={sending}
+        inputDisabled={inputDisabled}
+        configured={configured}
+        onInputChange={setInput}
+        onSend={handleSend}
+        onKeyDown={handleKeyDown}
+      />
+      <HistoryDrawer
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
-        styles={{
-          header: { padding: "6px 12px", fontSize: 13, fontWeight: 600 },
-          body: { padding: "4px" },
-        }}
-      >
-        <List
-          size="small"
-          dataSource={conversations}
-          locale={{ emptyText: "暂无历史对话" }}
-          renderItem={(conv) => (
-            <List.Item
-              style={{ cursor: "pointer", padding: "4px 4px" }}
-              onClick={() => {
-                setHistoryOpen(false);
-                void onSwitchConversation(conv.id);
-              }}
-              actions={[
-                <Popconfirm
-                  key="delete"
-                  title="删除该对话？此操作不可恢复。"
-                  onConfirm={(e) => {
-                    e?.stopPropagation();
-                    void onDeleteConversation(conv.id);
-                  }}
-                >
-                  <Button
-                    type="text"
-                    size="small"
-                    danger
-                    icon={<DeleteOutlined />}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </Popconfirm>,
-              ]}
-            >
-              <List.Item.Meta
-                title={
-                  <span style={{ fontSize: 12, lineHeight: "18px" }}>
-                    {activeSession === conv.id ? "当前 · " : ""}
-                    {conv.title}
-                  </span>
-                }
-                description={
-                  <span style={{ fontSize: 10, lineHeight: "14px" }}>
-                    {new Date(conv.updatedAt * 1000).toLocaleString()}
-                  </span>
-                }
-              />
-            </List.Item>
-          )}
-        />
-      </Drawer>
+        conversations={conversations}
+        activeSession={activeSession}
+        onSwitchConversation={onSwitchConversation}
+        onDeleteConversation={onDeleteConversation}
+      />
     </div>
   );
 }
