@@ -3,6 +3,7 @@ import {
   ClearOutlined,
   CopyOutlined,
   DisconnectOutlined,
+  MessageOutlined,
   SearchOutlined,
   ZoomInOutlined,
   ZoomOutOutlined,
@@ -17,6 +18,8 @@ interface TerminalHeaderProps {
   fontSize: number;
   maxFontSize: number;
   minFontSize: number;
+  aiOpen: boolean;
+  onToggleAI: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onSearch: () => void;
@@ -25,7 +28,7 @@ interface TerminalHeaderProps {
   onDisconnect: () => void;
 }
 
-/** 终端标题栏：主机信息 + 缩放/搜索/清空/复制/断开操作。 */
+/** 终端标题栏：主机信息 + AI 面板开关/缩放/搜索/清空/复制/断开操作。 */
 export default function TerminalHeader({
   hostName,
   hostAddr,
@@ -35,6 +38,8 @@ export default function TerminalHeader({
   fontSize,
   maxFontSize,
   minFontSize,
+  aiOpen,
+  onToggleAI,
   onZoomIn,
   onZoomOut,
   onSearch,
@@ -97,6 +102,14 @@ export default function TerminalHeader({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
+        <Tooltip title={aiOpen ? "收起 AI 面板" : "打开 AI 面板"}>
+          <Button
+            type={aiOpen ? "primary" : "text"}
+            size="small"
+            icon={<MessageOutlined />}
+            onClick={onToggleAI}
+          />
+        </Tooltip>
         <Tooltip title="放大 (Ctrl++)">
           <Button
             type="text"

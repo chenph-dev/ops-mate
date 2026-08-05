@@ -3,12 +3,21 @@ import { Button, Spin } from "antd";
 import { SettingOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import CommandCard from "@/components/CommandCard";
+import MarkdownContent from "@/components/MarkdownContent";
 import type {
   ApprovalStatus,
   CommandSuggestion,
   Message,
 } from "./types";
 import ToolOutputBlock from "./ToolOutputBlock";
+
+/** 空态示例 prompt：点击填充输入框（暗示半自动模型：可提议命令需审批）。 */
+const SUGGESTIONS = [
+  "检查磁盘使用情况并给出清理建议",
+  "查看系统负载和内存占用",
+  "查看最近 10 条系统错误日志",
+  "列出 Docker 容器运行状态",
+];
 
 interface MessageListProps {
   messages: Message[];
@@ -19,8 +28,11 @@ interface MessageListProps {
   busy: boolean;
   configured: boolean;
   cfgLoading: boolean;
+  runningCommand: string | null;
+  runElapsed: number;
   onApprove: (command: string) => Promise<void>;
   onReject: () => Promise<void>;
+  onSelectSuggestion: (text: string) => void;
 }
 
 /** 从 assistant 消息的 toolCalls JSON 解析出命令建议，并据相邻 tool 消息推断审批状态。 */
@@ -66,8 +78,11 @@ export default function MessageList({
   busy,
   configured,
   cfgLoading,
+  runningCommand,
+  runElapsed,
   onApprove,
   onReject,
+  onSelectSuggestion,
 }: MessageListProps): React.JSX.Element {
   const navigate = useNavigate();
   const msgRef = useRef<HTMLDivElement>(null);
@@ -76,7 +91,9 @@ export default function MessageList({
     if (msgRef.current) {
       msgRef.current.scrollTop = msgRef.current.scrollHeight;
     }
-  }, [messages, streamingText, pendingCommand]);
+    // runElapsed 每秒变化不入依赖：命令运行中不打断用户向上翻看历史，
+    // 仅命令开始（runningCommand 从 null 变为命令）时滚动到底部展示执行条。
+  }, [messages, streamingText, pendingCommand, runningCommand]);
 
   const renderMessage = (msg: Message, index: number): React.JSX.Element => {
     if (msg.role === "user") {
@@ -135,22 +152,24 @@ export default function MessageList({
               maxWidth: "85%",
               padding: "5px 10px",
               borderRadius: 8,
-              fontSize: 12,
-              lineHeight: 1.5,
               background: "var(--antd-color-fill-secondary)",
-              color: "var(--antd-color-text)",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-all",
             }}
           >
-            {msg.content}
+            {/* 已完成的助手消息：Markdown 渲染（表格/代码块/列表） */}
+            <MarkdownContent content={msg.content} />
           </div>
         </div>
       );
     }
 
-    // tool 消息：命令执行输出，默认折叠
-    return <ToolOutputBlock key={msg.id} content={msg.content} />;
+    // tool 消息：命令执行输出，默认折叠（含结构化元数据头部）
+    return (
+      <ToolOutputBlock
+        key={msg.id}
+        content={msg.content}
+        toolResult={msg.toolResult}
+      />
+    );
   };
 
   return (
@@ -191,16 +210,53 @@ export default function MessageList({
         <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
           <Spin size="small" />
         </div>
-      ) : messages.length === 0 && !streamingText && !pendingCommand ? (
+      ) : messages.length === 0 && !streamingText && !pendingCommand && !runningCommand ? (
         <div
           style={{
-            color: "var(--antd-color-text-secondary)",
-            fontSize: 12,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 8,
             padding: 16,
-            textAlign: "center",
           }}
         >
-          发送消息开始对话...
+          <div
+            style={{
+              color: "var(--antd-color-text-secondary)",
+              fontSize: 12,
+            }}
+          >
+            尝试让 AI 帮你操作这台主机，例如：
+          </div>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 6,
+              maxWidth: 360,
+              width: "100%",
+            }}
+          >
+            {SUGGESTIONS.map((s) => (
+              <div
+                key={s}
+                onClick={() => onSelectSuggestion(s)}
+                title="点击填入输入框"
+                style={{
+                  border: "1px solid var(--antd-color-border-secondary)",
+                  borderRadius: 6,
+                  padding: "6px 8px",
+                  fontSize: 11,
+                  lineHeight: 1.5,
+                  color: "var(--antd-color-text)",
+                  cursor: "pointer",
+                  background: "var(--antd-color-bg-elevated)",
+                }}
+              >
+                {s}
+              </div>
+            ))}
+          </div>
         </div>
       ) : (
         <>
@@ -245,12 +301,15 @@ export default function MessageList({
             />
           )}
 
-          {/* 错误提示 */}
+          {/* 错误提示；主动取消属正常反馈，用中性色而非红色 */}
           {lastError && (
             <div
               style={{
                 fontSize: 12,
-                color: "var(--antd-color-error)",
+                color:
+                  lastError === "本次执行已取消"
+                    ? "var(--antd-color-text-secondary)"
+                    : "var(--antd-color-error)",
                 padding: "4px 8px",
               }}
             >
@@ -261,6 +320,43 @@ export default function MessageList({
           {busy && !streamingText && (
             <div style={{ display: "flex", justifyContent: "flex-start" }}>
               <Spin size="small" />
+            </div>
+          )}
+
+          {/* 执行中：命令正在运行，展示在消息流末尾 */}
+          {runningCommand && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                marginTop: 6,
+              }}
+            >
+              <Spin size="small" />
+              <span
+                title={runningCommand}
+                style={{
+                  fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
+                  fontSize: 11,
+                  background: "rgba(0,0,0,0.25)",
+                  border: "1px solid var(--antd-color-border-secondary)",
+                  borderRadius: 4,
+                  padding: "2px 8px",
+                  color: "var(--antd-color-text-secondary)",
+                  maxWidth: "75%",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                $ {runningCommand}
+              </span>
+              <span
+                style={{ fontSize: 11, color: "var(--antd-color-text-secondary)" }}
+              >
+                {runElapsed}s
+              </span>
             </div>
           )}
         </>

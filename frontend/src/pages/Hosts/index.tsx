@@ -168,29 +168,40 @@ export default function HostsPage(): React.JSX.Element {
         }}
       />
 
-      {/* 右：终端 + AI 面板（悬浮） */}
-      <div style={{ position: 'relative', height: '100%' }}>
-        {/* 终端区域：占满整个右侧 */}
-        <Terminal
-          isDark={isDark}
-          hostID={selectedHost?.id}
-          connected={terminal.connected}
-          connecting={terminal.connecting}
-          reconnecting={terminal.reconnecting}
-          reconnectCount={terminal.reconnectCount}
-          hostName={selectedHost?.name ?? ''}
-          hostAddr={
-            selectedHost
-              ? `${selectedHost.user}@${selectedHost.addr}:${selectedHost.port}`
-              : ''
-          }
-          onData={terminal.sendData}
-          onResize={terminal.resize}
-          setOutputHandler={terminal.setOutputHandler}
-          onDisconnect={() => terminal.close()}
-        />
+      {/* 右：终端 + AI 面板（并排，AI 面板固定宽度、终端自适应让出空间） */}
+      <div
+        style={{
+          position: 'relative',
+          height: '100%',
+          display: 'flex',
+          minWidth: 0,
+        }}
+      >
+        {/* 终端区域：占据 AI 面板之外的剩余宽度 */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Terminal
+            isDark={isDark}
+            hostID={selectedHost?.id}
+            connected={terminal.connected}
+            connecting={terminal.connecting}
+            reconnecting={terminal.reconnecting}
+            reconnectCount={terminal.reconnectCount}
+            hostName={selectedHost?.name ?? ''}
+            hostAddr={
+              selectedHost
+                ? `${selectedHost.user}@${selectedHost.addr}:${selectedHost.port}`
+                : ''
+            }
+            onData={terminal.sendData}
+            onResize={terminal.resize}
+            setOutputHandler={terminal.setOutputHandler}
+            onDisconnect={() => terminal.close()}
+            aiOpen={!aiCollapsed}
+            onToggleAI={() => setAiCollapsed(!aiCollapsed)}
+          />
+        </div>
 
-        {/* AI 面板：悬浮在终端之上 */}
+        {/* AI 面板：收起时渲染右下角按钮（不占位），展开时并排固定宽度 */}
         <AIPanel
           activeSession={sessions.activeSession}
           messages={sessions.messages}
@@ -200,6 +211,8 @@ export default function HostsPage(): React.JSX.Element {
           commandStatus={sessions.commandStatus}
           sessionState={sessions.sessionState}
           lastError={sessions.lastError}
+          runningCommand={sessions.runningCommand}
+          runElapsed={sessions.runElapsed}
           hostName={selectedHost?.name ?? ''}
           collapsed={aiCollapsed}
           onRefreshConversations={sessions.refreshConversations}

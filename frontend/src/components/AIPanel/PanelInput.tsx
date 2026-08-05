@@ -1,7 +1,11 @@
 import { Button, Input } from "antd";
 import { SendOutlined } from "@ant-design/icons";
+import type { Ref } from "react";
+import type { TextAreaRef } from "antd/es/input/TextArea";
 
 interface PanelInputProps {
+  /** 输入框 ref（示例引导填充后聚焦用）。 */
+  ref?: Ref<TextAreaRef>;
   input: string;
   sending: boolean;
   inputDisabled: boolean;
@@ -13,6 +17,7 @@ interface PanelInputProps {
 
 /** 抽屉底部输入区。 */
 export default function PanelInput({
+  ref,
   input,
   sending,
   inputDisabled,
@@ -33,6 +38,7 @@ export default function PanelInput({
       }}
     >
       <Input.TextArea
+        ref={ref}
         value={input}
         onChange={(e) => onInputChange(e.target.value)}
         onKeyDown={onKeyDown}

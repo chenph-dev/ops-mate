@@ -1,14 +1,13 @@
 import { Button, Tag, Tooltip } from "antd";
 import {
-  HolderOutlined,
   MessageOutlined,
   CompressOutlined,
   PlusOutlined,
   StopOutlined,
-  HistoryOutlined,
 } from "@ant-design/icons";
-import type { configstore } from "@wailsjs/go/models";
+import type { configstore, convstore } from "@wailsjs/go/models";
 import type { SessionState } from "./types";
+import HistoryPopover from "./HistoryPopover";
 
 interface PanelHeaderProps {
   hostName: string;
@@ -17,16 +16,17 @@ interface PanelHeaderProps {
   cfgLoading: boolean;
   stateMeta: { text: string; color: string } | null;
   sessionState: SessionState;
-  resizeHover: boolean;
-  onResizeStart: (e: React.MouseEvent<HTMLDivElement>) => void;
-  onResizeHoverChange: (hover: boolean) => void;
+  conversations: convstore.Conversation[];
+  activeSession: string | null;
+  onSwitchConversation: (sid: string) => Promise<void>;
+  onDeleteConversation: (sid: string) => Promise<void>;
+  onRefreshConversations: () => Promise<void>;
   onCancel: () => Promise<void>;
-  onOpenHistory: () => void;
   onNewConversation: () => Promise<void>;
   onToggleCollapse: () => void;
 }
 
-/** 抽屉标题栏：整体作为拖拽调整高度的区域，grip 图标提示可拖动。 */
+/** 抽屉标题栏：AI 助手信息 + 会话操作按钮。宽度由面板左边缘拖拽条调整。 */
 export default function PanelHeader({
   hostName,
   aiCfg,
@@ -34,20 +34,17 @@ export default function PanelHeader({
   cfgLoading,
   stateMeta,
   sessionState,
-  resizeHover,
-  onResizeStart,
-  onResizeHoverChange,
+  conversations,
+  activeSession,
+  onSwitchConversation,
+  onDeleteConversation,
+  onRefreshConversations,
   onCancel,
-  onOpenHistory,
   onNewConversation,
   onToggleCollapse,
 }: PanelHeaderProps): React.JSX.Element {
   return (
     <div
-      onMouseDown={onResizeStart}
-      onMouseEnter={() => onResizeHoverChange(true)}
-      onMouseLeave={() => onResizeHoverChange(false)}
-      title="拖动调整高度"
       style={{
         padding: "6px 10px",
         display: "flex",
@@ -55,19 +52,9 @@ export default function PanelHeader({
         justifyContent: "space-between",
         borderBottom: "1px solid var(--antd-color-border-secondary)",
         flexShrink: 0,
-        cursor: "ns-resize",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <HolderOutlined
-          style={{
-            fontSize: 11,
-            color: resizeHover
-              ? "var(--antd-color-text)"
-              : "var(--antd-color-text-quaternary)",
-            transition: "color 0.2s",
-          }}
-        />
         <MessageOutlined style={{ color: "var(--antd-color-primary)" }} />
         <span style={{ fontSize: 12, fontWeight: 600 }}>AI 助手</span>
         <span
@@ -92,8 +79,8 @@ export default function PanelHeader({
         style={{ display: "flex", gap: 4 }}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        {sessionState === "Running" && (
-          <Tooltip title="取消执行">
+        {(sessionState === "Running" || sessionState === "Thinking") && (
+          <Tooltip title="取消本次（执行中/思考中均可中止）">
             <Button
               type="text"
               size="small"
@@ -103,14 +90,13 @@ export default function PanelHeader({
             />
           </Tooltip>
         )}
-        <Tooltip title="历史对话">
-          <Button
-            type="text"
-            size="small"
-            icon={<HistoryOutlined />}
-            onClick={onOpenHistory}
-          />
-        </Tooltip>
+        <HistoryPopover
+          conversations={conversations}
+          activeSession={activeSession}
+          onSwitchConversation={onSwitchConversation}
+          onDeleteConversation={onDeleteConversation}
+          onRefreshConversations={onRefreshConversations}
+        />
         <Tooltip title="新建对话">
           <Button
             type="text"
