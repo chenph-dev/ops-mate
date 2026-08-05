@@ -3,6 +3,7 @@ package convstore
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"ops-mate/internal/store"
@@ -110,6 +111,7 @@ func (s *ConvStore) ListConversations(hostID string) ([]Conversation, error) {
 }
 
 // SaveMessage 落库一条消息（含 tool calling 字段），并刷新会话 updated_at。
+// 会话首条 user 消息会用作标题摘要，让历史对话列表可读（而非"对话 <时间>"）。
 func (s *ConvStore) SaveMessage(m Message) error {
 	err := s.app.GORM().Create(&convMessage{
 		ID: crypto.NewID(), SessionID: m.SessionID, Role: m.Role,
@@ -121,9 +123,29 @@ func (s *ConvStore) SaveMessage(m Message) error {
 	if err != nil {
 		return err
 	}
+	if m.Role == "user" {
+		var count int64
+		if err := s.app.GORM().Model(&convMessage{}).
+			Where("session_id = ?", m.SessionID).Count(&count).Error; err == nil && count == 1 {
+			if sum := summarizeTitle(m.Content); sum != "" {
+				_ = s.app.GORM().Model(&convConversation{}).
+					Where("id = ?", m.SessionID).Update("title", sum).Error
+			}
+		}
+	}
 	return s.app.GORM().Model(&convConversation{}).
 		Where("id = ?", m.SessionID).
 		Update("updated_at", time.Now().Unix()).Error
+}
+
+// summarizeTitle 截取文本前 20 个字符作为会话标题摘要（rune 安全，中文不切碎）。
+func summarizeTitle(text string) string {
+	trimmed := strings.TrimSpace(text)
+	runes := []rune(trimmed)
+	if len(runes) <= 20 {
+		return trimmed
+	}
+	return string(runes[:20]) + "..."
 }
 
 // GetConversation 按 ID 取会话。

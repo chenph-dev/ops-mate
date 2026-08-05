@@ -51,24 +51,27 @@ export default function CommandCard({
     <div
       style={{
         border: `1px solid ${isHighRisk ? token.colorError : token.colorWarning}`,
-        borderRadius: 8,
-        padding: 12,
+        borderRadius: 6,
+        padding: 8,
         background: token.colorBgElevated,
-        margin: "8px 0",
+        margin: "4px 0",
       }}
     >
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 6,
-          marginBottom: 8,
+          gap: 4,
+          marginBottom: 6,
         }}
       >
         <WarningOutlined
-          style={{ color: isHighRisk ? token.colorError : token.colorWarning }}
+          style={{
+            color: isHighRisk ? token.colorError : token.colorWarning,
+            fontSize: 12,
+          }}
         />
-        <span style={{ fontWeight: 600, fontSize: 13 }}>
+        <span style={{ fontWeight: 600, fontSize: 12 }}>
           {isHighRisk ? "⚠️ AI 提议执行高风险命令" : "AI 提议执行命令"}
         </span>
         {status && (
@@ -86,17 +89,17 @@ export default function CommandCard({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           autoSize={{ minRows: 1, maxRows: 4 }}
-          style={{ fontFamily: "monospace", fontSize: 12, marginBottom: 8 }}
+          style={{ fontFamily: "monospace", fontSize: 11, marginBottom: 6 }}
         />
       ) : (
         <div
           style={{
             fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
-            fontSize: 12,
+            fontSize: 11,
             background: token.colorFillSecondary,
-            padding: "8px 10px",
+            padding: "5px 8px",
             borderRadius: 4,
-            marginBottom: 8,
+            marginBottom: 6,
             whiteSpace: "pre-wrap",
             wordBreak: "break-all",
           }}
@@ -105,9 +108,9 @@ export default function CommandCard({
         </div>
       )}
 
-      <div style={{ fontSize: 12, color: token.colorTextSecondary }}>
+      <div style={{ fontSize: 11, color: token.colorTextSecondary }}>
         <div>原因: {command.why || "-"}</div>
-        <div style={{ marginTop: 4 }}>
+        <div style={{ marginTop: 2 }}>
           风险:{" "}
           <Tag color={isHighRisk ? "red" : "orange"}>
             {isHighRisk ? "高" : command.risk || "低"}
@@ -117,8 +120,8 @@ export default function CommandCard({
 
       {!history && !done && (
         <>
-          <Divider style={{ margin: "8px 0" }} />
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <Divider style={{ margin: "4px 0" }} />
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 4 }}>
             <Tooltip title={editing ? "完成编辑" : "修改命令"}>
               <Button
                 size="small"

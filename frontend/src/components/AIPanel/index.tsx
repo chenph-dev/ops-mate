@@ -94,6 +94,56 @@ const STATE_LABEL: Record<string, { text: string; color: string }> = {
   Running: { text: "执行中", color: "green" },
 };
 
+/** 命令执行输出块：默认折叠成一行标题，点击展开查看完整输出。 */
+function ToolOutputBlock({ content }: { content: string }): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const lineCount = content.split("\n").filter((l) => l.trim() !== "").length;
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <div
+        onClick={() => setOpen(!open)}
+        title={open ? "收起输出" : "展开输出"}
+        style={{
+          fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
+          fontSize: 11,
+          background: "rgba(0,0,0,0.25)",
+          border: "1px solid var(--antd-color-border-secondary)",
+          borderRadius: 4,
+          padding: "2px 8px",
+          cursor: "pointer",
+          color: "var(--antd-color-text-secondary)",
+          userSelect: "none",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
+        {open ? "▾" : "▸"} 命令输出（{lineCount} 行）
+      </div>
+      {open && (
+        <div
+          style={{
+            fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
+            fontSize: 11,
+            background: "rgba(0,0,0,0.25)",
+            border: "1px solid var(--antd-color-border-secondary)",
+            borderTop: "none",
+            borderRadius: "0 0 4px 4px",
+            padding: "6px 8px",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-all",
+            color: "var(--antd-color-text)",
+            maxHeight: 240,
+            overflow: "auto",
+          }}
+        >
+          {content}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AIPanel({
   activeSession,
   messages,
@@ -307,28 +357,8 @@ export default function AIPanel({
       );
     }
 
-    // tool 消息：终端风格输出块
-    return (
-      <div key={msg.id} style={{ marginBottom: 6 }}>
-        <div
-          style={{
-            fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
-            fontSize: 11,
-            background: "rgba(0,0,0,0.25)",
-            border: "1px solid var(--antd-color-border-secondary)",
-            borderRadius: 4,
-            padding: "6px 8px",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-all",
-            color: "var(--antd-color-text)",
-            maxHeight: 200,
-            overflow: "auto",
-          }}
-        >
-          {msg.content}
-        </div>
-      </div>
-    );
+    // tool 消息：命令执行输出，默认折叠
+    return <ToolOutputBlock key={msg.id} content={msg.content} />;
   };
 
   const stateMeta = sessionState ? STATE_LABEL[sessionState] : null;
@@ -601,16 +631,21 @@ export default function AIPanel({
       <Drawer
         title="历史对话"
         placement="right"
-        width={300}
+        width={240}
         open={historyOpen}
         onClose={() => setHistoryOpen(false)}
+        styles={{
+          header: { padding: "6px 12px", fontSize: 13, fontWeight: 600 },
+          body: { padding: "4px" },
+        }}
       >
         <List
+          size="small"
           dataSource={conversations}
           locale={{ emptyText: "暂无历史对话" }}
           renderItem={(conv) => (
             <List.Item
-              style={{ cursor: "pointer", paddingLeft: 4, paddingRight: 4 }}
+              style={{ cursor: "pointer", padding: "4px 4px" }}
               onClick={() => {
                 setHistoryOpen(false);
                 void onSwitchConversation(conv.id);
@@ -636,13 +671,13 @@ export default function AIPanel({
             >
               <List.Item.Meta
                 title={
-                  <span style={{ fontSize: 13 }}>
+                  <span style={{ fontSize: 12, lineHeight: "18px" }}>
                     {activeSession === conv.id ? "当前 · " : ""}
                     {conv.title}
                   </span>
                 }
                 description={
-                  <span style={{ fontSize: 11 }}>
+                  <span style={{ fontSize: 10, lineHeight: "14px" }}>
                     {new Date(conv.updatedAt * 1000).toLocaleString()}
                   </span>
                 }

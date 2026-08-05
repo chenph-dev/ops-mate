@@ -1,6 +1,7 @@
 package convstore
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -34,7 +35,8 @@ func TestConversationAndCommands_FTS(t *testing.T) {
 	}
 
 	conv, _ := convs.ListConversations(hostID)
-	if len(conv) != 1 || conv[0].Title != "cpu 高" {
+	// 首条 user 消息会把标题更新为内容摘要
+	if len(conv) != 1 || conv[0].Title != "cpu 为什么高" {
 		t.Fatalf("ListConversations: %+v", conv)
 	}
 	msgs, _ := convs.LoadMessages(sid)
@@ -125,6 +127,37 @@ func TestSaveMessage_ApprovalStatusRoundTrip(t *testing.T) {
 	}
 	if len(msgs) != 1 || msgs[0].ApprovalStatus != "rejected" {
 		t.Errorf("approval_status 往返失败: %+v", msgs)
+	}
+}
+
+func TestSaveMessage_FirstUserMessageSetsTitleSummary(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	app, _ := store.Open()
+	defer closeDB(app)
+
+	convs := NewConvStore(app)
+	hosts := hoststore.NewHostsStore(app)
+	hostID, _ := hosts.SaveHost(hoststore.HostInput{Name: "h", Addr: "1.1.1.1", Port: 22, User: "u", AuthType: "password", Secret: "x"})
+	sid, _ := convs.NewConversation(hostID, "对话 初始")
+
+	// 首条 user 消息应把标题更新为 20 字符摘要
+	longText := strings.Repeat("测", 30)
+	if err := convs.SaveMessage(Message{SessionID: sid, Role: "user", Content: longText}); err != nil {
+		t.Fatalf("SaveMessage: %v", err)
+	}
+	conv, _ := convs.GetConversation(sid)
+	want := strings.Repeat("测", 20) + "..."
+	if conv.Title != want {
+		t.Errorf("标题应为摘要 %q，得到 %q", want, conv.Title)
+	}
+
+	// 第二条消息不应覆盖标题
+	if err := convs.SaveMessage(Message{SessionID: sid, Role: "user", Content: "第二条"}); err != nil {
+		t.Fatalf("SaveMessage 2: %v", err)
+	}
+	conv, _ = convs.GetConversation(sid)
+	if conv.Title != want {
+		t.Errorf("第二条消息不应覆盖标题: %q", conv.Title)
 	}
 }
 
