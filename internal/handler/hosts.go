@@ -48,7 +48,10 @@ func (h *HostsHandler) DeleteNode(nodeID string) error {
 }
 
 // TestConnection 保存前验证：临时构造执行器跑 `echo ok`。
-func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, string, error) {
+// 注意：返回 (bool, error) 两个值——Wails 绑定层（boundMethod.go）仅支持
+// 1~2 个返回值，返回 3 个值（如 bool+string+error）时前端恒得到空值，
+// 导致连接成功也显示"失败"。失败原因走 error 供前端 catch 展示。
+func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, error) {
 	ex := sshexec.NewExecutor(sshexec.Host{
 		Addr: in.Addr, Port: in.Port, User: in.User,
 		AuthType: in.AuthType, Secret: in.Secret,
@@ -57,11 +60,11 @@ func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, string, err
 	defer cancel()
 	ch, err := ex.Exec(ctx, "echo ok")
 	if err != nil {
-		return false, err.Error(), nil
+		return false, err
 	}
 	for range ch {
 	}
-	return true, "", nil
+	return true, nil
 }
 
 // ExecuteCommand 在指定主机上执行单条命令，返回输出。
