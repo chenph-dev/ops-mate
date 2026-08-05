@@ -312,7 +312,8 @@ func (m *SessionManager) RejectCommand(sid string) error {
 	return nil
 }
 
-// CancelRun 中止执行中的命令（仅 Running 态有效）。
+// CancelRun 中止本轮执行：思考中（等待 LLM 生成）与执行中（命令运行）均可取消。
+// 取消后 Graph Invoke 返回 context.Canceled，run() 会清理状态并回 Idle。
 func (m *SessionManager) CancelRun(sid string) error {
 	s, err := m.sessionFor(sid)
 	if err != nil {
@@ -320,8 +321,8 @@ func (m *SessionManager) CancelRun(sid string) error {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.state != stRunning {
-		return fmt.Errorf("当前没有执行中的命令（state=%s）", s.state)
+	if s.state != stRunning && s.state != stThinking {
+		return fmt.Errorf("当前没有可取消的任务（state=%s）", s.state)
 	}
 	if s.cancel != nil {
 		s.cancel()
@@ -373,6 +374,9 @@ func (m *SessionManager) run(s *agentSession, ctx context.Context, input []*sche
 		// 非中断错误也清理 checkpoint：若残留，下一轮 Invoke 会从上一轮
 		// 中断/失败点恢复，导致 state 消息翻倍错乱。
 		_ = s.checkpoints.Delete(ctx, s.id)
+		// 整轮对话结束：清空 tool call 队列，防止取消/中断遗留混入下一轮导致配对错位。
+		// （AwaitingApproval 分支不清——当前待审批 tool_call 仍需 Take。）
+		s.toolCalls.Reset()
 		if errors.Is(err, context.Canceled) {
 			m.emitError(s.id, "本次执行已取消")
 		} else {
@@ -384,6 +388,7 @@ func (m *SessionManager) run(s *agentSession, ctx context.Context, input []*sche
 	s.state = stIdle
 	s.interruptID = ""
 	_ = s.checkpoints.Delete(ctx, s.id)
+	s.toolCalls.Reset()
 	m.emitState(s.id, StateIdle)
 }
 

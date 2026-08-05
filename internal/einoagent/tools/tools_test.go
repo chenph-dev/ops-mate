@@ -175,6 +175,45 @@ func TestTruncateForDisplay_RuneSafe(t *testing.T) {
 	}
 }
 
+// 回归：run:result emit 时，该命令的 tool 消息必须已落库。
+// 修复前 run:result 在 saveToolMessage 之前 emit，前端收到事件触发 resync 时
+// tool 消息还不在库中，assistant 提议与其结果的相邻配对缺失，
+// 审批状态会被误判回"待审批"。
+func TestSSHTool_RunResultEmittedAfterToolMessagePersisted(t *testing.T) {
+	app := testutil.OpenTempStore(t)
+	hosts := hoststore.NewHostsStore(app)
+	convs := convstore.NewConvStore(app)
+	hostID, _ := hosts.SaveHost(hoststore.HostInput{Name: "h", Addr: "1.1.1.1", Port: 22, User: "u", AuthType: "password", Secret: "x"})
+	sid, _ := convs.NewConversation(hostID, "t")
+
+	ex := &testutil.FakeExec{Lines: []sshexec.Line{{Stream: "stdout", Text: "file1"}}}
+	holder := NewToolCallHolder()
+	holder.Add(&schema.ToolCall{ID: "call_1", Function: schema.FunctionCall{Name: "execute_command"}})
+
+	persistedAtResult := false
+	emit := func(_ string, event string, _ any) {
+		if event == "run:result" {
+			msgs, err := convs.LoadMessages(sid)
+			if err != nil {
+				t.Errorf("LoadMessages: %v", err)
+				return
+			}
+			for _, m := range msgs {
+				if m.Role == "tool" && m.ToolCallID == "call_1" {
+					persistedAtResult = true
+				}
+			}
+		}
+	}
+	tool := NewSSHTool(sid, ex, emit, convs, holder)
+	if _, err := tool.execute(context.Background(), "ls"); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+	if !persistedAtResult {
+		t.Error("run:result emit 时 tool 消息应已落库（修复前在落库之前 emit）")
+	}
+}
+
 // 注：rejected 落库分支与空批准数据守卫都需要图执行上下文（einotool.Resume）才能触发，
 // 工具层无法直接测试。空批准数据守卫由 graph 包测试
 // （TestApprovalFlow_ApproveWithEmptyCommandGuarded）覆盖；

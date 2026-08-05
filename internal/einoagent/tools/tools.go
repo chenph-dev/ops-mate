@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
@@ -32,6 +33,16 @@ type commandInfo struct {
 	Why          string `json:"why"`
 	Risk         string `json:"risk"`
 	AssessedRisk string `json:"assessedRisk"`
+}
+
+// toolMeta 工具执行元数据，JSON 序列化后存入消息的 ToolResult 字段
+// （DB 列 tool_result 预留未用），供前端历史回放时展示命令、退出码、耗时等结构化信息。
+type toolMeta struct {
+	Command    string `json:"command"`
+	ExitCode   int    `json:"exitCode,omitempty"`
+	DurationMS int64  `json:"durationMs,omitempty"`
+	Status     string `json:"status"` // "approved" | "rejected"
+	Cancelled  bool   `json:"cancelled,omitempty"`
 }
 
 // ToolCallHolder 按先进先出保存待执行的 tool call 队列，
@@ -63,6 +74,16 @@ func (h *ToolCallHolder) Take() *schema.ToolCall {
 	tc := h.tcs[0]
 	h.tcs = h.tcs[1:]
 	return tc
+}
+
+// Reset 清空待执行的 tool call 队列。
+// 一轮对话真正结束（Idle：成功/失败/取消）后调用，防止取消或中断遗留的
+// tool_call 混入下一轮，导致 tool 消息配错 tool_call_id。
+// 注意：等待审批（AwaitingApproval）时不能调用——当前待审批的 tool_call 仍需 Take。
+func (h *ToolCallHolder) Reset() {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.tcs = h.tcs[:0]
 }
 
 // SSHTool 把 SSH 执行器包装为 eino InvokableTool。
@@ -124,46 +145,49 @@ func (t *SSHTool) InvokableRun(ctx context.Context, argsJSON string, opts ...ein
 		Risk: riskLabel, AssessedRisk: risk,
 	}
 
+	// 恢复调用判定：该工具在本次运行确实被中断过，且 resume 数据匹配当前命令。
+	// 不能仅凭 wasInterrupted 判断——多 tool_call 顺序执行时，后续命令的 ctx 也会携带
+	// "本次运行曾中断"的上下文，若据此跳过 emit，会导致后续命令的前端审批卡缺失
+	// （表现为"卡在某条命令待审批但没有操作按钮"）。
 	wasInterrupted, _, _ := einotool.GetInterruptState[commandInfo](ctx)
-	if !wasInterrupted {
-		// 首次调用：任意风险等级都中断等审批（全量审批）。
-		if t.emit != nil {
-			t.emit(t.sessionID, "ai:command", info)
+	isTarget, hasData, data := einotool.GetResumeContext[string](ctx)
+	if wasInterrupted && isTarget && hasData {
+		// 协议约定：resume 数据为保留字 "rejected" 表示拒绝，其余字符串视为（可能被用户编辑过的）待执行命令。
+		if data == "rejected" {
+			content := "用户拒绝了这条命令，未执行。请不要重复提议同一条命令，换其他方案或向用户询问更多信息。"
+			if t.convs != nil {
+				// 拒绝也必须落库 tool 消息，否则 assistant 的 tool_calls 没有配对结果，
+				// 历史回放时模型会拒绝整个会话。
+				t.saveToolMessage(content, "rejected",
+					toolMeta{Command: args.Command, Status: "rejected"})
+			}
+			return content, nil
 		}
-		return "", einotool.Interrupt(ctx, info)
+		if strings.TrimSpace(data) == "" {
+			// 批准数据为空同样落库配对结果，避免产生孤立 tool_calls。
+			content := "批准数据为空，命令未执行。请重新提议命令。"
+			if t.convs != nil {
+				t.saveToolMessage(content, "rejected",
+					toolMeta{Command: args.Command, Status: "rejected"})
+			}
+			return content, nil
+		}
+		// data = 批准后的最终命令（用户可能编辑过）
+		return t.execute(ctx, data)
 	}
 
-	// 恢复路径
-	isTarget, hasData, data := einotool.GetResumeContext[string](ctx)
-	if !isTarget || !hasData {
-		// 不是本次审批目标（或无数据）：重新中断，让 Resume 信号传播到正确位置。
-		return "", einotool.Interrupt(ctx, info)
+	// 首次调用，或中断上下文存在但 resume 数据不匹配当前命令（多 tool_call 的后续命令）：
+	// 每次都 emit ai:command 并中断，等待该命令的审批。
+	if t.emit != nil {
+		t.emit(t.sessionID, "ai:command", info)
 	}
-	// 协议约定：resume 数据为保留字 "rejected" 表示拒绝，其余字符串视为（可能被用户编辑过的）待执行命令。
-	if data == "rejected" {
-		content := "用户拒绝了这条命令，未执行。请不要重复提议同一条命令，换其他方案或向用户询问更多信息。"
-		if t.convs != nil {
-			// 拒绝也必须落库 tool 消息，否则 assistant 的 tool_calls 没有配对结果，
-			// 历史回放时模型会拒绝整个会话。
-			t.saveToolMessage(content, "rejected")
-		}
-		return content, nil
-	}
-	if strings.TrimSpace(data) == "" {
-		// 批准数据为空同样落库配对结果，避免产生孤立 tool_calls。
-		content := "批准数据为空，命令未执行。请重新提议命令。"
-		if t.convs != nil {
-			t.saveToolMessage(content, "rejected")
-		}
-		return content, nil
-	}
-	// data = 批准后的最终命令（用户可能编辑过）
-	return t.execute(ctx, data)
+	return "", einotool.Interrupt(ctx, info)
 }
 
 // execute 执行命令：推送事件、落库、返回回灌模型的文本（永不返回 error，
 // 执行失败也转为文本回灌，让 AI 看到并可换方案）。
 func (t *SSHTool) execute(ctx context.Context, command string) (string, error) {
+	start := time.Now()
 	if t.emit != nil {
 		t.emit(t.sessionID, "run:start", map[string]any{"command": command})
 	}
@@ -171,19 +195,10 @@ func (t *SSHTool) execute(ctx context.Context, command string) (string, error) {
 	output, exitCode, execErr := runCommand(ctx, t.executor, command)
 	cancelled := ctx.Err() != nil
 	display := truncateForDisplay(output)
-
-	if t.emit != nil {
-		errStr := ""
-		if execErr != nil {
-			errStr = execErr.Error()
-		}
-		t.emit(t.sessionID, "run:result", map[string]any{
-			"command":   command,
-			"output":    display,
-			"exitCode":  exitCode,
-			"error":     errStr,
-			"cancelled": cancelled,
-		})
+	meta := toolMeta{
+		Command: command, ExitCode: exitCode,
+		DurationMS: time.Since(start).Milliseconds(),
+		Status:     "approved", Cancelled: cancelled,
 	}
 
 	var content string
@@ -201,24 +216,42 @@ func (t *SSHTool) execute(ctx context.Context, command string) (string, error) {
 
 	// 落库保留较完整输出（≤64KB 展示截断），回灌模型用 8KB 截断——历史回放时模型看到的 tool 结果可能比原轮次更多，属预期。
 	if t.convs != nil {
-		t.saveToolMessage(content, "approved")
+		t.saveToolMessage(content, "approved", meta)
 		if err := t.convs.SaveCommand(t.sessionID, command, exitCode, display); err != nil {
 			log.Printf("einoagent: save command record: %v", err)
 		}
+	}
+
+	// 落库完成后再 emit run:result —— 保证前端收到事件触发 resync 时，本命令的
+	// tool 消息已在库中，assistant 提议与其结果的相邻配对完整，
+	// 审批状态不会被误判回"待审批"。
+	if t.emit != nil {
+		errStr := ""
+		if execErr != nil {
+			errStr = execErr.Error()
+		}
+		t.emit(t.sessionID, "run:result", map[string]any{
+			"command":   command,
+			"output":    display,
+			"exitCode":  exitCode,
+			"error":     errStr,
+			"cancelled": cancelled,
+		})
 	}
 
 	return truncateForModel(content), nil
 }
 
 // saveToolMessage 落库一条 tool 消息，配对当前 Take 出的 tool call，
-// 并记录审批状态（"approved" 已批准执行 / "rejected" 已拒绝）。
+// 并记录审批状态（"approved" 已批准执行 / "rejected" 已拒绝）与执行元数据 meta。
 // 批准执行、拒绝、空批准数据等所有结束审批的路径都必须调用，
 // 否则 assistant 的 tool_calls 在历史中孤立，模型端会拒绝整个请求。
-func (t *SSHTool) saveToolMessage(content, approvalStatus string) {
+func (t *SSHTool) saveToolMessage(content, approvalStatus string, meta toolMeta) {
 	toolCallID := ""
 	if tc := t.holder.Take(); tc != nil {
 		toolCallID = tc.ID
 	}
+	metaJSON, _ := json.Marshal(meta)
 	if err := t.convs.SaveMessage(convstore.Message{
 		SessionID:      t.sessionID,
 		Role:           history.RoleTool,
@@ -226,6 +259,7 @@ func (t *SSHTool) saveToolMessage(content, approvalStatus string) {
 		ToolCallID:     toolCallID,
 		ToolName:       "execute_command",
 		ApprovalStatus: approvalStatus,
+		ToolResult:     string(metaJSON),
 	}); err != nil {
 		log.Printf("einoagent: save tool message: %v", err)
 	}

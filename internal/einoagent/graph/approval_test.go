@@ -160,6 +160,128 @@ func TestApprovalFlow_ResumeDoesNotRecallModelBeforeInterrupt(t *testing.T) {
 	}
 }
 
+// 串行约束：模型一次回复多条命令时，只保留第一条执行，其余丢弃。
+// 若 ToolsNode 一次执行全部、每条都中断，后端仅存单个 interruptID 而前端仅单个审批卡，
+// 会导致"显示 pwd、实际执行 ls"的错配。
+func TestApprovalFlow_MultiToolCallsTruncatedToOne(t *testing.T) {
+	ctx := context.Background()
+	ex := &testutil.FakeExec{Lines: []sshexec.Line{{Stream: "stdout", Text: "ok"}}}
+	rec := &testutil.EmitRecorder{}
+	holder := agenttools.NewToolCallHolder()
+	sshTool := agenttools.NewSSHTool("s1", ex, rec.Emit, nil, holder)
+	toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
+		Tools: []einotool.BaseTool{sshTool}, ExecuteSequentially: true,
+	})
+	if err != nil {
+		t.Fatalf("NewToolNode: %v", err)
+	}
+	// 模型一次回复两条命令（ls、pwd）
+	multi := schema.AssistantMessage("", []schema.ToolCall{
+		{ID: "call_1", Type: "function",
+			Function: schema.FunctionCall{Name: "execute_command", Arguments: `{"command":"ls","why":"诊断"}`}},
+		{ID: "call_2", Type: "function",
+			Function: schema.FunctionCall{Name: "execute_command", Arguments: `{"command":"pwd","why":"诊断"}`}},
+	})
+	m := &testutil.ScriptedModel{Responses: []*schema.Message{
+		multi,
+		schema.AssistantMessage("完成", nil),
+	}}
+	wrapped := agentmodel.NewStreamingChatModel(m, "s1", rec.Emit, func(msg *schema.Message) {
+		for i := range msg.ToolCalls {
+			holder.Add(&msg.ToolCalls[i])
+		}
+	})
+	g, err := BuildAgentGraph(ctx, wrapped, toolsNode, checkpoint.NewMemCheckpointStore())
+	if err != nil {
+		t.Fatalf("BuildAgentGraph: %v", err)
+	}
+	input := []*schema.Message{schema.UserMessage("跑两条命令")}
+
+	// 第一次 Invoke：应只对第一条命令（ls）中断等审批
+	_, err = g.Invoke(context.Background(), input, compose.WithCheckPointID("s-multi"))
+	info, ok := compose.ExtractInterruptInfo(err)
+	if !ok || len(info.InterruptContexts) == 0 {
+		t.Fatalf("期望中断: %v", err)
+	}
+	// 串行约束下只 emit 了 ls（pwd 被丢弃）
+	if cmds := rec.SnapshotCommands(); len(cmds) != 1 || cmds[0] != "ls" {
+		t.Fatalf("串行约束下应只 emit [ls]，实际 %v", cmds)
+	}
+
+	// 批准 ls → 执行 → 完成
+	resumeCtx := compose.ResumeWithData(context.Background(), info.InterruptContexts[0].ID, "ls")
+	if _, err := g.Invoke(resumeCtx, input, compose.WithCheckPointID("s-multi")); err != nil {
+		t.Fatalf("Resume: %v", err)
+	}
+	if got := ex.Commands(); len(got) != 1 || got[0] != "ls" {
+		t.Fatalf("应只执行 ls，实际 %v", got)
+	}
+}
+
+// 连续命令：模型在命令执行后再提议下一条（不同模型回复，每条各一次 tool_call），
+// 每条都必须 emit ai:command。修复前：后续命令首次执行时 GetInterruptState 误判为
+// 恢复调用而跳过 emit，导致"卡在某条命令待审批但没有操作按钮"。
+func TestApprovalFlow_SequentialCommandsEmitEach(t *testing.T) {
+	ctx := context.Background()
+	ex := &testutil.FakeExec{Lines: []sshexec.Line{{Stream: "stdout", Text: "ok"}}}
+	rec := &testutil.EmitRecorder{}
+	holder := agenttools.NewToolCallHolder()
+	sshTool := agenttools.NewSSHTool("s1", ex, rec.Emit, nil, holder)
+	toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
+		Tools: []einotool.BaseTool{sshTool}, ExecuteSequentially: true,
+	})
+	if err != nil {
+		t.Fatalf("NewToolNode: %v", err)
+	}
+	// 两次模型回复各提议一条命令：先 ls，审批执行后再提议 pwd
+	m := &testutil.ScriptedModel{Responses: []*schema.Message{
+		schema.AssistantMessage("", []schema.ToolCall{
+			{ID: "call_1", Type: "function",
+				Function: schema.FunctionCall{Name: "execute_command", Arguments: `{"command":"ls","why":"诊断"}`}},
+		}),
+		schema.AssistantMessage("", []schema.ToolCall{
+			{ID: "call_2", Type: "function",
+				Function: schema.FunctionCall{Name: "execute_command", Arguments: `{"command":"pwd","why":"诊断"}`}},
+		}),
+		schema.AssistantMessage("完成", nil),
+	}}
+	wrapped := agentmodel.NewStreamingChatModel(m, "s1", rec.Emit, func(msg *schema.Message) {
+		for i := range msg.ToolCalls {
+			holder.Add(&msg.ToolCalls[i])
+		}
+	})
+	g, err := BuildAgentGraph(ctx, wrapped, toolsNode, checkpoint.NewMemCheckpointStore())
+	if err != nil {
+		t.Fatalf("BuildAgentGraph: %v", err)
+	}
+	input := []*schema.Message{schema.UserMessage("一步步来")}
+
+	// 第一次中断（ls）
+	_, err = g.Invoke(context.Background(), input, compose.WithCheckPointID("s-seq"))
+	info, ok := compose.ExtractInterruptInfo(err)
+	if !ok || len(info.InterruptContexts) == 0 {
+		t.Fatalf("期望第一次中断: %v", err)
+	}
+	if cmds := rec.SnapshotCommands(); len(cmds) != 1 || cmds[0] != "ls" {
+		t.Fatalf("第一次应 emit [ls]，实际 %v", cmds)
+	}
+
+	// 批准 ls → 执行 → 模型再提议 pwd → 应再次中断并 emit
+	resumeCtx := compose.ResumeWithData(context.Background(), info.InterruptContexts[0].ID, "ls")
+	if _, err := g.Invoke(resumeCtx, input, compose.WithCheckPointID("s-seq")); err == nil {
+		t.Fatal("批准 ls 后模型再提议 pwd，应再次中断")
+	} else if _, ok2 := compose.ExtractInterruptInfo(err); !ok2 {
+		t.Fatalf("期望第二次中断: %v", err)
+	}
+	cmds := rec.SnapshotCommands()
+	if len(cmds) != 2 || cmds[0] != "ls" || cmds[1] != "pwd" {
+		t.Fatalf("应 emit [ls pwd]，实际 %v", cmds)
+	}
+	if got := ex.Commands(); len(got) != 1 || got[0] != "ls" {
+		t.Fatalf("此阶段应只执行 ls，实际 %v", got)
+	}
+}
+
 func TestApprovalFlow_ApproveWithEmptyCommandGuarded(t *testing.T) {
 	g, ex, _ := approvalFixture(t,
 		[]*schema.Message{

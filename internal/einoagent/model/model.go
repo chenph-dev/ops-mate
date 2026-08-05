@@ -5,10 +5,16 @@ import (
 	"context"
 	"errors"
 	"io"
+	"time"
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 )
+
+// modelTimeout 单次模型生成的超时。只覆盖模型调用（Stream），
+// 防止 API 挂起导致会话永久卡在 Thinking；命令执行走 tools 节点独立 context，不受此限制。
+// 若部分模型推理时间较长，可调大此值。
+const modelTimeout = 120 * time.Second
 
 // StreamingChatModel 把 eino ChatModel 包装为"生成即流式推送"的模型：
 // Graph 以 Invoke 方式执行时，ChatModel 节点调用 Generate；
@@ -37,8 +43,12 @@ func NewStreamingChatModel(
 }
 
 // Generate 内部走流式：逐块发 ai:text，累积后返回完整消息。
+// 模型调用带独立超时（modelTimeout），超时后 Stream/Recv 返回错误，由上层转为错误事件，
+// 会话回到 Idle 而非永久卡在 Thinking。
 func (m *StreamingChatModel) Generate(ctx context.Context, input []*schema.Message, opts ...einomodel.Option) (*schema.Message, error) {
-	sr, err := m.base.Stream(ctx, input, opts...)
+	modelCtx, cancel := context.WithTimeout(ctx, modelTimeout)
+	defer cancel()
+	sr, err := m.base.Stream(modelCtx, input, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -68,6 +78,13 @@ func (m *StreamingChatModel) Generate(ctx context.Context, input []*schema.Messa
 	full, err := schema.ConcatMessages(chunks)
 	if err != nil {
 		return nil, err
+	}
+	// 串行约束：一次对话轮次只允许一条待审批命令。
+	// 模型若一次返回多个 tool_call，只保留第一个，其余丢弃——
+	// 否则 ToolsNode 会一次执行全部、每条都中断，而后端仅存单个 interruptID、
+	// 前端仅有单个审批卡插槽，会导致"显示 pwd、实际执行 ls"的错配。
+	if len(full.ToolCalls) > 1 {
+		full.ToolCalls = full.ToolCalls[:1]
 	}
 	if m.onAssistant != nil {
 		m.onAssistant(full)

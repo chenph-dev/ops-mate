@@ -3,6 +3,7 @@ package testutil
 
 import (
 	"context"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -14,11 +15,12 @@ import (
 	"ops-mate/internal/store"
 )
 
-// EmitRecorder 按序记录 emit 事件（ai:text 增量提取到 Deltas）。
+// EmitRecorder 按序记录 emit 事件（ai:text 增量提取到 Deltas，ai:command 提取到 Commands）。
 type EmitRecorder struct {
-	mu     sync.Mutex
-	Events []string
-	Deltas []string
+	mu       sync.Mutex
+	Events   []string
+	Deltas   []string
+	Commands []string
 }
 
 // Emit 实现 emit 回调签名。
@@ -33,6 +35,14 @@ func (r *EmitRecorder) Emit(_sessionID, event string, data any) {
 			}
 		}
 	}
+	if event == "ai:command" {
+		// data 为 tools.commandInfo（未导出类型），用反射提取 Command 字段。
+		if v := reflect.ValueOf(data); v.IsValid() && v.Kind() == reflect.Struct {
+			if f := v.FieldByName("Command"); f.IsValid() && f.Kind() == reflect.String {
+				r.Commands = append(r.Commands, f.String())
+			}
+		}
+	}
 }
 
 // SnapshotEvents 返回事件名列表副本（线程安全）。
@@ -40,6 +50,13 @@ func (r *EmitRecorder) SnapshotEvents() []string {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return append([]string(nil), r.Events...)
+}
+
+// SnapshotCommands 返回 ai:command 的 command 列表副本（线程安全）。
+func (r *EmitRecorder) SnapshotCommands() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return append([]string(nil), r.Commands...)
 }
 
 // FakeExec 实现 sshexec.Exec，返回预设行。
