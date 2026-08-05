@@ -269,6 +269,10 @@ export function useCommandCompletion(
 
   const handleKeyEvent = useCallback(
     (e: KeyboardEvent): boolean => {
+      // xterm 的 attachCustomKeyEventHandler 对 keydown/keypress/keyup 都会回调。
+      // 若不区分事件类型，keyup 的 ArrowDown/ArrowUp 会再次触发选中移动，
+      // 导致按一次方向键选中项跳两行。这里仅处理 keydown。
+      if (e.type !== "keydown") return true;
       if (!completion.open) return true;
 
       if (e.key === "Tab" || e.key === "Enter") {

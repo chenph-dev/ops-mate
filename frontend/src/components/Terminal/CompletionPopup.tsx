@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { theme } from "antd";
 
 interface CommandMatch {
@@ -25,6 +26,12 @@ export default function CompletionPopup({
   onSelect,
 }: CompletionPopupProps): React.JSX.Element {
   const { token } = theme.useToken();
+  const selectedRef = useRef<HTMLDivElement | null>(null);
+
+  // 选中项变化时滚动到可视区，避免方向键选择超出弹窗可视范围
+  useEffect(() => {
+    selectedRef.current?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
 
   return (
     <div
@@ -53,6 +60,7 @@ export default function CompletionPopup({
         return (
           <div
             key={`${match.type}-${match.name}-${index}`}
+            ref={selected ? selectedRef : undefined}
             onClick={(): void => onSelect(match)}
             style={{
               padding: "5px 12px",
