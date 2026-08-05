@@ -8,9 +8,11 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"ops-mate/internal/einoagent"
 	"ops-mate/internal/handler"
+	"ops-mate/internal/sshexec"
 	"ops-mate/internal/store"
 	cfgstore "ops-mate/internal/store/config"
 	convstore "ops-mate/internal/store/conversations"
@@ -28,15 +30,13 @@ func main() {
 	}
 
 	cfgStore := cfgstore.NewConfigStore(app)
-	chatModel, err := einoagent.NewChatModel(context.Background(), mustAIConfig(cfgStore))
-	if err != nil {
-		fmt.Println("build chat model error:", err)
-	}
-
-	sessionManager := einoagent.NewSessionManager(app, chatModel)
-
 	hostsStore := hoststore.NewHostsStore(app)
 	convStore := convstore.NewConvStore(app)
+
+	// AI 模型不在启动时构建（配置可能为空/变更）——
+	// SessionManager 在每轮对话开始时按最新配置懒构建（热更新）。
+	sessionManager := einoagent.NewSessionManager(app, cfgStore,
+		executorFor(hostsStore), emitEvent)
 
 	err = wails.Run(&options.App{
 		Title:  "ops-mate",
@@ -56,8 +56,8 @@ func main() {
 		// 每个 handler 是独立模块，前端通过 wailsjs/go/main/<TypeName> 访问。
 		Bind: []interface{}{
 			handler.NewHostsHandler(hostsStore),
-			handler.NewAIConfigHandler(cfgStore),
-			handler.NewSessionsHandler(hostsStore, convStore, sessionManager),
+			handler.NewAIConfigHandler(cfgStore, sessionManager.InvalidateConfig),
+			handler.NewSessionsHandler(convStore, sessionManager),
 			handler.NewTerminalHandler(hostsStore),
 		},
 	})
@@ -67,8 +67,28 @@ func main() {
 	}
 }
 
-// mustAIConfig 读取 AI 配置（启动阶段，错误可忽略，用空配置兜底）。
-func mustAIConfig(s *cfgstore.ConfigStore) cfgstore.AIConfig {
-	cfg, _ := s.GetAIConfig()
-	return cfg
+// executorFor 返回按 hostID 解析凭据并构造 SSH 执行器的工厂。
+// 凭据解析失败返回 nil（SessionManager 会给出"凭据不可用"错误事件）。
+func executorFor(hosts *hoststore.HostsStore) func(hostID string) sshexec.Exec {
+	return func(hostID string) sshexec.Exec {
+		secret, authType, err := hosts.GetHostSecret(hostID)
+		if err != nil {
+			return nil
+		}
+		meta, err := hosts.HostMetaByID(hostID)
+		if err != nil || meta == nil {
+			return nil
+		}
+		return sshexec.NewExecutor(sshexec.Host{
+			Addr: meta.Addr, Port: meta.Port, User: meta.User,
+			AuthType: authType, Secret: secret,
+		})
+	}
+}
+
+// emitEvent 统一的 Wails 事件推送（载荷 {sessionId, data}）。
+func emitEvent(sessionID, event string, data any) {
+	wailsruntime.EventsEmit(handler.Ctx(), event, map[string]any{
+		"sessionId": sessionID, "data": data,
+	})
 }
