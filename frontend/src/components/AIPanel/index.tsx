@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { TextAreaRef } from "antd/es/input/TextArea";
+import type { InputRef } from "antd";
 import { GetAIConfig } from "@wailsjs/go/handler/AIConfigHandler";
 import type { configstore, convstore } from "@wailsjs/go/models";
 import type {
@@ -70,7 +70,7 @@ export default function AIPanel({
     return saved >= 280 && saved <= 600 ? saved : 420;
   });
   const resizeRef = useRef<{ startX: number; startW: number } | null>(null);
-  const inputRef = useRef<TextAreaRef>(null);
+  const inputRef = useRef<InputRef>(null);
 
   // 左边缘拖拽调整宽度：mousedown 挂 window 监听，mouseup 移除，实时持久化。
   const onResizeStart = useCallback(
@@ -160,8 +160,11 @@ export default function AIPanel({
         flexDirection: "column",
         position: "relative",
         background: "var(--antd-color-bg-elevated)",
-        borderLeft: "1px solid var(--antd-color-border)",
-        boxShadow: "var(--antd-box-shadow)",
+        // 与终端风格一致：同边框、同圆角，overflow hidden 裁切内容到圆角内
+        border: "1px solid var(--antd-color-border-secondary)",
+        borderRadius: 8,
+        overflow: "hidden",
+        marginLeft: 5,
       }}
     >
       {/* 左边缘拖拽条：调整面板宽度（与终端并排，终端自动让出空间） */}

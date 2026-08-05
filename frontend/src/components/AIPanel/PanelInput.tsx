@@ -1,11 +1,11 @@
 import { Button, Input } from "antd";
 import { SendOutlined } from "@ant-design/icons";
 import type { Ref } from "react";
-import type { TextAreaRef } from "antd/es/input/TextArea";
+import type { InputRef } from "antd";
 
 interface PanelInputProps {
   /** 输入框 ref（示例引导填充后聚焦用）。 */
-  ref?: Ref<TextAreaRef>;
+  ref?: Ref<InputRef>;
   input: string;
   sending: boolean;
   inputDisabled: boolean;
@@ -15,7 +15,11 @@ interface PanelInputProps {
   onKeyDown: (e: React.KeyboardEvent) => void;
 }
 
-/** 抽屉底部输入区。 */
+/**
+ * 抽屉底部输入区。
+ * 发送按钮使用 antd Input 原生的 suffix 内置在输入框内部右侧，
+ * 天然与输入框一体，不存在外部按钮的高度对齐问题。
+ */
 export default function PanelInput({
   ref,
   input,
@@ -31,13 +35,10 @@ export default function PanelInput({
       style={{
         padding: "6px 8px",
         borderTop: "1px solid var(--antd-color-border-secondary)",
-        display: "flex",
-        gap: 6,
-        alignItems: "flex-end",
         flexShrink: 0,
       }}
     >
-      <Input.TextArea
+      <Input
         ref={ref}
         value={input}
         onChange={(e) => onInputChange(e.target.value)}
@@ -49,17 +50,19 @@ export default function PanelInput({
               ? "等待本轮对话结束..."
               : "输入问题..."
         }
-        autoSize={{ minRows: 1, maxRows: 3 }}
-        style={{ fontSize: 12 }}
         disabled={inputDisabled}
-      />
-      <Button
-        type="primary"
-        size="small"
-        icon={<SendOutlined />}
-        onClick={() => void onSend()}
-        disabled={!input.trim() || sending || inputDisabled}
-        loading={sending}
+        style={{ fontSize: 12 }}
+        suffix={
+          <Button
+            type="primary"
+            size="small"
+            icon={<SendOutlined />}
+            onClick={() => void onSend()}
+            disabled={!input.trim() || sending || inputDisabled}
+            loading={sending}
+            style={{ marginRight: -8 }}
+          />
+        }
       />
     </div>
   );
