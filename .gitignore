@@ -2,6 +2,9 @@
 build/bin
 frontend/dist
 
+# Docs / planning notes (not part of the app)
+docs/
+
 # Wails generated frontend bindings (auto-generated from Go code)
 frontend/wailsjs/
 
