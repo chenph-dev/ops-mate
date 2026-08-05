@@ -1,4 +1,4 @@
-package einoagent
+package guardrail
 
 import "testing"
 

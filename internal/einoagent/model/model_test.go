@@ -1,4 +1,4 @@
-package einoagent
+package model
 
 import (
 	"context"
@@ -6,11 +6,13 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/cloudwego/eino/components/model"
+	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
+
+	"ops-mate/internal/einoagent/testutil"
 )
 
-// fakeStreamModel 实现 model.ToolCallingChatModel，Stream 返回预设 chunks。
+// fakeStreamModel 实现 einomodel.ToolCallingChatModel，Stream 返回预设 chunks。
 type fakeStreamModel struct {
 	mu     sync.Mutex
 	chunks []*schema.Message
@@ -18,11 +20,11 @@ type fakeStreamModel struct {
 	tools  []*schema.ToolInfo
 }
 
-func (f *fakeStreamModel) Generate(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
+func (f *fakeStreamModel) Generate(ctx context.Context, input []*schema.Message, opts ...einomodel.Option) (*schema.Message, error) {
 	return nil, errors.New("测试中不应直接调用 fake 的 Generate")
 }
 
-func (f *fakeStreamModel) Stream(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (f *fakeStreamModel) Stream(ctx context.Context, input []*schema.Message, opts ...einomodel.Option) (*schema.StreamReader[*schema.Message], error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.err != nil {
@@ -31,30 +33,11 @@ func (f *fakeStreamModel) Stream(ctx context.Context, input []*schema.Message, o
 	return schema.StreamReaderFromArray(f.chunks), nil
 }
 
-func (f *fakeStreamModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+func (f *fakeStreamModel) WithTools(tools []*schema.ToolInfo) (einomodel.ToolCallingChatModel, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.tools = tools
 	return f, nil
-}
-
-type emitRecorder struct {
-	mu     sync.Mutex
-	events []string // 按序记录 event 名
-	deltas []string
-}
-
-func (r *emitRecorder) emit(sessionID, event string, data any) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.events = append(r.events, event)
-	if event == "ai:text" {
-		if m, ok := data.(map[string]any); ok {
-			if d, ok := m["delta"].(string); ok {
-				r.deltas = append(r.deltas, d)
-			}
-		}
-	}
 }
 
 func TestStreamingChatModel_EmitsDeltasAndAccumulates(t *testing.T) {
@@ -62,9 +45,9 @@ func TestStreamingChatModel_EmitsDeltasAndAccumulates(t *testing.T) {
 		{Role: schema.Assistant, Content: "你"},
 		{Role: schema.Assistant, Content: "好"},
 	}}
-	rec := &emitRecorder{}
+	rec := &testutil.EmitRecorder{}
 	var assistantGot *schema.Message
-	w := NewStreamingChatModel(base, "s1", rec.emit, func(m *schema.Message) { assistantGot = m })
+	w := NewStreamingChatModel(base, "s1", rec.Emit, func(m *schema.Message) { assistantGot = m })
 
 	got, err := w.Generate(context.Background(), []*schema.Message{schema.UserMessage("hi")})
 	if err != nil {
@@ -73,8 +56,8 @@ func TestStreamingChatModel_EmitsDeltasAndAccumulates(t *testing.T) {
 	if got.Content != "你好" {
 		t.Errorf("累积内容 = %q，want 你好", got.Content)
 	}
-	if len(rec.deltas) != 2 || rec.deltas[0] != "你" || rec.deltas[1] != "好" {
-		t.Errorf("ai:text 增量序列错误: %v", rec.deltas)
+	if len(rec.Deltas) != 2 || rec.Deltas[0] != "你" || rec.Deltas[1] != "好" {
+		t.Errorf("ai:text 增量序列错误: %v", rec.Deltas)
 	}
 	if assistantGot == nil || assistantGot.Content != "你好" {
 		t.Errorf("onAssistant 回调未收到完整消息: %+v", assistantGot)
@@ -88,8 +71,8 @@ func TestStreamingChatModel_ToolCallChunksNotEmitted(t *testing.T) {
 			Function: schema.FunctionCall{Name: "execute_command", Arguments: `{"command":"ls"}`},
 		}}},
 	}}
-	rec := &emitRecorder{}
-	w := NewStreamingChatModel(base, "s1", rec.emit, nil)
+	rec := &testutil.EmitRecorder{}
+	w := NewStreamingChatModel(base, "s1", rec.Emit, nil)
 
 	got, err := w.Generate(context.Background(), nil)
 	if err != nil {
@@ -98,8 +81,8 @@ func TestStreamingChatModel_ToolCallChunksNotEmitted(t *testing.T) {
 	if len(got.ToolCalls) != 1 || got.ToolCalls[0].ID != "c1" {
 		t.Errorf("tool calls 累积错误: %+v", got.ToolCalls)
 	}
-	if len(rec.deltas) != 0 {
-		t.Errorf("tool call chunks 不应发 ai:text，得到 %v", rec.deltas)
+	if len(rec.Deltas) != 0 {
+		t.Errorf("tool call chunks 不应发 ai:text，得到 %v", rec.Deltas)
 	}
 }
 
@@ -109,8 +92,8 @@ func TestStreamingChatModel_NilChunkSkipped(t *testing.T) {
 		nil,
 		{Role: schema.Assistant, Content: "b"},
 	}}
-	rec := &emitRecorder{}
-	w := NewStreamingChatModel(base, "s1", rec.emit, nil)
+	rec := &testutil.EmitRecorder{}
+	w := NewStreamingChatModel(base, "s1", rec.Emit, nil)
 	got, err := w.Generate(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("Generate: %v", err)

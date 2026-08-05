@@ -1,4 +1,5 @@
-package einoagent
+// Package guardrail 提供危险命令护栏（AssessRisk）。
+package guardrail
 
 import (
 	"regexp"

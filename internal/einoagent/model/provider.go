@@ -1,10 +1,10 @@
-package einoagent
+package model
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/components/model"
+	einomodel "github.com/cloudwego/eino/components/model"
 	claudemodel "github.com/cloudwego/eino-ext/components/model/claude"
 	ollamamodel "github.com/cloudwego/eino-ext/components/model/ollama"
 	openaimodel "github.com/cloudwego/eino-ext/components/model/openai"
@@ -23,7 +23,7 @@ import (
 //   - "deepseek" / "dashscope" / "zhipu" 等：等价选 openai + 各自 BaseURL
 //
 // 返回的 model.ToolCallingChatModel 实现了 Stream/Generate，可直接用于 eino Graph。
-func NewChatModel(ctx context.Context, cfg configstore.AIConfig) (model.ToolCallingChatModel, error) {
+func NewChatModel(ctx context.Context, cfg configstore.AIConfig) (einomodel.ToolCallingChatModel, error) {
 	switch cfg.Provider {
 	case "ollama":
 		baseURL := cfg.BaseURL

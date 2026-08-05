@@ -1,4 +1,5 @@
-package einoagent
+// Package prompt 定义 AI 的 SystemPrompt 与系统消息构造。
+package prompt
 
 import "github.com/cloudwego/eino/schema"
 

@@ -1,11 +1,12 @@
-package einoagent
+// Package model 提供 StreamingChatModel 流式包装层与 eino ChatModel 构造。
+package model
 
 import (
 	"context"
 	"errors"
 	"io"
 
-	"github.com/cloudwego/eino/components/model"
+	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 )
 
@@ -16,7 +17,7 @@ import (
 // 即"模型层流式、编排层同步"，规避 eino Graph 级流式与 Interrupt
 // 组合的兼容性风险。
 type StreamingChatModel struct {
-	base        model.ToolCallingChatModel
+	base        einomodel.ToolCallingChatModel
 	sessionID   string
 	emit        func(sessionID, event string, data any)
 	onAssistant func(msg *schema.Message) // assistant 消息完成回调（用于落库）
@@ -24,7 +25,7 @@ type StreamingChatModel struct {
 
 // NewStreamingChatModel 构造包装层。emit/onAssistant 可为 nil（测试场景）。
 func NewStreamingChatModel(
-	base model.ToolCallingChatModel,
+	base einomodel.ToolCallingChatModel,
 	sessionID string,
 	emit func(sessionID, event string, data any),
 	onAssistant func(msg *schema.Message),
@@ -36,7 +37,7 @@ func NewStreamingChatModel(
 }
 
 // Generate 内部走流式：逐块发 ai:text，累积后返回完整消息。
-func (m *StreamingChatModel) Generate(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
+func (m *StreamingChatModel) Generate(ctx context.Context, input []*schema.Message, opts ...einomodel.Option) (*schema.Message, error) {
 	sr, err := m.base.Stream(ctx, input, opts...)
 	if err != nil {
 		return nil, err
@@ -75,12 +76,12 @@ func (m *StreamingChatModel) Generate(ctx context.Context, input []*schema.Messa
 }
 
 // Stream 透传给底层模型。契约：调用方必须使用 Graph Invoke 模式（本包装层只在 Generate 中发事件/回调）；Stream 模式不会触发 emit 与 onAssistant。
-func (m *StreamingChatModel) Stream(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *StreamingChatModel) Stream(ctx context.Context, input []*schema.Message, opts ...einomodel.Option) (*schema.StreamReader[*schema.Message], error) {
 	return m.base.Stream(ctx, input, opts...)
 }
 
 // WithTools 委托底层模型绑定工具，并返回包了一层的新实例。
-func (m *StreamingChatModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+func (m *StreamingChatModel) WithTools(tools []*schema.ToolInfo) (einomodel.ToolCallingChatModel, error) {
 	bound, err := m.base.WithTools(tools)
 	if err != nil {
 		return nil, err

@@ -1,4 +1,5 @@
-package einoagent
+// Package session 提供 SessionManager：Agent 会话的异步执行、审批与配置热更新。
+package session
 
 import (
 	"context"
@@ -7,11 +8,17 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/components/tool"
+	einomodel "github.com/cloudwego/eino/components/model"
+	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
+	"ops-mate/internal/einoagent/checkpoint"
+	"ops-mate/internal/einoagent/graph"
+	"ops-mate/internal/einoagent/history"
+	agentmodel "ops-mate/internal/einoagent/model"
+	"ops-mate/internal/einoagent/prompt"
+	agenttools "ops-mate/internal/einoagent/tools"
 	"ops-mate/internal/sshexec"
 	configstore "ops-mate/internal/store/config"
 	convstore "ops-mate/internal/store/conversations"
@@ -82,13 +89,13 @@ type agentSession struct {
 	state       runState
 	graph       compose.Runnable[[]*schema.Message, []*schema.Message]
 	builtAt     int // 构建时的 configVersion
-	checkpoints *memCheckpointStore
+	checkpoints *checkpoint.MemCheckpointStore
 	interruptID string
 	lastInput   []*schema.Message
 	cancel      context.CancelFunc
 
 	holder    *executorHolder
-	toolCalls *toolCallHolder
+	toolCalls *agenttools.ToolCallHolder
 }
 
 // SessionManager 管理所有 Agent 会话。
@@ -101,8 +108,8 @@ type SessionManager struct {
 	emit        func(sessionID, event string, data any)
 
 	// modelFactory 构造基础模型；可注入以便测试。
-	// 默认走 einoagent.NewChatModel（eino-ext provider）。
-	modelFactory func(ctx context.Context, cfg configstore.AIConfig) (model.ToolCallingChatModel, error)
+	// 默认走 einoagent.agentmodel.NewChatModel（eino-ext provider）。
+	modelFactory func(ctx context.Context, cfg configstore.AIConfig) (einomodel.ToolCallingChatModel, error)
 
 	mu            sync.Mutex
 	sessions      map[string]*agentSession
@@ -123,8 +130,8 @@ func NewSessionManager(
 		cfg:         cfg,
 		executorFor: executorFor,
 		emit:        emit,
-		modelFactory: func(ctx context.Context, c configstore.AIConfig) (model.ToolCallingChatModel, error) {
-			return NewChatModel(ctx, c)
+		modelFactory: func(ctx context.Context, c configstore.AIConfig) (einomodel.ToolCallingChatModel, error) {
+			return agentmodel.NewChatModel(ctx, c)
 		},
 		sessions: map[string]*agentSession{},
 	}
@@ -169,9 +176,9 @@ func (m *SessionManager) sessionFor(sid string) (*agentSession, error) {
 	}
 	s = &agentSession{
 		id: sid, hostID: conv.HostID,
-		checkpoints: newMemCheckpointStore(),
+		checkpoints: checkpoint.NewMemCheckpointStore(),
 		holder:      &executorHolder{},
-		toolCalls:   newToolCallHolder(),
+		toolCalls:   agenttools.NewToolCallHolder(),
 	}
 	m.mu.Lock()
 	if existing, ok := m.sessions[sid]; ok {
@@ -210,7 +217,7 @@ func (m *SessionManager) SendMessage(sid, text string) error {
 
 	// 落库 user 消息
 	if err := m.convs.SaveMessage(convstore.Message{
-		SessionID: sid, Role: RoleUser, Content: text,
+		SessionID: sid, Role: history.RoleUser, Content: text,
 	}); err != nil {
 		s.mu.Lock()
 		s.state = stIdle
@@ -405,15 +412,15 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 		return fmt.Errorf("构建模型失败: %w", err)
 	}
 
-	sshTool := NewSSHTool(s.id, s.holder, m.emit, m.convs, s.toolCalls)
+	sshTool := agenttools.NewSSHTool(s.id, s.holder, m.emit, m.convs, s.toolCalls)
 	toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
-		Tools: []tool.BaseTool{sshTool}, ExecuteSequentially: true,
+		Tools: []einotool.BaseTool{sshTool}, ExecuteSequentially: true,
 	})
 	if err != nil {
 		return fmt.Errorf("构建工具节点失败: %w", err)
 	}
 
-	wrapped := NewStreamingChatModel(base, s.id, m.emit, m.onAssistant(s))
+	wrapped := agentmodel.NewStreamingChatModel(base, s.id, m.emit, m.onAssistant(s))
 	info, err := sshTool.Info(ctx)
 	if err != nil {
 		return fmt.Errorf("tool info: %w", err)
@@ -423,7 +430,7 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 		return fmt.Errorf("绑定工具失败: %w", err)
 	}
 
-	graph, err := BuildAgentGraph(ctx, withTools, toolsNode, s.checkpoints)
+	graph, err := graph.BuildAgentGraph(ctx, withTools, toolsNode, s.checkpoints)
 	if err != nil {
 		return fmt.Errorf("构建 Graph 失败: %w", err)
 	}
@@ -436,9 +443,9 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 func (m *SessionManager) onAssistant(s *agentSession) func(msg *schema.Message) {
 	return func(msg *schema.Message) {
 		_ = m.convs.SaveMessage(convstore.Message{
-			SessionID: s.id, Role: RoleAssistant,
+			SessionID: s.id, Role: history.RoleAssistant,
 			Content:   msg.Content,
-			ToolCalls: ToolCallsToJSON(msg.ToolCalls),
+			ToolCalls: history.ToolCallsToJSON(msg.ToolCalls),
 		})
 		for i := range msg.ToolCalls {
 			s.toolCalls.Add(&msg.ToolCalls[i])
@@ -448,17 +455,17 @@ func (m *SessionManager) onAssistant(s *agentSession) func(msg *schema.Message) 
 
 // buildInput 组装模型输入：系统提示 + 记忆注入 + DB 历史。
 func (m *SessionManager) buildInput(s *agentSession, userText string) ([]*schema.Message, error) {
-	history, err := m.convs.LoadMessages(s.id)
+	hist, err := m.convs.LoadMessages(s.id)
 	if err != nil {
 		return nil, fmt.Errorf("加载历史失败: %w", err)
 	}
-	msgs, err := HistoryToEino(history)
+	msgs, err := history.HistoryToEino(hist)
 	if err != nil {
 		return nil, err
 	}
 
 	input := make([]*schema.Message, 0, len(msgs)+2)
-	input = append(input, SystemMessage())
+	input = append(input, prompt.SystemMessage())
 
 	// FTS5 记忆注入（失败不阻断主流程）
 	if recall, err := m.mem.Recall(s.hostID, userText); err == nil && len(recall.PastCommands) > 0 {

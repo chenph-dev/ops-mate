@@ -1,4 +1,5 @@
-package einoagent
+// Package history 提供消息角色常量与历史消息 ↔ eino schema.Message 的转换。
+package history
 
 import (
 	"encoding/json"

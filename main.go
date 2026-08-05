@@ -10,7 +10,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"ops-mate/internal/einoagent"
+	"ops-mate/internal/einoagent/session"
 	"ops-mate/internal/handler"
 	"ops-mate/internal/sshexec"
 	"ops-mate/internal/store"
@@ -35,7 +35,7 @@ func main() {
 
 	// AI 模型不在启动时构建（配置可能为空/变更）——
 	// SessionManager 在每轮对话开始时按最新配置懒构建（热更新）。
-	sessionManager := einoagent.NewSessionManager(app, cfgStore,
+	sessionManager := session.NewSessionManager(app, cfgStore,
 		executorFor(hostsStore), emitEvent)
 
 	err = wails.Run(&options.App{

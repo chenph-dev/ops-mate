@@ -1,10 +1,11 @@
-package einoagent
+// Package graph 提供 eino Agent Graph 的构建（llm ↔ tools 条件分支循环 + checkpoint）。
+package graph
 
 import (
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino/components/model"
+	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 )
@@ -44,7 +45,7 @@ func init() {
 // 调用方每次 Invoke（含 Resume）必须带 WithCheckPointID(sessionID)。
 func BuildAgentGraph(
 	ctx context.Context,
-	chatModel model.BaseChatModel,
+	chatModel einomodel.BaseChatModel,
 	toolsNode *compose.ToolsNode,
 	ckptStore compose.CheckPointStore,
 ) (compose.Runnable[[]*schema.Message, []*schema.Message], error) {

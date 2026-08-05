@@ -1,40 +1,17 @@
-package einoagent
+package graph
 
 import (
 	"context"
 	"testing"
 
-	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/components/tool"
+	einomodel "github.com/cloudwego/eino/components/model"
+	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
+
+	"ops-mate/internal/einoagent/checkpoint"
+	"ops-mate/internal/einoagent/testutil"
 )
-
-// scriptedModel 按顺序返回预设回复，实现 model.ToolCallingChatModel。
-type scriptedModel struct {
-	responses []*schema.Message
-	calls     int
-	inputs    [][]*schema.Message
-}
-
-func (m *scriptedModel) Generate(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
-	if m.calls >= len(m.responses) {
-		return schema.AssistantMessage("（无更多预设回复）", nil), nil
-	}
-	m.inputs = append(m.inputs, input)
-	r := m.responses[m.calls]
-	m.calls++
-	return r, nil
-}
-
-func (m *scriptedModel) Stream(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.StreamReader[*schema.Message], error) {
-	msg, _ := m.Generate(ctx, input, opts...)
-	return schema.StreamReaderFromArray([]*schema.Message{msg}), nil
-}
-
-func (m *scriptedModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
-	return m, nil
-}
 
 // echoTool 测试用普通工具（不中断），记录收到的参数。
 type echoTool struct {
@@ -51,12 +28,12 @@ func (t *echoTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	}, nil
 }
 
-func (t *echoTool) InvokableRun(ctx context.Context, argsJSON string, opts ...tool.Option) (string, error) {
+func (t *echoTool) InvokableRun(ctx context.Context, argsJSON string, opts ...einotool.Option) (string, error) {
 	t.lastArgs = argsJSON
 	return "echo:" + argsJSON, nil
 }
 
-func buildTestGraph(t *testing.T, chatModel model.ToolCallingChatModel, tools []tool.BaseTool) (compose.Runnable[[]*schema.Message, []*schema.Message], *memCheckpointStore) {
+func buildTestGraph(t *testing.T, chatModel einomodel.ToolCallingChatModel, tools []einotool.BaseTool) (compose.Runnable[[]*schema.Message, []*schema.Message], *checkpoint.MemCheckpointStore) {
 	t.Helper()
 	ctx := context.Background()
 	toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
@@ -65,7 +42,7 @@ func buildTestGraph(t *testing.T, chatModel model.ToolCallingChatModel, tools []
 	if err != nil {
 		t.Fatalf("NewToolNode: %v", err)
 	}
-	ckpt := newMemCheckpointStore()
+	ckpt := checkpoint.NewMemCheckpointStore()
 	g, err := BuildAgentGraph(ctx, chatModel, toolsNode, ckpt)
 	if err != nil {
 		t.Fatalf("BuildAgentGraph: %v", err)
@@ -74,11 +51,11 @@ func buildTestGraph(t *testing.T, chatModel model.ToolCallingChatModel, tools []
 }
 
 func TestBuildAgentGraph_NoToolCalls_EndsAtModel(t *testing.T) {
-	m := &scriptedModel{responses: []*schema.Message{
+	m := &testutil.ScriptedModel{Responses: []*schema.Message{
 		schema.AssistantMessage("直接回答", nil),
 	}}
 	et := &echoTool{}
-	g, _ := buildTestGraph(t, m, []tool.BaseTool{et})
+	g, _ := buildTestGraph(t, m, []einotool.BaseTool{et})
 
 	out, err := g.Invoke(context.Background(),
 		[]*schema.Message{schema.UserMessage("你好")},
@@ -96,13 +73,13 @@ func TestBuildAgentGraph_NoToolCalls_EndsAtModel(t *testing.T) {
 	if et.lastArgs != "" {
 		t.Errorf("无 tool call 时不应执行工具，得到 %q", et.lastArgs)
 	}
-	if m.calls != 1 {
-		t.Errorf("模型应只被调用 1 次，实际 %d", m.calls)
+	if m.Calls != 1 {
+		t.Errorf("模型应只被调用 1 次，实际 %d", m.Calls)
 	}
 }
 
 func TestBuildAgentGraph_ToolCallRoutesToToolsAndLoops(t *testing.T) {
-	m := &scriptedModel{responses: []*schema.Message{
+	m := &testutil.ScriptedModel{Responses: []*schema.Message{
 		schema.AssistantMessage("", []schema.ToolCall{{
 			ID: "c1", Type: "function",
 			Function: schema.FunctionCall{Name: "echo_tool", Arguments: `{"text":"hi"}`},
@@ -110,7 +87,7 @@ func TestBuildAgentGraph_ToolCallRoutesToToolsAndLoops(t *testing.T) {
 		schema.AssistantMessage("最终结论", nil),
 	}}
 	et := &echoTool{}
-	g, _ := buildTestGraph(t, m, []tool.BaseTool{et})
+	g, _ := buildTestGraph(t, m, []einotool.BaseTool{et})
 
 	out, err := g.Invoke(context.Background(),
 		[]*schema.Message{schema.UserMessage("跑一下")},
@@ -125,13 +102,13 @@ func TestBuildAgentGraph_ToolCallRoutesToToolsAndLoops(t *testing.T) {
 	if last.Content != "最终结论" {
 		t.Errorf("回灌后末条消息 = %q，want 最终结论", last.Content)
 	}
-	if m.calls != 2 {
-		t.Errorf("模型应被调用 2 次（提议+总结），实际 %d", m.calls)
+	if m.Calls != 2 {
+		t.Errorf("模型应被调用 2 次（提议+总结），实际 %d", m.Calls)
 	}
-	if len(m.inputs) != 2 {
-		t.Fatalf("期望记录 2 次模型输入，得到 %d", len(m.inputs))
+	if len(m.Inputs) != 2 {
+		t.Fatalf("期望记录 2 次模型输入，得到 %d", len(m.Inputs))
 	}
-	second := m.inputs[1]
+	second := m.Inputs[1]
 	if len(second) != 3 {
 		t.Fatalf("第二次模型调用应收到完整历史 3 条消息，得到 %d", len(second))
 	}
@@ -142,7 +119,7 @@ func TestBuildAgentGraph_ToolCallRoutesToToolsAndLoops(t *testing.T) {
 	}
 }
 
-// interruptTool 首次调用即 tool.Interrupt；恢复后返回结果。
+// interruptTool 首次调用即 einotool.Interrupt；恢复后返回结果。
 type interruptTool struct{}
 
 func (t *interruptTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
@@ -155,29 +132,29 @@ func (t *interruptTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 	}, nil
 }
 
-func (t *interruptTool) InvokableRun(ctx context.Context, argsJSON string, opts ...tool.Option) (string, error) {
-	wasInterrupted, _, _ := tool.GetInterruptState[string](ctx)
+func (t *interruptTool) InvokableRun(ctx context.Context, argsJSON string, opts ...einotool.Option) (string, error) {
+	wasInterrupted, _, _ := einotool.GetInterruptState[string](ctx)
 	if !wasInterrupted {
-		return "", tool.Interrupt(ctx, "awaiting-approval")
+		return "", einotool.Interrupt(ctx, "awaiting-approval")
 	}
-	isTarget, hasData, data := tool.GetResumeContext[string](ctx)
+	isTarget, hasData, data := einotool.GetResumeContext[string](ctx)
 	if !isTarget || !hasData {
-		return "", tool.Interrupt(ctx, "awaiting-approval")
+		return "", einotool.Interrupt(ctx, "awaiting-approval")
 	}
 	return "resumed:" + data, nil
 }
 
 func TestBuildAgentGraph_InterruptAndResumeCycle(t *testing.T) {
-	m := &scriptedModel{responses: []*schema.Message{
+	m := &testutil.ScriptedModel{Responses: []*schema.Message{
 		schema.AssistantMessage("", []schema.ToolCall{{
 			ID: "c1", Type: "function",
 			Function: schema.FunctionCall{Name: "interrupt_tool", Arguments: `{"x":"1"}`},
 		}}),
 		schema.AssistantMessage("完成", nil),
 	}}
-	ckpt := newMemCheckpointStore()
+	ckpt := checkpoint.NewMemCheckpointStore()
 	toolsNode, err := compose.NewToolNode(context.Background(), &compose.ToolsNodeConfig{
-		Tools: []tool.BaseTool{&interruptTool{}}, ExecuteSequentially: true,
+		Tools: []einotool.BaseTool{&interruptTool{}}, ExecuteSequentially: true,
 	})
 	if err != nil {
 		t.Fatalf("NewToolNode: %v", err)

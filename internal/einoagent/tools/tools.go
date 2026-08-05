@@ -1,4 +1,5 @@
-package einoagent
+// Package tools 提供 SSH 执行工具（SSHTool，含全量审批）与输出截断/落库。
+package tools
 
 import (
 	"context"
@@ -9,9 +10,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cloudwego/eino/components/tool"
+	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
 
+	"ops-mate/internal/einoagent/guardrail"
+	"ops-mate/internal/einoagent/history"
 	"ops-mate/internal/sshexec"
 	convstore "ops-mate/internal/store/conversations"
 )
@@ -31,27 +34,27 @@ type commandInfo struct {
 	AssessedRisk string `json:"assessedRisk"`
 }
 
-// toolCallHolder 按先进先出保存待执行的 tool call 队列，
+// ToolCallHolder 按先进先出保存待执行的 tool call 队列，
 // 供 SSHTool 落库 tool 消息时配对 tool_call_id。
 // 由 StreamingChatModel 的 onAssistant 回调写入（一次模型回复可含多个 tool_calls）。
 // ToolsNode 按 tool_calls 顺序逐个执行（ExecuteSequentially），审批/恢复也逐个进行，
 // 因此 Take() 取出的顺序与工具执行顺序一致，保证每个 tool 消息配对正确的 tool_call_id。
-type toolCallHolder struct {
+type ToolCallHolder struct {
 	mu  sync.Mutex
 	tcs []*schema.ToolCall
 }
 
-func newToolCallHolder() *toolCallHolder { return &toolCallHolder{} }
+func NewToolCallHolder() *ToolCallHolder { return &ToolCallHolder{} }
 
 // Add 追加一个待执行的 tool call。
-func (h *toolCallHolder) Add(tc *schema.ToolCall) {
+func (h *ToolCallHolder) Add(tc *schema.ToolCall) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.tcs = append(h.tcs, tc)
 }
 
 // Take 弹出并返回队首的 tool call；队列为空返回 nil。
-func (h *toolCallHolder) Take() *schema.ToolCall {
+func (h *ToolCallHolder) Take() *schema.ToolCall {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if len(h.tcs) == 0 {
@@ -63,14 +66,14 @@ func (h *toolCallHolder) Take() *schema.ToolCall {
 }
 
 // SSHTool 把 SSH 执行器包装为 eino InvokableTool。
-// 全量审批：每条命令（含低风险）都先 emit ai:command 再 tool.Interrupt，
+// 全量审批：每条命令（含低风险）都先 emit ai:command 再 einotool.Interrupt，
 // Resume 数据 = 批准命令字符串（可能被用户编辑）或 "rejected"。
 type SSHTool struct {
 	sessionID string
 	executor  sshexec.Exec // 实际为 per-session executorHolder
 	emit      func(sessionID, event string, data any)
 	convs     *convstore.ConvStore
-	holder    *toolCallHolder
+	holder    *ToolCallHolder
 }
 
 // NewSSHTool 构造 SSH 工具。convs 为 nil 时不落库（测试简化）。
@@ -79,7 +82,7 @@ func NewSSHTool(
 	executor sshexec.Exec,
 	emit func(sessionID, event string, data any),
 	convs *convstore.ConvStore,
-	holder *toolCallHolder,
+	holder *ToolCallHolder,
 ) *SSHTool {
 	return &SSHTool{
 		sessionID: sessionID, executor: executor,
@@ -100,7 +103,7 @@ func (t *SSHTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
 }
 
 // InvokableRun 实现全量审批 + 执行。
-func (t *SSHTool) InvokableRun(ctx context.Context, argsJSON string, opts ...tool.Option) (string, error) {
+func (t *SSHTool) InvokableRun(ctx context.Context, argsJSON string, opts ...einotool.Option) (string, error) {
 	var args struct {
 		Command string `json:"command"`
 		Why     string `json:"why"`
@@ -110,7 +113,7 @@ func (t *SSHTool) InvokableRun(ctx context.Context, argsJSON string, opts ...too
 		return "命令参数解析失败：" + err.Error() + "。请重新以 JSON 格式提议命令。", nil
 	}
 
-	risk := AssessRisk(args.Command)
+	risk := guardrail.AssessRisk(args.Command)
 	// AssessedRisk 是守卫的原始判定（"" = 干净）；Risk 是展示标签（"" 归一为 "low"）。
 	riskLabel := risk
 	if riskLabel == "" {
@@ -121,20 +124,20 @@ func (t *SSHTool) InvokableRun(ctx context.Context, argsJSON string, opts ...too
 		Risk: riskLabel, AssessedRisk: risk,
 	}
 
-	wasInterrupted, _, _ := tool.GetInterruptState[commandInfo](ctx)
+	wasInterrupted, _, _ := einotool.GetInterruptState[commandInfo](ctx)
 	if !wasInterrupted {
 		// 首次调用：任意风险等级都中断等审批（全量审批）。
 		if t.emit != nil {
 			t.emit(t.sessionID, "ai:command", info)
 		}
-		return "", tool.Interrupt(ctx, info)
+		return "", einotool.Interrupt(ctx, info)
 	}
 
 	// 恢复路径
-	isTarget, hasData, data := tool.GetResumeContext[string](ctx)
+	isTarget, hasData, data := einotool.GetResumeContext[string](ctx)
 	if !isTarget || !hasData {
 		// 不是本次审批目标（或无数据）：重新中断，让 Resume 信号传播到正确位置。
-		return "", tool.Interrupt(ctx, info)
+		return "", einotool.Interrupt(ctx, info)
 	}
 	// 协议约定：resume 数据为保留字 "rejected" 表示拒绝，其余字符串视为（可能被用户编辑过的）待执行命令。
 	if data == "rejected" {
@@ -218,7 +221,7 @@ func (t *SSHTool) saveToolMessage(content, approvalStatus string) {
 	}
 	if err := t.convs.SaveMessage(convstore.Message{
 		SessionID:      t.sessionID,
-		Role:           RoleTool,
+		Role:           history.RoleTool,
 		Content:        content,
 		ToolCallID:     toolCallID,
 		ToolName:       "execute_command",

@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"ops-mate/internal/einoagent"
+	"ops-mate/internal/einoagent/session"
 	convstore "ops-mate/internal/store/conversations"
 )
 
@@ -10,11 +10,11 @@ import (
 // emitEvent 函数直接推 Wails 事件。
 type SessionsHandler struct {
 	convs          *convstore.ConvStore
-	sessionManager *einoagent.SessionManager
+	sessionManager *session.SessionManager
 }
 
 // NewSessionsHandler 构造 SessionsHandler。
-func NewSessionsHandler(convs *convstore.ConvStore, sm *einoagent.SessionManager) *SessionsHandler {
+func NewSessionsHandler(convs *convstore.ConvStore, sm *session.SessionManager) *SessionsHandler {
 	return &SessionsHandler{convs: convs, sessionManager: sm}
 }
 

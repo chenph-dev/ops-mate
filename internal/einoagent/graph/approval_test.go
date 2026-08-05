@@ -1,62 +1,56 @@
-package einoagent
+package graph
 
 import (
 	"context"
 	"testing"
 
-	"github.com/cloudwego/eino/components/tool"
+	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
+	agentmodel "ops-mate/internal/einoagent/model"
+	agenttools "ops-mate/internal/einoagent/tools"
+	"ops-mate/internal/einoagent/testutil"
 	"ops-mate/internal/sshexec"
+	"ops-mate/internal/einoagent/checkpoint"
 )
 
-// approvalFixture 组装：scripted 模型 + SSHTool(fake executor) + Graph + checkpoint。
+// approvalFixture 组装：ScriptedModel + SSHTool(fake executor) + Graph + checkpoint。
 func approvalFixture(t *testing.T, modelResponses []*schema.Message, execLines []sshexec.Line) (
 	compose.Runnable[[]*schema.Message, []*schema.Message],
-	*fakeExec, *emitRecorder,
+	*testutil.FakeExec, *testutil.EmitRecorder,
 ) {
 	t.Helper()
 	ctx := context.Background()
-	ex := &fakeExec{lines: execLines}
-	rec := &emitRecorder{}
-	holder := newToolCallHolder()
-	sshTool := NewSSHTool("s1", ex, rec.emit, nil, holder)
+	ex := &testutil.FakeExec{Lines: execLines}
+	rec := &testutil.EmitRecorder{}
+	holder := agenttools.NewToolCallHolder()
+	sshTool := agenttools.NewSSHTool("s1", ex, rec.Emit, nil, holder)
 
 	toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
-		Tools: []tool.BaseTool{sshTool}, ExecuteSequentially: true,
+		Tools: []einotool.BaseTool{sshTool}, ExecuteSequentially: true,
 	})
 	if err != nil {
 		t.Fatalf("NewToolNode: %v", err)
 	}
-	m := &scriptedModel{responses: modelResponses}
+	m := &testutil.ScriptedModel{Responses: modelResponses}
 	// 模拟 SessionManager 的 onAssistant：记录 holder（集成测试只关心命令执行）
-	wrapped := NewStreamingChatModel(m, "s1", rec.emit, func(msg *schema.Message) {
+	wrapped := agentmodel.NewStreamingChatModel(m, "s1", rec.Emit, func(msg *schema.Message) {
 		if len(msg.ToolCalls) > 0 {
 			holder.Add(&msg.ToolCalls[0])
 		}
 	})
-	g, err := BuildAgentGraph(ctx, wrapped, toolsNode, newMemCheckpointStore())
+	g, err := BuildAgentGraph(ctx, wrapped, toolsNode, checkpoint.NewMemCheckpointStore())
 	if err != nil {
 		t.Fatalf("BuildAgentGraph: %v", err)
 	}
 	return g, ex, rec
 }
 
-func toolCallResponse(cmd string) *schema.Message {
-	return schema.AssistantMessage("", []schema.ToolCall{{
-		ID: "call_1", Type: "function",
-		Function: schema.FunctionCall{
-			Name:      "execute_command",
-			Arguments: `{"command":"` + cmd + `","why":"诊断"}`,
-		},
-	}})
-}
-
 func TestApprovalFlow_ApproveWithEditedCommand(t *testing.T) {
 	g, ex, _ := approvalFixture(t,
 		[]*schema.Message{
-			toolCallResponse("ls"),
+			testutil.ToolCallResponse("ls"),
 			schema.AssistantMessage("文件已列出", nil),
 		},
 		[]sshexec.Line{{Stream: "stdout", Text: "file1"}},
@@ -81,7 +75,7 @@ func TestApprovalFlow_ApproveWithEditedCommand(t *testing.T) {
 		t.Fatalf("Resume Invoke: %v", err)
 	}
 
-	cmds := ex.commands()
+	cmds := ex.Commands()
 	if len(cmds) != 1 || cmds[0] != "ls -la" {
 		t.Fatalf("应执行用户编辑后的命令，得到 %v", cmds)
 	}
@@ -93,7 +87,7 @@ func TestApprovalFlow_ApproveWithEditedCommand(t *testing.T) {
 func TestApprovalFlow_RejectFeedsBack(t *testing.T) {
 	g, ex, _ := approvalFixture(t,
 		[]*schema.Message{
-			toolCallResponse("reboot"),
+			testutil.ToolCallResponse("reboot"),
 			schema.AssistantMessage("好的，换个方案", nil),
 		},
 		nil,
@@ -111,7 +105,7 @@ func TestApprovalFlow_RejectFeedsBack(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resume(rejected): %v", err)
 	}
-	if len(ex.commands()) != 0 {
+	if len(ex.Commands()) != 0 {
 		t.Error("拒绝后不应执行任何命令")
 	}
 	if len(out) == 0 || out[len(out)-1].Content != "好的，换个方案" {
@@ -121,26 +115,26 @@ func TestApprovalFlow_RejectFeedsBack(t *testing.T) {
 
 func TestApprovalFlow_ResumeDoesNotRecallModelBeforeInterrupt(t *testing.T) {
 	// checkpoint 的核心价值：Resume 不重复中断点之前的 LLM 调用。
-	// 用 scriptedModel 的调用次数断言：整个 approve 流程模型只被调用 2 次
+	// 用 ScriptedModel 的调用次数断言：整个 approve 流程模型只被调用 2 次
 	// （首次提议 1 次 + 回灌总结 1 次），Resume 不触发第 3 次。
 	ctx := context.Background()
-	ex := &fakeExec{lines: []sshexec.Line{{Stream: "stdout", Text: "ok"}}}
-	rec := &emitRecorder{}
-	holder := newToolCallHolder()
-	sshTool := NewSSHTool("s1", ex, rec.emit, nil, holder)
+	ex := &testutil.FakeExec{Lines: []sshexec.Line{{Stream: "stdout", Text: "ok"}}}
+	rec := &testutil.EmitRecorder{}
+	holder := agenttools.NewToolCallHolder()
+	sshTool := agenttools.NewSSHTool("s1", ex, rec.Emit, nil, holder)
 	toolsNode, _ := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
-		Tools: []tool.BaseTool{sshTool}, ExecuteSequentially: true,
+		Tools: []einotool.BaseTool{sshTool}, ExecuteSequentially: true,
 	})
-	m := &scriptedModel{responses: []*schema.Message{
-		toolCallResponse("uptime"),
+	m := &testutil.ScriptedModel{Responses: []*schema.Message{
+		testutil.ToolCallResponse("uptime"),
 		schema.AssistantMessage("运行正常", nil),
 	}}
-	wrapped := NewStreamingChatModel(m, "s1", rec.emit, func(msg *schema.Message) {
+	wrapped := agentmodel.NewStreamingChatModel(m, "s1", rec.Emit, func(msg *schema.Message) {
 		if len(msg.ToolCalls) > 0 {
 			holder.Add(&msg.ToolCalls[0])
 		}
 	})
-	g, err := BuildAgentGraph(ctx, wrapped, toolsNode, newMemCheckpointStore())
+	g, err := BuildAgentGraph(ctx, wrapped, toolsNode, checkpoint.NewMemCheckpointStore())
 	if err != nil {
 		t.Fatalf("BuildAgentGraph: %v", err)
 	}
@@ -151,7 +145,7 @@ func TestApprovalFlow_ResumeDoesNotRecallModelBeforeInterrupt(t *testing.T) {
 	if !ok {
 		t.Fatalf("期望中断: %v", err)
 	}
-	callsBeforeResume := m.calls
+	callsBeforeResume := m.Calls
 	if callsBeforeResume != 1 {
 		t.Fatalf("中断前模型应恰好被调用 1 次，实际 %d", callsBeforeResume)
 	}
@@ -160,16 +154,16 @@ func TestApprovalFlow_ResumeDoesNotRecallModelBeforeInterrupt(t *testing.T) {
 	if _, err := g.Invoke(resumeCtx, input, compose.WithCheckPointID("s3")); err != nil {
 		t.Fatalf("Resume: %v", err)
 	}
-	if m.calls != callsBeforeResume+1 {
+	if m.Calls != callsBeforeResume+1 {
 		t.Errorf("Resume 不应重放中断点前的模型调用：之前 %d 次，之后共 %d 次（期望 +1）",
-			callsBeforeResume, m.calls)
+			callsBeforeResume, m.Calls)
 	}
 }
 
 func TestApprovalFlow_ApproveWithEmptyCommandGuarded(t *testing.T) {
 	g, ex, _ := approvalFixture(t,
 		[]*schema.Message{
-			toolCallResponse("ls"),
+			testutil.ToolCallResponse("ls"),
 			schema.AssistantMessage("重新提议", nil),
 		},
 		nil,
@@ -188,8 +182,8 @@ func TestApprovalFlow_ApproveWithEmptyCommandGuarded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resume(空命令): %v", err)
 	}
-	if len(ex.commands()) != 0 {
-		t.Errorf("空批准数据不应执行任何命令: %v", ex.commands())
+	if len(ex.Commands()) != 0 {
+		t.Errorf("空批准数据不应执行任何命令: %v", ex.Commands())
 	}
 	if len(out) == 0 || out[len(out)-1].Content != "重新提议" {
 		t.Errorf("空命令守卫应回灌模型重新提议: %+v", out)

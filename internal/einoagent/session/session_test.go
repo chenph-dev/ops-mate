@@ -1,15 +1,16 @@
-package einoagent
+package session
 
 import (
 	"context"
 	"errors"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/cloudwego/eino/components/model"
+	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 
+	"ops-mate/internal/einoagent/history"
+	"ops-mate/internal/einoagent/testutil"
 	configstore "ops-mate/internal/store/config"
 	convstore "ops-mate/internal/store/conversations"
 	hoststore "ops-mate/internal/store/hosts"
@@ -24,15 +25,15 @@ type sessionFixture struct {
 	app       *store.DB
 	convs     *convstore.ConvStore
 	mgr       *SessionManager
-	rec       *emitRecorder
-	modelImpl *scriptedModel
-	ex        *fakeExec
+	rec       *testutil.EmitRecorder
+	modelImpl *testutil.ScriptedModel
+	ex        *testutil.FakeExec
 	hostID    string
 }
 
 func newSessionFixture(t *testing.T, responses []*schema.Message) *sessionFixture {
 	t.Helper()
-	app := openTempStore(t)
+	app := testutil.OpenTempStore(t)
 	hosts := hoststore.NewHostsStore(app)
 	convs := convstore.NewConvStore(app)
 	cfg := configstore.NewConfigStore(app)
@@ -48,37 +49,25 @@ func newSessionFixture(t *testing.T, responses []*schema.Message) *sessionFixtur
 		t.Fatalf("SaveHost: %v", err)
 	}
 
-	rec := &emitRecorder{}
+	rec := &testutil.EmitRecorder{}
 	f := &sessionFixture{
 		t: t, app: app, convs: convs, rec: rec,
-		modelImpl: &scriptedModel{responses: responses},
-		ex:        &fakeExec{lines: []sshexec.Line{{Stream: "stdout", Text: "out"}}},
+		modelImpl: &testutil.ScriptedModel{Responses: responses},
+		ex:        &testutil.FakeExec{Lines: []sshexec.Line{{Stream: "stdout", Text: "out"}}},
 		hostID:    hostID,
 	}
 	f.mgr = NewSessionManager(app, cfg,
 		func(hid string) sshexec.Exec { return f.ex },
-		rec.emit,
+		rec.Emit,
 	)
-	f.mgr.modelFactory = func(ctx context.Context, c configstore.AIConfig) (model.ToolCallingChatModel, error) {
+	f.mgr.modelFactory = func(ctx context.Context, c configstore.AIConfig) (einomodel.ToolCallingChatModel, error) {
 		return f.modelImpl, nil
 	}
 	return f
 }
 
-func waitFor(t *testing.T, cond func() bool, what string) {
-	t.Helper()
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		if cond() {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("等待超时: %s", what)
-}
-
 func (f *sessionFixture) waitState(sid, want string) {
-	waitFor(f.t, func() bool { return f.mgr.sessionState(sid) == want }, "state="+want)
+	testutil.WaitFor(f.t, func() bool { return f.mgr.sessionState(sid) == want }, "state="+want)
 }
 
 // --- 用例 ---
@@ -113,7 +102,7 @@ func TestSessionManager_TextOnlyTurnPersists(t *testing.T) {
 
 func TestSessionManager_ApprovalRoundTrip(t *testing.T) {
 	f := newSessionFixture(t, []*schema.Message{
-		toolCallResponse("top -bn1"),
+		testutil.ToolCallResponse("top -bn1"),
 		schema.AssistantMessage("是 go 进程占满", nil),
 	})
 	sid, _ := f.mgr.EnsureSession(f.hostID)
@@ -128,7 +117,7 @@ func TestSessionManager_ApprovalRoundTrip(t *testing.T) {
 	}
 	f.waitState(sid, StateIdle)
 
-	if cmds := f.ex.commands(); len(cmds) != 1 || cmds[0] != "top -bn1" {
+	if cmds := f.ex.Commands(); len(cmds) != 1 || cmds[0] != "top -bn1" {
 		t.Fatalf("未执行批准的命令: %v", cmds)
 	}
 	msgs, _ := f.convs.LoadMessages(sid)
@@ -146,7 +135,7 @@ func TestSessionManager_ApprovalRoundTrip(t *testing.T) {
 
 func TestSessionManager_RejectFlow(t *testing.T) {
 	f := newSessionFixture(t, []*schema.Message{
-		toolCallResponse("reboot"),
+		testutil.ToolCallResponse("reboot"),
 		schema.AssistantMessage("那换个方案", nil),
 	})
 	sid, _ := f.mgr.EnsureSession(f.hostID)
@@ -158,7 +147,7 @@ func TestSessionManager_RejectFlow(t *testing.T) {
 	}
 	f.waitState(sid, StateIdle)
 
-	if cmds := f.ex.commands(); len(cmds) != 0 {
+	if cmds := f.ex.Commands(); len(cmds) != 0 {
 		t.Errorf("拒绝后不应执行命令: %v", cmds)
 	}
 	msgs, _ := f.convs.LoadMessages(sid)
@@ -169,7 +158,7 @@ func TestSessionManager_RejectFlow(t *testing.T) {
 	// 拒绝路径必须落库 tool 消息（配对 assistant tool_calls，否则历史回放被 API 拒绝）
 	var toolMsg *convstore.Message
 	for i := range msgs {
-		if msgs[i].Role == RoleTool {
+		if msgs[i].Role == history.RoleTool {
 			toolMsg = &msgs[i]
 		}
 	}
@@ -186,7 +175,7 @@ func TestSessionManager_RejectFlow(t *testing.T) {
 
 func TestSessionManager_SendDuringApprovalRejected(t *testing.T) {
 	f := newSessionFixture(t, []*schema.Message{
-		toolCallResponse("ls"),
+		testutil.ToolCallResponse("ls"),
 		schema.AssistantMessage("ok", nil),
 	})
 	sid, _ := f.mgr.EnsureSession(f.hostID)
@@ -208,13 +197,11 @@ func TestSessionManager_MissingExecutor(t *testing.T) {
 		t.Error("执行器不可用应返回错误")
 	}
 	found := false
-	f.rec.mu.Lock()
-	for _, e := range f.rec.events {
+	for _, e := range f.rec.SnapshotEvents() {
 		if e == "ai:error" {
 			found = true
 		}
 	}
-	f.rec.mu.Unlock()
 	if !found {
 		t.Error("期望推送 ai:error 事件")
 	}
@@ -222,7 +209,7 @@ func TestSessionManager_MissingExecutor(t *testing.T) {
 
 func TestSessionManager_ModelFactoryError(t *testing.T) {
 	f := newSessionFixture(t, nil)
-	f.mgr.modelFactory = func(ctx context.Context, c configstore.AIConfig) (model.ToolCallingChatModel, error) {
+	f.mgr.modelFactory = func(ctx context.Context, c configstore.AIConfig) (einomodel.ToolCallingChatModel, error) {
 		return nil, errors.New("unsupported provider")
 	}
 	sid, _ := f.mgr.EnsureSession(f.hostID)
@@ -233,11 +220,11 @@ func TestSessionManager_ModelFactoryError(t *testing.T) {
 
 func TestSessionManager_CancelRun(t *testing.T) {
 	f := newSessionFixture(t, []*schema.Message{
-		toolCallResponse("sleep 30"),
+		testutil.ToolCallResponse("sleep 30"),
 		schema.AssistantMessage("done", nil),
 	})
 	// 阻塞式 executor：直到 ctx 取消
-	blockEx := &blockingExec{}
+	blockEx := &testutil.BlockingExec{}
 	f.mgr.executorFor = func(hid string) sshexec.Exec { return blockEx }
 	sid, _ := f.mgr.EnsureSession(f.hostID)
 	_ = f.mgr.SendMessage(sid, "跑个长命令")
@@ -249,16 +236,4 @@ func TestSessionManager_CancelRun(t *testing.T) {
 		t.Fatalf("CancelRun: %v", err)
 	}
 	f.waitState(sid, StateIdle)
-}
-
-// blockingExec 阻塞到 ctx 取消。
-type blockingExec struct{}
-
-func (b *blockingExec) Exec(ctx context.Context, command string) (<-chan sshexec.Line, error) {
-	ch := make(chan sshexec.Line)
-	go func() {
-		<-ctx.Done()
-		close(ch)
-	}()
-	return ch, nil
 }
