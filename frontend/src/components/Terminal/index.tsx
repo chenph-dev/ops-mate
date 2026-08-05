@@ -477,7 +477,7 @@ export default function Terminal({
               zIndex: 10,
             }}
           >
-            <Spin tip={reconnecting ? "连接断开，正在重连..." : "连接中..."} />
+            <Spin description={reconnecting ? "连接断开，正在重连..." : "连接中..."} />
           </div>
         )}
       </div>

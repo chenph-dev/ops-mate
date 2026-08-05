@@ -71,7 +71,7 @@ export default function HostForm({
       onCancel={onCancel}
       onOk={handleSubmit}
       confirmLoading={submitting}
-      destroyOnClose
+      destroyOnHidden
       afterOpenChange={(open) => {
         if (open) {
           form.setFieldsValue(initialValues ?? defaultValues);
