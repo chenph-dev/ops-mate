@@ -98,6 +98,22 @@ func (s *HostsStore) SaveHost(in HostInput) (string, error) {
 	return id, nil
 }
 
+// UpdateHost 更新主机信息（节点编辑）。secret 为空则保留原凭据，非空则重新加密。
+func (s *HostsStore) UpdateHost(id string, in HostInput) error {
+	updates := map[string]any{
+		"name": in.Name, "addr": in.Addr, "port": in.Port,
+		"user": in.User, "auth_type": in.AuthType,
+	}
+	if in.Secret != "" {
+		enc, err := s.app.Encrypt([]byte(in.Secret))
+		if err != nil {
+			return fmt.Errorf("encrypt auth: %w", err)
+		}
+		updates["auth_encrypted"] = enc
+	}
+	return s.app.GORM().Model(&Host{}).Where("id = ?", id).Updates(updates).Error
+}
+
 // CreateFolder 创建目录（node_type='folder'）。
 func (s *HostsStore) CreateFolder(name, parentID string) (string, error) {
 	id := crypto.NewID()

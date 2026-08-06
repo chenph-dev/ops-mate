@@ -32,6 +32,7 @@ export default function HostForm({
   const [form] = Form.useForm<HostInput>();
   const [submitting, setSubmitting] = useState(false);
   const [testing, setTesting] = useState(false);
+  const authType = Form.useWatch("authType", form);
 
   const handleSubmit = async (): Promise<void> => {
     const values = await form.validateFields();
@@ -49,6 +50,11 @@ export default function HostForm({
 
   const handleTest = async (): Promise<void> => {
     const values = await form.validateFields();
+    // 编辑模式：secret 留空表示不修改，测试连接需要真实凭据，提示先输入
+    if (initialValues && !values.secret) {
+      message.warning("请输入新密码/私钥后再测试");
+      return;
+    }
     setTesting(true);
     try {
       const ok = await onTest(values);
@@ -121,19 +127,18 @@ export default function HostForm({
         </Form.Item>
         <Form.Item
           name="secret"
-          label={
-            Form.useWatch("authType", form) === "privatekey"
-              ? "私钥 (PEM)"
-              : "密码"
-          }
-          rules={[{ required: true, message: "请输入" }]}
+          label={authType === "privatekey" ? "私钥 (PEM)" : "密码"}
+          // 编辑模式 secret 非必填（留空保留原密码），新增必填
+          rules={[{ required: !initialValues, message: "请输入" }]}
         >
           <Input.TextArea
             rows={3}
             placeholder={
-              Form.useWatch("authType", form) === "privatekey"
-                ? "-----BEGIN RSA PRIVATE KEY-----..."
-                : "输入密码"
+              initialValues
+                ? "留空则不修改密码/私钥"
+                : authType === "privatekey"
+                  ? "-----BEGIN RSA PRIVATE KEY-----..."
+                  : "输入密码"
             }
           />
         </Form.Item>

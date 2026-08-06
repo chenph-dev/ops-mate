@@ -27,6 +27,11 @@ func (h *HostsHandler) SaveHost(in hoststore.HostInput) (string, error) {
 	return h.hosts.SaveHost(in)
 }
 
+// UpdateHost 更新主机信息（节点编辑）。
+func (h *HostsHandler) UpdateHost(id string, in hoststore.HostInput) error {
+	return h.hosts.UpdateHost(id, in)
+}
+
 func (h *HostsHandler) DeleteHost(id string) error {
 	return h.hosts.DeleteNode(id)
 }
