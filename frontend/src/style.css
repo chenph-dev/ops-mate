@@ -22,3 +22,58 @@ body {
   height: 100%;
   overflow: hidden;
 }
+
+/* ===== 全局滚动条美化（WebView2/Chromium） =====
+ * 颜色用 antd CSS 变量，明暗主题自动适配。
+ * background-clip: content-box + 透明边框实现内缩，8px 滑道显示约 4px 滑块。
+ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--antd-color-border);
+  border: 2px solid transparent;
+  background-clip: content-box;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--antd-color-text-quaternary);
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ===== SFTP 传输任务弹窗 Tabs 紧凑样式 ===== */
+.sftp-task-tabs .ant-tabs-nav {
+  margin-bottom: 0 !important;
+}
+
+.sftp-task-tabs .ant-tabs-tab {
+  padding: 3px 0 !important;
+  margin: 0 10px 0 0 !important;
+  font-size: 12px;
+}
+
+.sftp-task-tabs .ant-tabs-tab + .ant-tabs-tab {
+  margin: 0 10px 0 0 !important;
+}
+
+/* SFTP 传输任务表格紧凑（表头/单元格字号与留白） */
+.sftp-task-table .ant-table-thead > tr > th {
+  padding: 3px 8px !important;
+  font-size: 12px;
+}
+
+.sftp-task-table .ant-table-tbody > tr > td {
+  padding: 3px 8px !important;
+}
