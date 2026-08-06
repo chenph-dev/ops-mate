@@ -7,7 +7,7 @@ type AIConfig = configstore.AIConfig;
 
 const { Title, Paragraph } = Typography;
 
-// API 协议（provider 值直接对应后端 provider.go 的 NewChatModel 分支）。
+// LLM 模型供应商（provider 值直接对应后端 provider.go 的 NewChatModel 分支）。
 // 具体服务商（OpenAI/DeepSeek/通义/智谱/Ollama 等）通过 BaseURL + Model 区分。
 const protocols = [
   { label: 'OpenAI 兼容', value: 'openai' },
@@ -39,15 +39,15 @@ export default function ConfigPage(): React.JSX.Element {
 
   return (
     <div style={{ maxWidth: 560, margin: '0 auto' }}>
-      <Title level={4}>AI 配置</Title>
+      <Title level={4}>LLM模型配置</Title>
       <Paragraph type="secondary" style={{ fontSize: 12 }}>
         配置 AI 提供商。更改后立即生效。
       </Paragraph>
 
       <Card size="small">
         <Form form={form} layout="vertical" size="small">
-          <Form.Item name="provider" label="API 协议" rules={[{ required: true, message: '请选择 API 协议' }]}>
-            <Select options={protocols} placeholder="选择 API 协议" />
+          <Form.Item name="provider" label="LLM模型供应商" rules={[{ required: true, message: '请选择 LLM 模型供应商' }]}>
+            <Select options={protocols} placeholder="选择 LLM 模型供应商" />
           </Form.Item>
 
           <Form.Item name="baseURL" label="Base URL">

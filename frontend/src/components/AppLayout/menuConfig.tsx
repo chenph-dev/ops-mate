@@ -28,7 +28,7 @@ export const routes: RouteItem[] = [
   },
   {
     path: "/config",
-    label: "AI 配置",
+    label: "LLM模型配置",
     icon: <CloudServerOutlined />,
     component: lazyPage(() => import("@/pages/Config")),
   },

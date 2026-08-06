@@ -114,8 +114,8 @@ export default function AIPanel({
   const inputDisabled =
     busy || sessionState === "AwaitingApproval" || !configured;
 
-  // 展开抽屉时拉取 AI 配置：已配置在标题显示模型；未配置给出提醒与跳转。
-  // 从「AI 配置」页保存后返回本页，AIPanel 重新挂载，collapsed 回到初始态，
+  // 展开抽屉时拉取 LLM 模型配置：已配置在标题显示模型；未配置给出提醒与跳转。
+  // 从「LLM模型配置」页保存后返回本页，AIPanel 重新挂载，collapsed 回到初始态，
   // 再次展开即拉到最新配置（热更新）。
   useEffect(() => {
     if (collapsed) return;

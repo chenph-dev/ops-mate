@@ -229,8 +229,8 @@ export default function MessageList({
               textAlign: "center",
             }}
           >
-            尚未配置 AI 后端。请在「AI 配置」页设置
-            API 协议、Base URL、API Key 与模型。
+            尚未配置 LLM 模型。请在「LLM模型配置」页设置
+            LLM 模型供应商、Base URL、API Key 与模型。
           </div>
           <Button
             type="primary"
