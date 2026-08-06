@@ -33,7 +33,7 @@ type Session struct {
 // OpenSession 建立交互式 SSH 会话并启动远程 shell（PTY）。
 // cols/rows 为终端初始尺寸。注意：stdin/stdout/stderr 管道必须在 Shell() 之前配置。
 func OpenSession(ctx context.Context, host Host, cols, rows int) (*Session, error) {
-	client, err := dial(ctx, host)
+	client, err := Dial(ctx, host)
 	if err != nil {
 		return nil, err
 	}

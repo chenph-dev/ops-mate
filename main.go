@@ -12,6 +12,7 @@ import (
 
 	"ops-mate/internal/einoagent/session"
 	"ops-mate/internal/handler"
+	sftppkg "ops-mate/internal/sftp"
 	"ops-mate/internal/sshexec"
 	"ops-mate/internal/store"
 	cfgstore "ops-mate/internal/store/config"
@@ -38,6 +39,22 @@ func main() {
 	sessionManager := session.NewSessionManager(app, cfgStore,
 		executorFor(hostsStore), emitEvent)
 
+	// SFTP 管理器：按 hostID 懒建立/复用连接，应用退出时关闭。
+	sftpManager := sftppkg.NewManager(func(hostID string) (*sshexec.Host, error) {
+		secret, authType, err := hostsStore.GetHostSecret(hostID)
+		if err != nil {
+			return nil, err
+		}
+		meta, err := hostsStore.HostMetaByID(hostID)
+		if err != nil {
+			return nil, err
+		}
+		return &sshexec.Host{
+			Addr: meta.Addr, Port: meta.Port, User: meta.User,
+			AuthType: authType, Secret: secret,
+		}, nil
+	})
+
 	err = wails.Run(&options.App{
 		Title:  "ops-mate",
 		Width:  1024,
@@ -53,12 +70,16 @@ func main() {
 		OnStartup: func(ctx context.Context) {
 			handler.SetCtx(ctx)
 		},
+		OnShutdown: func(ctx context.Context) {
+			sftpManager.Close()
+		},
 		// 每个 handler 是独立模块，前端通过 wailsjs/go/main/<TypeName> 访问。
 		Bind: []interface{}{
 			handler.NewHostsHandler(hostsStore),
 			handler.NewAIConfigHandler(cfgStore, sessionManager.InvalidateConfig),
 			handler.NewSessionsHandler(convStore, sessionManager),
 			handler.NewTerminalHandler(hostsStore),
+			handler.NewSftpHandler(sftpManager),
 		},
 	})
 

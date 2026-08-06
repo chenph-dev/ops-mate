@@ -37,7 +37,7 @@ type Executor struct{ host Host }
 func NewExecutor(h Host) *Executor { return &Executor{host: h} }
 
 func (e *Executor) dial(ctx context.Context) (*ssh.Client, error) {
-	return dial(ctx, e.host)
+	return Dial(ctx, e.host)
 }
 
 // Exec 执行命令，返回行流通道（执行结束后关闭）。ctx 取消则中止会话。
