@@ -31,6 +31,7 @@ interface TerminalProps {
   hostAddr: string;
   aiOpen: boolean;
   onToggleAI: () => void;
+  onRefresh: () => void;
   onData: (data: string) => void;
   onResize: (cols: number, rows: number) => void;
   setOutputHandler: (cb: (data: Uint8Array) => void) => void;
@@ -54,6 +55,7 @@ export default function Terminal({
   hostAddr,
   aiOpen,
   onToggleAI,
+  onRefresh,
   onData,
   onResize,
   setOutputHandler,
@@ -429,6 +431,7 @@ export default function Terminal({
         minFontSize={MIN_FONT_SIZE}
         aiOpen={aiOpen}
         onToggleAI={onToggleAI}
+        onRefresh={onRefresh}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onSearch={(): void => {

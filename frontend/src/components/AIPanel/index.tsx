@@ -25,6 +25,7 @@ export interface AIPanelProps {
   runningCommand: string | null;
   runElapsed: number;
   runOutput: string;
+  sshConnected: boolean;
   hostName: string;
   collapsed: boolean;
   onRefreshConversations: () => Promise<void>;
@@ -53,6 +54,7 @@ export default function AIPanel({
   runningCommand,
   runElapsed,
   runOutput,
+  sshConnected,
   hostName,
   collapsed,
   onRefreshConversations,
@@ -218,6 +220,7 @@ export default function AIPanel({
         cfgLoading={cfgLoading}
         stateMeta={stateMeta}
         sessionState={sessionState}
+        sshConnected={sshConnected}
         conversations={conversations}
         activeSession={activeSession}
         onSwitchConversation={onSwitchConversation}
@@ -228,6 +231,21 @@ export default function AIPanel({
         onNewConversation={onNewConversation}
         onToggleCollapse={onToggleCollapse}
       />
+      {/* SSH 断开警告：AI 命令依赖主机连接 */}
+      {!sshConnected && (
+        <div
+          style={{
+            padding: "4px 10px",
+            fontSize: 11,
+            lineHeight: 1.5,
+            background: "var(--antd-color-warning-bg)",
+            borderBottom: "1px solid var(--antd-color-warning-border)",
+            color: "var(--antd-color-warning-text)",
+          }}
+        >
+          ⚠ SSH 连接已断开，AI 命令无法在主机执行。请先在终端建立连接。
+        </div>
+      )}
       <MessageList
         messages={messages}
         streamingText={streamingText}

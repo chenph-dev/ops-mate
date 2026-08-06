@@ -131,16 +131,20 @@ export default function HostForm({
           // 编辑模式 secret 非必填（留空保留原密码），新增必填
           rules={[{ required: !initialValues, message: "请输入" }]}
         >
-          <Input.TextArea
-            rows={3}
-            placeholder={
-              initialValues
-                ? "留空则不修改密码/私钥"
-                : authType === "privatekey"
-                  ? "-----BEGIN RSA PRIVATE KEY-----..."
-                  : "输入密码"
-            }
-          />
+          {authType === "privatekey" ? (
+            <Input.TextArea
+              rows={3}
+              placeholder={
+                initialValues
+                  ? "留空则不修改私钥"
+                  : "-----BEGIN RSA PRIVATE KEY-----..."
+              }
+            />
+          ) : (
+            <Input.Password
+              placeholder={initialValues ? "留空则不修改密码" : "输入密码"}
+            />
+          )}
         </Form.Item>
       </Form>
       <div style={{ textAlign: "right", marginTop: 8 }}>

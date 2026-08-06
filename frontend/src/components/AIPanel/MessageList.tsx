@@ -183,7 +183,7 @@ export default function MessageList({
               background: "var(--antd-color-fill-secondary)",
             }}
           >
-            {/* 已完成的助手消息：Markdown 渲染（表格/代码块/列表） */}
+            {/* 已完成的智能体消息：Markdown 渲染（表格/代码块/列表） */}
             <MarkdownContent content={msg.content} />
           </div>
           <Button

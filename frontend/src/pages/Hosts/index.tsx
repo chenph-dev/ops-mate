@@ -30,7 +30,7 @@ function toHostInput(node: TreeNode): HostInput {
 export default function HostsPage(): React.JSX.Element {
   const { message, modal } = AntdApp.useApp();
   const { isDark } = useThemeToggle();
-  const { tree, addHost, updateHost, testConnection, createFolder, deleteNode } = useHosts();
+  const { tree, addHost, updateHost, getHostSecret, testConnection, createFolder, deleteNode } = useHosts();
   const [selectedHost, setSelectedHost] = useState<TreeNode | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formParentId, setFormParentId] = useState('');
@@ -132,12 +132,22 @@ export default function HostsPage(): React.JSX.Element {
     setFormOpen(true);
   }, []);
 
-  const handleEditHost = useCallback((host: TreeNode) => {
-    setEditingHostId(host.id);
-    setFormInitialValues(toHostInput(host));
-    setFormParentId(host.parentId ?? '');
-    setFormOpen(true);
-  }, []);
+  const handleEditHost = useCallback(
+    async (host: TreeNode) => {
+      setEditingHostId(host.id);
+      setFormParentId(host.parentId ?? '');
+      // 加载已存密码/私钥回填（TreeNode 不含凭据），失败则留空（保留原密码）
+      let secret = '';
+      try {
+        secret = await getHostSecret(host.id);
+      } catch {
+        // 忽略：留空表示不修改
+      }
+      setFormInitialValues({ ...toHostInput(host), secret });
+      setFormOpen(true);
+    },
+    [getHostSecret],
+  );
 
   const handleDelete = useCallback(async (node: TreeNode) => {
     modal.confirm({
@@ -165,6 +175,15 @@ export default function HostsPage(): React.JSX.Element {
     setSelectedHost(node);
     setView('sftp');
   }, []);
+
+  // 终端工具栏「刷新连接」：重连当前选中主机。
+  // terminal 对象每次 render 重建但 open 稳定，selectedHost?.id 是意图依赖。
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
+  const handleRefreshTerminal = useCallback(() => {
+    if (selectedHost?.id) {
+      void terminal.open(selectedHost.id);
+    }
+  }, [selectedHost?.id, terminal]);
 
   const handleSelect = useCallback((node: TreeNode) => {
     setSelectedHost(node);
@@ -259,7 +278,7 @@ export default function HostsPage(): React.JSX.Element {
             minWidth: 0,
           }}
         >
-            {/* 终端区域：占据 AI 面板之外的剩余宽度 */}
+            {/* 终端区域：占据智能体面板之外的剩余宽度 */}
             <div style={{ flex: 1, minWidth: 0 }}>
               <Terminal
                 isDark={isDark}
@@ -280,10 +299,11 @@ export default function HostsPage(): React.JSX.Element {
                 onDisconnect={() => terminal.close()}
                 aiOpen={!aiCollapsed}
                 onToggleAI={() => setAiCollapsed(!aiCollapsed)}
+                onRefresh={handleRefreshTerminal}
               />
             </div>
 
-            {/* AI 面板：收起时渲染右下角按钮（不占位），展开时并排固定宽度 */}
+            {/* 智能体面板：收起时渲染右下角按钮（不占位），展开时并排固定宽度 */}
             <AIPanel
               activeSession={sessions.activeSession}
               messages={sessions.messages}
@@ -296,6 +316,7 @@ export default function HostsPage(): React.JSX.Element {
               runningCommand={sessions.runningCommand}
               runElapsed={sessions.runElapsed}
               runOutput={sessions.runOutput}
+              sshConnected={terminal.connected}
               hostName={selectedHost?.name ?? ''}
               collapsed={aiCollapsed}
               onRefreshConversations={sessions.refreshConversations}

@@ -3,7 +3,8 @@ import {
   ClearOutlined,
   CopyOutlined,
   DisconnectOutlined,
-  MessageOutlined,
+  ReloadOutlined,
+  RobotOutlined,
   SearchOutlined,
   ZoomInOutlined,
   ZoomOutOutlined,
@@ -20,6 +21,7 @@ interface TerminalHeaderProps {
   minFontSize: number;
   aiOpen: boolean;
   onToggleAI: () => void;
+  onRefresh: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onSearch: () => void;
@@ -28,7 +30,7 @@ interface TerminalHeaderProps {
   onDisconnect: () => void;
 }
 
-/** 终端标题栏：主机信息 + AI 面板开关/缩放/搜索/清空/复制/断开操作。 */
+/** 终端标题栏：主机信息 + 智能体面板开关/刷新/缩放/搜索/清空/复制/断开操作。 */
 export default function TerminalHeader({
   hostName,
   hostAddr,
@@ -40,6 +42,7 @@ export default function TerminalHeader({
   minFontSize,
   aiOpen,
   onToggleAI,
+  onRefresh,
   onZoomIn,
   onZoomOut,
   onSearch,
@@ -102,12 +105,20 @@ export default function TerminalHeader({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-        <Tooltip title={aiOpen ? "收起 AI 面板" : "打开 AI 面板"}>
+        <Tooltip title={aiOpen ? "收起智能体面板" : "打开智能体面板"}>
           <Button
             type={aiOpen ? "primary" : "text"}
             size="small"
-            icon={<MessageOutlined />}
+            icon={<RobotOutlined />}
             onClick={onToggleAI}
+          />
+        </Tooltip>
+        <Tooltip title="刷新连接">
+          <Button
+            type="text"
+            size="small"
+            icon={<ReloadOutlined />}
+            onClick={onRefresh}
           />
         </Tooltip>
         <Tooltip title="放大 (Ctrl++)">

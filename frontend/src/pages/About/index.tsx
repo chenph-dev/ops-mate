@@ -10,7 +10,7 @@ export default function About(): React.JSX.Element {
       <Card size="small">
         <Space direction="vertical" size={4}>
           <Paragraph style={{ margin: 0 }}>
-            <Text strong>ops-mate</Text> — 基于 Wails + React 的 AI 运维助手
+            <Text strong>ops-mate</Text> — 基于 Wails + React 的 AI 运维智能体
           </Paragraph>
           <Paragraph type="secondary" style={{ fontSize: 12, margin: 0 }}>
             通过 AI 对话远程管理 Linux 主机，支持命令审批、历史记忆、多主机管理。

@@ -1,6 +1,6 @@
 import { Button, Tag, Tooltip } from "antd";
 import {
-  MessageOutlined,
+  RobotOutlined,
   CompressOutlined,
   PlusOutlined,
   StopOutlined,
@@ -16,6 +16,7 @@ interface PanelHeaderProps {
   cfgLoading: boolean;
   stateMeta: { text: string; color: string } | null;
   sessionState: SessionState;
+  sshConnected: boolean;
   conversations: convstore.Conversation[];
   activeSession: string | null;
   onSwitchConversation: (sid: string) => Promise<void>;
@@ -27,7 +28,7 @@ interface PanelHeaderProps {
   onToggleCollapse: () => void;
 }
 
-/** 抽屉标题栏：AI 助手信息 + 会话操作按钮。宽度由面板左边缘拖拽条调整。 */
+/** 抽屉标题栏：智能体信息 + 会话操作按钮。宽度由面板左边缘拖拽条调整。 */
 export default function PanelHeader({
   hostName,
   aiCfg,
@@ -35,6 +36,7 @@ export default function PanelHeader({
   cfgLoading,
   stateMeta,
   sessionState,
+  sshConnected,
   conversations,
   activeSession,
   onSwitchConversation,
@@ -57,8 +59,8 @@ export default function PanelHeader({
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <MessageOutlined style={{ color: "var(--antd-color-primary)" }} />
-        <span style={{ fontSize: 12, fontWeight: 600 }}>AI 助手</span>
+        <RobotOutlined style={{ color: "var(--antd-color-primary)" }} />
+        <span style={{ fontSize: 12, fontWeight: 600 }}>智能体</span>
         <span
           style={{ fontSize: 11, color: "var(--antd-color-text-secondary)" }}
         >
@@ -74,6 +76,7 @@ export default function PanelHeader({
             · {aiCfg.model}
           </span>
         )}
+        {!sshConnected && <Tag color="warning">SSH 已断开</Tag>}
         {!configured && !cfgLoading && <Tag color="error">未配置</Tag>}
         {stateMeta && <Tag color={stateMeta.color}>{stateMeta.text}</Tag>}
       </div>

@@ -32,6 +32,12 @@ func (h *HostsHandler) UpdateHost(id string, in hoststore.HostInput) error {
 	return h.hosts.UpdateHost(id, in)
 }
 
+// GetHostSecret 返回主机解密后的凭据（编辑表单回填密码/私钥）。
+func (h *HostsHandler) GetHostSecret(hostID string) (string, error) {
+	secret, _, err := h.hosts.GetHostSecret(hostID)
+	return secret, err
+}
+
 func (h *HostsHandler) DeleteHost(id string) error {
 	return h.hosts.DeleteNode(id)
 }

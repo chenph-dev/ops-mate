@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   SaveHost,
   UpdateHost,
+  GetHostSecret,
   TestConnection,
   CreateFolder,
   ListTree,
@@ -19,6 +20,7 @@ export function useHosts(): {
   refresh: () => Promise<void>;
   addHost: (input: HostInput) => Promise<string | void>;
   updateHost: (id: string, input: HostInput) => Promise<void>;
+  getHostSecret: (id: string) => Promise<string>;
   removeHost: (id: string) => Promise<void>;
   testConnection: (input: HostInput) => Promise<boolean>;
   createFolder: (name: string, parentId: string) => Promise<string | void>;
@@ -64,6 +66,10 @@ export function useHosts(): {
     await refresh();
   }, [refresh]);
 
+  const getHostSecret = useCallback(async (id: string): Promise<string> => {
+    return GetHostSecret(id);
+  }, []);
+
   const removeHost = useCallback(async (id: string) => {
     await DeleteNode(id);
     await refresh();
@@ -89,5 +95,5 @@ export function useHosts(): {
     await refresh();
   }, [refresh]);
 
-  return { tree, loading, refresh, addHost, updateHost, removeHost, testConnection, createFolder, moveNode, deleteNode };
+  return { tree, loading, refresh, addHost, updateHost, getHostSecret, removeHost, testConnection, createFolder, moveNode, deleteNode };
 }
