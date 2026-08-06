@@ -40,20 +40,37 @@ func main() {
 		executorFor(hostsStore), emitEvent)
 
 	// SFTP 管理器：按 hostID 懒建立/复用连接，应用退出时关闭。
-	sftpManager := sftppkg.NewManager(func(hostID string) (*sshexec.Host, error) {
-		secret, authType, err := hostsStore.GetHostSecret(hostID)
-		if err != nil {
-			return nil, err
-		}
-		meta, err := hostsStore.HostMetaByID(hostID)
-		if err != nil {
-			return nil, err
-		}
-		return &sshexec.Host{
-			Addr: meta.Addr, Port: meta.Port, User: meta.User,
-			AuthType: authType, Secret: secret,
-		}, nil
-	})
+	sftpManager := sftppkg.NewManager(
+		func(hostID string) (*sshexec.Host, error) {
+			secret, authType, err := hostsStore.GetHostSecret(hostID)
+			if err != nil {
+				return nil, err
+			}
+			meta, err := hostsStore.HostMetaByID(hostID)
+			if err != nil {
+				return nil, err
+			}
+			return &sshexec.Host{
+				Addr: meta.Addr, Port: meta.Port, User: meta.User,
+				AuthType: authType, Secret: secret,
+			}, nil
+		},
+		// 传输进度事件：推送前端实时更新任务进度
+		func(t *sftppkg.Task) {
+			wailsruntime.EventsEmit(handler.Ctx(), "sftp:progress", map[string]any{
+				"taskID": t.ID, "done": t.Done, "total": t.Total,
+				"status": string(t.Status),
+			})
+		},
+		// 任务开始事件：前端自动打开传输任务弹窗
+		func(t *sftppkg.Task) {
+			wailsruntime.EventsEmit(handler.Ctx(), "sftp:task-start", map[string]any{
+				"taskID": t.ID, "direction": t.Direction,
+				"localPath": t.LocalPath, "remotePath": t.RemotePath,
+				"total": t.Total,
+			})
+		},
+	)
 
 	err = wails.Run(&options.App{
 		Title:  "ops-mate",
