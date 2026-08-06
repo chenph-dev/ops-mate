@@ -1,24 +1,44 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { App as AntdApp, Input } from 'antd';
+import { App as AntdApp, Input, Segmented } from 'antd';
 import type { hoststore } from '@wailsjs/go/models';
 
 type TreeNode = hoststore.TreeNode;
+type HostInput = hoststore.HostInput;
 import { useHosts } from '@/hooks/useHosts';
 import { useSessions } from '@/hooks/useSessions';
 import { useThemeToggle } from '@/context/ThemeContext';
 import { useTerminal } from '@/hooks/useTerminal';
 import HostList from '@/components/HostList';
 import HostForm from '@/components/HostForm';
+import SftpPanel from '@/components/SftpPanel';
 import Terminal from '@/components/Terminal';
 import AIPanel from '@/components/AIPanel';
+
+/** TreeNode → 编辑表单值：TreeNode 不含凭据，secret 留空（空则后端保留原密码）。 */
+function toHostInput(node: TreeNode): HostInput {
+  return {
+    name: node.name,
+    parentId: node.parentId ?? '',
+    addr: node.addr ?? '',
+    port: node.port ?? 22,
+    user: node.user ?? '',
+    authType: node.authType ?? 'password',
+    secret: '',
+  };
+}
 
 export default function HostsPage(): React.JSX.Element {
   const { message, modal } = AntdApp.useApp();
   const { isDark } = useThemeToggle();
-  const { tree, addHost, testConnection, createFolder, deleteNode } = useHosts();
+  const { tree, addHost, updateHost, testConnection, createFolder, deleteNode } = useHosts();
   const [selectedHost, setSelectedHost] = useState<TreeNode | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formParentId, setFormParentId] = useState('');
+  // 节点编辑：非空表示编辑该主机，空表示新增
+  const [editingHostId, setEditingHostId] = useState<string | null>(null);
+  const [formInitialValues, setFormInitialValues] = useState<HostInput | null>(null);
+  // 右侧视图：终端+AI / SFTP
+  const [view, setView] = useState<'terminal' | 'sftp'>('terminal');
   const [aiCollapsed, setAiCollapsed] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     const saved = Number(localStorage.getItem('hosts-sidebar-width'));
@@ -106,14 +126,18 @@ export default function HostsPage(): React.JSX.Element {
   }, [createFolder, modal]);
 
   const handleAddHost = useCallback((parentId: string) => {
+    setEditingHostId(null);
+    setFormInitialValues(null);
     setFormParentId(parentId);
     setFormOpen(true);
   }, []);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleEditHost = useCallback((_host: TreeNode) => {
-    message.info('编辑功能待实现');
-  }, [message]);
+  const handleEditHost = useCallback((host: TreeNode) => {
+    setEditingHostId(host.id);
+    setFormInitialValues(toHostInput(host));
+    setFormParentId(host.parentId ?? '');
+    setFormOpen(true);
+  }, []);
 
   const handleDelete = useCallback(async (node: TreeNode) => {
     modal.confirm({
@@ -123,10 +147,24 @@ export default function HostsPage(): React.JSX.Element {
     });
   }, [deleteNode, modal]);
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const handleTest = useCallback(async (_host: TreeNode) => {
-    message.info('请编辑主机以测试连接（需要密码/密钥）');
-  }, [message]);
+  // 右键「连接」菜单：与双击一致，真正打开终端
+  const handleTest = useCallback(
+    async (node: TreeNode) => {
+      setSelectedHost(node);
+      try {
+        await terminal.open(node.id);
+      } catch (err) {
+        message.error(`连接失败: ${err}`);
+      }
+    },
+    [terminal, message],
+  );
+
+  // 右键「SFTP 文件」：切到 SFTP 视图浏览该主机文件
+  const handleSftp = useCallback((node: TreeNode) => {
+    setSelectedHost(node);
+    setView('sftp');
+  }, []);
 
   const handleSelect = useCallback((node: TreeNode) => {
     setSelectedHost(node);
@@ -164,6 +202,7 @@ export default function HostsPage(): React.JSX.Element {
         onEditHost={handleEditHost}
         onDelete={handleDelete}
         onTest={handleTest}
+        onSftp={handleSftp}
       />
 
       {/* 分隔条：左右拖动调整左侧宽度 */}
@@ -182,75 +221,120 @@ export default function HostsPage(): React.JSX.Element {
         }}
       />
 
-      {/* 右：终端 + AI 面板（并排，AI 面板固定宽度、终端自适应让出空间） */}
+      {/* 右：视图切换（终端+AI / SFTP）+ 内容 */}
       <div
         style={{
-          position: 'relative',
-          height: '100%',
           display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
           minWidth: 0,
         }}
       >
-        {/* 终端区域：占据 AI 面板之外的剩余宽度 */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <Terminal
-            isDark={isDark}
-            hostID={selectedHost?.id}
-            connected={terminal.connected}
-            connecting={terminal.connecting}
-            reconnecting={terminal.reconnecting}
-            reconnectCount={terminal.reconnectCount}
-            hostName={selectedHost?.name ?? ''}
-            hostAddr={
-              selectedHost
-                ? `${selectedHost.user}@${selectedHost.addr}:${selectedHost.port}`
-                : ''
-            }
-            onData={terminal.sendData}
-            onResize={terminal.resize}
-            setOutputHandler={terminal.setOutputHandler}
-            onDisconnect={() => terminal.close()}
-            aiOpen={!aiCollapsed}
-            onToggleAI={() => setAiCollapsed(!aiCollapsed)}
+        {/* 视图切换 */}
+        <div
+          style={{
+            padding: '4px 8px',
+            borderBottom: '1px solid var(--antd-color-border-secondary)',
+            background: 'var(--antd-color-bg-layout)',
+            flexShrink: 0,
+          }}
+        >
+          <Segmented
+            size="small"
+            value={view}
+            onChange={(v) => setView(v as 'terminal' | 'sftp')}
+            options={[
+              { label: '终端', value: 'terminal' },
+              { label: 'SFTP', value: 'sftp', disabled: !selectedHost },
+            ]}
           />
         </div>
+        {/* 终端视图：始终挂载（保留 xterm 输出），display 控制显隐，避免切换时重挂清空 */}
+        <div
+          style={{
+            position: 'relative',
+            flex: 1,
+            minHeight: 0,
+            display: view === 'sftp' ? 'none' : 'flex',
+            minWidth: 0,
+          }}
+        >
+            {/* 终端区域：占据 AI 面板之外的剩余宽度 */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <Terminal
+                isDark={isDark}
+                hostID={selectedHost?.id}
+                connected={terminal.connected}
+                connecting={terminal.connecting}
+                reconnecting={terminal.reconnecting}
+                reconnectCount={terminal.reconnectCount}
+                hostName={selectedHost?.name ?? ''}
+                hostAddr={
+                  selectedHost
+                    ? `${selectedHost.user}@${selectedHost.addr}:${selectedHost.port}`
+                    : ''
+                }
+                onData={terminal.sendData}
+                onResize={terminal.resize}
+                setOutputHandler={terminal.setOutputHandler}
+                onDisconnect={() => terminal.close()}
+                aiOpen={!aiCollapsed}
+                onToggleAI={() => setAiCollapsed(!aiCollapsed)}
+              />
+            </div>
 
-        {/* AI 面板：收起时渲染右下角按钮（不占位），展开时并排固定宽度 */}
-        <AIPanel
-          activeSession={sessions.activeSession}
-          messages={sessions.messages}
-          conversations={sessions.conversations}
-          streamingText={sessions.streamingText}
-          pendingCommand={sessions.pendingCommand}
-          commandStatus={sessions.commandStatus}
-          sessionState={sessions.sessionState}
-          lastError={sessions.lastError}
-          runningCommand={sessions.runningCommand}
-          runElapsed={sessions.runElapsed}
-          runOutput={sessions.runOutput}
-          hostName={selectedHost?.name ?? ''}
-          collapsed={aiCollapsed}
-          onRefreshConversations={sessions.refreshConversations}
-          onSwitchConversation={sessions.switchConversation}
-          onDeleteConversation={sessions.deleteConversation}
-          onRenameConversation={sessions.renameConversation}
-          onToggleCollapse={() => setAiCollapsed(!aiCollapsed)}
-          onSendMessage={sessions.sendMessage}
-          onClearMessages={sessions.clearMessages}
-          onRunInTerminal={runInTerminal}
-          onApprove={sessions.approve}
-          onReject={sessions.reject}
-          onCancel={sessions.cancel}
-          onNewConversation={sessions.newConversation}
-        />
-      </div>
+            {/* AI 面板：收起时渲染右下角按钮（不占位），展开时并排固定宽度 */}
+            <AIPanel
+              activeSession={sessions.activeSession}
+              messages={sessions.messages}
+              conversations={sessions.conversations}
+              streamingText={sessions.streamingText}
+              pendingCommand={sessions.pendingCommand}
+              commandStatus={sessions.commandStatus}
+              sessionState={sessions.sessionState}
+              lastError={sessions.lastError}
+              runningCommand={sessions.runningCommand}
+              runElapsed={sessions.runElapsed}
+              runOutput={sessions.runOutput}
+              hostName={selectedHost?.name ?? ''}
+              collapsed={aiCollapsed}
+              onRefreshConversations={sessions.refreshConversations}
+              onSwitchConversation={sessions.switchConversation}
+              onDeleteConversation={sessions.deleteConversation}
+              onRenameConversation={sessions.renameConversation}
+              onToggleCollapse={() => setAiCollapsed(!aiCollapsed)}
+              onSendMessage={sessions.sendMessage}
+              onClearMessages={sessions.clearMessages}
+              onRunInTerminal={runInTerminal}
+              onApprove={sessions.approve}
+              onReject={sessions.reject}
+              onCancel={sessions.cancel}
+              onNewConversation={sessions.newConversation}
+            />
+          </div>
+
+      {/* SFTP 视图：条件挂载（切走卸载，重进重新加载根目录） */}
+      {view === 'sftp' && (
+        <div style={{ flex: 1, minHeight: 0, padding: '4px 5px' }}>
+          <SftpPanel
+            hostId={selectedHost?.id ?? null}
+            hostName={selectedHost?.name ?? ''}
+          />
+        </div>
+      )}
+    </div>
 
       {/* 主机表单弹窗 */}
       <HostForm
         open={formOpen}
+        initialValues={formInitialValues}
         onCancel={() => setFormOpen(false)}
         onSubmit={async (input) => {
-          await addHost({ ...input, parentId: formParentId });
+          if (editingHostId) {
+            await updateHost(editingHostId, input);
+          } else {
+            await addHost({ ...input, parentId: formParentId });
+          }
           setFormOpen(false);
         }}
         onTest={async (input) => {

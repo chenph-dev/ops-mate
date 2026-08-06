@@ -3,6 +3,7 @@ import type { DataNode } from "antd/es/tree";
 import {
   DesktopOutlined,
   FolderOutlined,
+  FolderOpenOutlined,
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
@@ -23,6 +24,7 @@ interface HostListProps {
   onEditHost: (host: TreeNode) => void;
   onDelete: (node: TreeNode) => void;
   onTest: (host: TreeNode) => void;
+  onSftp: (host: TreeNode) => void;
 }
 
 interface ContextMenuProps {
@@ -35,6 +37,7 @@ interface ContextMenuProps {
   onEdit: () => void;
   onDelete: () => void;
   onTest: () => void;
+  onSftp: () => void;
 }
 
 function ContextMenu({
@@ -47,6 +50,7 @@ function ContextMenu({
   onEdit,
   onDelete,
   onTest,
+  onSftp,
 }: ContextMenuProps): React.JSX.Element {
   const { token } = theme.useToken();
   const items =
@@ -78,6 +82,12 @@ function ContextMenu({
             icon: <LinkOutlined />,
             label: "连接",
             onClick: onTest,
+          },
+          {
+            key: "sftp",
+            icon: <FolderOpenOutlined />,
+            label: "SFTP 文件",
+            onClick: onSftp,
           },
           {
             key: "edit",
@@ -137,6 +147,7 @@ export default function HostList({
   onEditHost,
   onDelete,
   onTest,
+  onSftp,
 }: HostListProps): React.JSX.Element {
   const { token } = theme.useToken();
   const [contextMenu, setContextMenu] = useState<{
@@ -289,6 +300,10 @@ export default function HostList({
           }}
           onTest={() => {
             onTest(contextMenu.node);
+            setContextMenu(null);
+          }}
+          onSftp={() => {
+            onSftp(contextMenu.node);
             setContextMenu(null);
           }}
         />
