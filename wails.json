@@ -8,7 +8,12 @@
   "frontend:dev:watcher": "pnpm run dev",
   "frontend:dev:serverUrl": "auto",
   "author": {
-    "name": "chenph",
-    "email": "18397756053@163.com"
+    "name": "ops-mate",
+    "email": "ops-mate@example.com"
+  },
+  "info": {
+    "companyName": "ops-mate",
+    "productName": "ops-mate",
+    "productVersion": "1.0.1"
   }
 }

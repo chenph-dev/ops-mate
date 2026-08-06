@@ -1,19 +1,105 @@
-# README
+# ops-mate
 
-## About
+**ops-mate** is a desktop application for SSH server operations and automated ops management, built with [Wails v2](https://wails.io/) (Go backend + React/TypeScript frontend). It combines a classic SSH/SFTP client with an **AI-powered ops agent** that can plan and execute troubleshooting or remediation tasks on your servers — with human approval at every step.
 
-This is the official Wails React-TS template.
+![ops-mate 主界面](images/home.png)
 
-You can configure the project by editing `wails.json`. More information about the project settings can be found
-here: https://wails.io/docs/reference/project-config
+## Features
 
-## Live Development
+### 🖥️ Host Management
+- Organize hosts into a folder **tree** (create / rename / move / delete nodes)
+- Manage SSH connection info (host, port, user, auth)
+- **Test connection** before saving; run ad-hoc commands
+- Passwords/secrets are **encrypted at rest**
 
-To run in live development mode, run `wails dev` in the project directory. This will run a Vite development
-server that will provide very fast hot reload of your frontend changes. If you want to develop in a browser
-and have access to your Go methods, there is also a dev server that runs on http://localhost:34115. Connect
-to this in your browser, and you can call your Go code from devtools.
+### 💻 SSH Terminal
+- Full interactive terminal (xterm.js, WebGL/canvas rendering)
+- Dynamic **resize**, search, copy/paste, command history
+- Multiple concurrent host sessions
+
+### 📁 SFTP File Transfer
+- Browse remote directories, create / delete / rename
+- **Upload / download** with a concurrent queue
+- Per-task **progress** with pause / resume / cancel
+
+### 🤖 AI Ops Agent
+- Chat with an LLM agent that has a direct view of your selected host
+- **`execute_command` tool** — the agent proposes concrete shell commands; **every command must be approved by you before it runs**
+- **Plan mode (`create_plan`)** — for complex multi-step tasks the agent first submits an execution plan (goal + step list) for your approval, then executes step by step
+- **Guardrails** — dangerous operations (delete, restart, shutdown, formatting) are flagged and always require explicit approval
+- Conversation history per host, with rename / delete
+
+### ⚙️ Model Configuration
+- Bring your own LLM: provider, model, base URL, API key (**encrypted at rest**)
+- Supports OpenAI-compatible protocols (OpenAI / DeepSeek / Qwen(通义) / Zhipu(智谱) / Moonshot / Volcengine, etc.), **Anthropic Claude**, and local **Ollama**
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Shell | Wails v2 (Go + WebView2) |
+| Backend | Go, [eino](https://github.com/cloudwego/eino) agent framework, eino-ext model adapters |
+| Storage | SQLite via `modernc.org/sqlite` (pure Go, no CGO) + GORM + golang-migrate |
+| Frontend | React 19, TypeScript, Vite, Ant Design 6, react-router-dom 7, xterm.js |
+
+## Architecture
+
+```
+┌─────────────────────────── Frontend (React) ───────────────────────────┐
+│  HostsPage ──► HostTree / Terminal / SFTP Panel / AIPanel / PlanCard   │
+└───────────────────────────────┬────────────────────────────────────────┘
+                                │  Wails bindings (window.go)
+┌───────────────────────────────▼────────────────────────────────────────┐
+│                         Go Backend (Wails)                              │
+│  handlers: Hosts · Terminal · Sftp · Sessions · AIConfig                │
+│  internal/einoagent: model(provider) · tools · session · guardrail     │
+│  internal/store:     hosts · conversations · config · memory (SQLite)   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+- **Bindings**: exported methods on Go handler structs are auto-bound and callable from the frontend via `@wailsjs/go/**` (auto-generated, never edit).
+- **Routing**: `react-router-dom` with `HashRouter` (required for embedded Wails assets). Single source of truth in `frontend/src/components/AppLayout/menuConfig.tsx`.
+- **Frameless window**: custom title-bar drag region built in the frontend.
+- **AI events**: the agent streams events (`ai:text`, `ai:command`, `ai:plan`, `run:*`) to the frontend over Wails events to drive the approval UI.
+
+## Development
+
+Prerequisites: [Go](https://go.dev/dl/), [Node.js](https://nodejs.org/), [pnpm](https://pnpm.io/), and the [Wails CLI](https://wails.io/docs/gettingstarted/installation).
+
+```bash
+# Live development (hot reload for Go + frontend)
+wails dev
+
+# Frontend-only (standalone Vite, no Go bridge)
+cd frontend && pnpm dev
+```
 
 ## Building
 
-To build a redistributable, production mode package, use `wails build`.
+```bash
+# Production build
+wails build
+
+# Build for a specific platform
+wails build -platform windows/amd64
+wails build -platform darwin/universal
+```
+
+## Project Layout
+
+```
+├── main.go                  # Wails app entry, binding
+├── internal/
+│   ├── handler/             # Wails-bound API handlers (hosts, terminal, sftp, sessions, ai config)
+│   ├── einoagent/           # AI agent (model/provider, tools, session, guardrail, history)
+│   ├── sftp/                # SFTP transfer engine (concurrent queue)
+│   └── store/               # SQLite persistence (hosts, conversations, config, memory)
+├── frontend/
+│   ├── src/                 # React app (pages, components, hooks)
+│   └── wailsjs/             # auto-generated Wails bindings (do not edit)
+└── wails.json               # Wails project config
+```
+
+## License
+
+[MIT](LICENSE) © ops-mate contributors
