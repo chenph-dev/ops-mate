@@ -98,6 +98,8 @@ type agentSession struct {
 	interruptID string
 	lastInput   []*schema.Message
 	cancel      context.CancelFunc
+	// 审批类型：等待审批时区分是"计划"（create_plan）还是"命令"（execute_command）
+	approvalType string // "" | "plan" | "command"
 
 	holder    *executorHolder
 	toolCalls *agenttools.ToolCallHolder
@@ -281,9 +283,9 @@ func (m *SessionManager) ApproveCommand(sid, command string) error {
 		return err
 	}
 	s.mu.Lock()
-	if s.state != stAwaitingApproval {
+	if s.state != stAwaitingApproval || s.approvalType != "command" {
 		s.mu.Unlock()
-		return fmt.Errorf("当前无待审批命令（state=%s）", s.state)
+		return fmt.Errorf("当前无待审批命令（state=%s type=%s）", s.state, s.approvalType)
 	}
 	s.state = stRunning
 	input := s.lastInput
@@ -305,9 +307,57 @@ func (m *SessionManager) RejectCommand(sid string) error {
 		return err
 	}
 	s.mu.Lock()
-	if s.state != stAwaitingApproval {
+	if s.state != stAwaitingApproval || s.approvalType != "command" {
 		s.mu.Unlock()
-		return fmt.Errorf("当前无待审批命令（state=%s）", s.state)
+		return fmt.Errorf("当前无待审批命令（state=%s type=%s）", s.state, s.approvalType)
+	}
+	s.state = stThinking
+	input := s.lastInput
+	s.mu.Unlock()
+
+	m.emitState(sid, StateThinking)
+	runCtx, cancel := context.WithCancel(context.Background())
+	s.mu.Lock()
+	s.cancel = cancel
+	s.mu.Unlock()
+	go m.run(s, runCtx, input, true, "rejected")
+	return nil
+}
+
+// ApprovePlan 批准执行计划，恢复模型开始按计划逐步执行。
+func (m *SessionManager) ApprovePlan(sid string) error {
+	s, err := m.sessionFor(sid)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if s.state != stAwaitingApproval || s.approvalType != "plan" {
+		s.mu.Unlock()
+		return fmt.Errorf("当前无待审批计划（state=%s type=%s）", s.state, s.approvalType)
+	}
+	s.state = stRunning
+	input := s.lastInput
+	s.mu.Unlock()
+
+	m.emitState(sid, StateRunning)
+	runCtx, cancel := context.WithCancel(context.Background())
+	s.mu.Lock()
+	s.cancel = cancel
+	s.mu.Unlock()
+	go m.run(s, runCtx, input, true, "approved")
+	return nil
+}
+
+// RejectPlan 拒绝执行计划，回灌模型重新规划或询问用户。
+func (m *SessionManager) RejectPlan(sid string) error {
+	s, err := m.sessionFor(sid)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	if s.state != stAwaitingApproval || s.approvalType != "plan" {
+		s.mu.Unlock()
+		return fmt.Errorf("当前无待审批计划（state=%s type=%s）", s.state, s.approvalType)
 	}
 	s.state = stThinking
 	input := s.lastInput
@@ -397,6 +447,11 @@ func (m *SessionManager) run(s *agentSession, ctx context.Context, input []*sche
 	if err != nil {
 		if info, ok := compose.ExtractInterruptInfo(err); ok && len(info.InterruptContexts) > 0 {
 			s.interruptID = info.InterruptContexts[0].ID
+			// 区分审批类型：create_plan 中断的是计划审批，否则是命令审批
+			s.approvalType = "command"
+			if _, isPlan := info.InterruptContexts[0].Info.(agenttools.PlanInfo); isPlan {
+				s.approvalType = "plan"
+			}
 			s.state = stAwaitingApproval
 			m.emitState(s.id, StateAwaitingApproval)
 			return
@@ -450,19 +505,26 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 	}
 
 	sshTool := agenttools.NewSSHTool(s.id, s.holder, m.emit, m.convs, s.toolCalls)
+	planTool := agenttools.NewPlanTool(s.id, m.emit, m.convs, s.toolCalls)
 	toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
-		Tools: []einotool.BaseTool{sshTool}, ExecuteSequentially: true,
+		Tools: []einotool.BaseTool{sshTool, planTool}, ExecuteSequentially: true,
 	})
 	if err != nil {
 		return fmt.Errorf("构建工具节点失败: %w", err)
 	}
 
 	wrapped := agentmodel.NewStreamingChatModel(base, s.id, m.emit, m.onAssistant(s))
+	// 两个工具都暴露给模型：execute_command（单条命令）+ create_plan（计划模式）。
+	// 遗漏任一个，模型便不知道其存在、永远不会生成对应 tool_call。
 	info, err := sshTool.Info(ctx)
 	if err != nil {
 		return fmt.Errorf("tool info: %w", err)
 	}
-	withTools, err := wrapped.WithTools([]*schema.ToolInfo{info})
+	planInfo, err := planTool.Info(ctx)
+	if err != nil {
+		return fmt.Errorf("plan tool info: %w", err)
+	}
+	withTools, err := wrapped.WithTools([]*schema.ToolInfo{info, planInfo})
 	if err != nil {
 		return fmt.Errorf("绑定工具失败: %w", err)
 	}

@@ -311,6 +311,8 @@ export default function HostsPage(): React.JSX.Element {
               streamingText={sessions.streamingText}
               pendingCommand={sessions.pendingCommand}
               commandStatus={sessions.commandStatus}
+              pendingPlan={sessions.pendingPlan}
+              planStatus={sessions.planStatus}
               sessionState={sessions.sessionState}
               lastError={sessions.lastError}
               runningCommand={sessions.runningCommand}
@@ -329,6 +331,8 @@ export default function HostsPage(): React.JSX.Element {
               onRunInTerminal={runInTerminal}
               onApprove={sessions.approve}
               onReject={sessions.reject}
+              onApprovePlan={sessions.approvePlan}
+              onRejectPlan={sessions.rejectPlan}
               onCancel={sessions.cancel}
               onNewConversation={sessions.newConversation}
             />

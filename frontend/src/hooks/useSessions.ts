@@ -4,7 +4,9 @@ import {
   NewSession,
   SendMessage,
   ApproveCommand,
+  ApprovePlan,
   RejectCommand,
+  RejectPlan,
   CancelRun,
   ClearMessages,
   LoadMessages,
@@ -30,6 +32,12 @@ export interface CommandSuggestion {
   why: string;
   risk: string;
   assessedRisk: string;
+}
+
+/** 执行计划（create_plan 工具提交，计划模式）。 */
+export interface PlanInfo {
+  goal: string;
+  steps: string[];
 }
 
 export type SessionState =
@@ -60,6 +68,8 @@ export function useSessions(hostId: string | null): {
   streamingText: string;
   pendingCommand: CommandSuggestion | null;
   commandStatus: ApprovalStatus | null;
+  pendingPlan: PlanInfo | null;
+  planStatus: ApprovalStatus | null;
   sessionState: SessionState;
   lastError: string | null;
   runningCommand: string | null;
@@ -75,6 +85,8 @@ export function useSessions(hostId: string | null): {
   clearMessages: () => Promise<void>;
   approve: (command: string) => Promise<void>;
   reject: () => Promise<void>;
+  approvePlan: () => Promise<void>;
+  rejectPlan: () => Promise<void>;
   cancel: () => Promise<void>;
 } {
   const [activeSession, setActiveSession] = useState<string | null>(null);
@@ -83,6 +95,10 @@ export function useSessions(hostId: string | null): {
   const [streamingText, setStreamingText] = useState('');
   const [pendingCommand, setPendingCommand] = useState<CommandSuggestion | null>(null);
   const [commandStatus, setCommandStatus] = useState<ApprovalStatus | null>(null);
+  const [pendingPlan, setPendingPlan] = useState<PlanInfo | null>(null);
+  // 计划审批独立状态：不复用 commandStatus——否则计划批准后模型执行第一条命令，
+  // ai:command 会把 commandStatus 重置为 pending，已批准的计划卡会退回"待审批"。
+  const [planStatus, setPlanStatus] = useState<ApprovalStatus | null>(null);
   const [sessionState, setSessionState] = useState<SessionState>(null);
   const [lastError, setLastError] = useState<string | null>(null);
   // 执行中的命令与计时（run:start 置位，run:result / Idle 清除）
@@ -129,6 +145,9 @@ export function useSessions(hostId: string | null): {
         setPendingCommand(null);
         setCommandStatus(null);
       }
+      // 计划审批不涉及命令轮次，重同步后一律清空
+      setPendingPlan(null);
+      setPlanStatus(null);
       // 同步完成即无进行中的命令（切换会话 / 命令结束 / 回到 Idle）
       setRunningCommand(null);
       setRunStartAt(null);
@@ -154,6 +173,7 @@ export function useSessions(hostId: string | null): {
     setActiveSession(sid);
     setPendingCommand(null);
     setCommandStatus(null);
+    setPlanStatus(null);
     setSessionState(null);
     setLastError(null);
     setStreamingText('');
@@ -168,6 +188,7 @@ export function useSessions(hostId: string | null): {
     setActiveSession(sid);
     setPendingCommand(null);
     setCommandStatus(null);
+    setPlanStatus(null);
     setSessionState(null);
     setLastError(null);
     await resync(sid);
@@ -195,6 +216,8 @@ export function useSessions(hostId: string | null): {
     setStreamingText('');
     setPendingCommand(null);
     setCommandStatus(null);
+    setPendingPlan(null);
+    setPlanStatus(null);
     setSessionState(null);
     setLastError(null);
   }, [hostId]);
@@ -218,6 +241,8 @@ export function useSessions(hostId: string | null): {
       setStreamingText('');
       setPendingCommand(null);
       setCommandStatus(null);
+      setPendingPlan(null);
+      setPlanStatus(null);
       setSessionState(null);
       setLastError(null);
       setRunningCommand(null);
@@ -291,6 +316,38 @@ export function useSessions(hostId: string | null): {
     }
   }, [activeSession]);
 
+  // 计划审批同样防重复提交：双击/连点只提交一次，避免第二次后端报"无待审批计划"后把状态打回 pending
+  const approvePlanBusyRef = useRef(false);
+  const rejectPlanBusyRef = useRef(false);
+
+  /** 批准执行计划（计划模式）。 */
+  const approvePlan = useCallback(async (): Promise<void> => {
+    if (!activeSession || approvePlanBusyRef.current) return;
+    approvePlanBusyRef.current = true;
+    setPlanStatus('approved');
+    try {
+      await ApprovePlan(activeSession);
+    } catch {
+      setPlanStatus('pending');
+    } finally {
+      approvePlanBusyRef.current = false;
+    }
+  }, [activeSession]);
+
+  /** 拒绝执行计划（计划模式）。 */
+  const rejectPlan = useCallback(async (): Promise<void> => {
+    if (!activeSession || rejectPlanBusyRef.current) return;
+    rejectPlanBusyRef.current = true;
+    setPlanStatus('rejected');
+    try {
+      await RejectPlan(activeSession);
+    } catch {
+      setPlanStatus('pending');
+    } finally {
+      rejectPlanBusyRef.current = false;
+    }
+  }, [activeSession]);
+
   const cancel = useCallback(async (): Promise<void> => {
     if (!activeSession) return;
     await CancelRun(activeSession);
@@ -312,6 +369,13 @@ export function useSessions(hostId: string | null): {
       commandEpoch.current += 1;
       setPendingCommand(raw.data as unknown as CommandSuggestion);
       setCommandStatus('pending');
+      setStreamingText('');
+    });
+
+    const offPlan = EventsOn('ai:plan', (raw: AgentEvent) => {
+      if (!isMine(raw)) return;
+      setPendingPlan(raw.data as unknown as PlanInfo);
+      setPlanStatus('pending');
       setStreamingText('');
     });
 
@@ -359,6 +423,7 @@ export function useSessions(hostId: string | null): {
     return () => {
       offText();
       offCommand();
+      offPlan();
       offRunStart();
       offRunOutput();
       offRunResult();
@@ -374,6 +439,8 @@ export function useSessions(hostId: string | null): {
     streamingText,
     pendingCommand,
     commandStatus,
+    pendingPlan,
+    planStatus,
     sessionState,
     lastError,
     runningCommand,
@@ -389,6 +456,8 @@ export function useSessions(hostId: string | null): {
     clearMessages,
     approve,
     reject,
+    approvePlan,
+    rejectPlan,
     cancel,
   };
 }

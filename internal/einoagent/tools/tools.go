@@ -45,6 +45,12 @@ type toolMeta struct {
 	Cancelled  bool   `json:"cancelled,omitempty"`
 }
 
+// PlanInfo 执行计划（create_plan 工具提交，供前端计划卡与计划审批）。
+type PlanInfo struct {
+	Goal  string   `json:"goal"`
+	Steps []string `json:"steps"`
+}
+
 // ToolCallHolder 按先进先出保存待执行的 tool call 队列，
 // 供 SSHTool 落库 tool 消息时配对 tool_call_id。
 // 由 StreamingChatModel 的 onAssistant 回调写入（一次模型回复可含多个 tool_calls）。
@@ -84,6 +90,86 @@ func (h *ToolCallHolder) Reset() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.tcs = h.tcs[:0]
+}
+
+// PlanTool 把"执行计划"包装为 eino InvokableTool（计划模式）：
+// 面对复杂/多步任务时，模型先提交 create_plan（目标 + 步骤列表）→ emit ai:plan →
+// einotool.Interrupt 等待计划审批；批准后模型按计划逐步执行（每步走 execute_command 串行审批）。
+type PlanTool struct {
+	sessionID string
+	emit      func(sessionID, event string, data any)
+	convs     *convstore.ConvStore
+	holder    *ToolCallHolder
+}
+
+// NewPlanTool 构造计划工具。convs 为 nil 时不落库（测试简化）。
+func NewPlanTool(sessionID string, emit func(sessionID, event string, data any), convs *convstore.ConvStore, holder *ToolCallHolder) *PlanTool {
+	return &PlanTool{sessionID: sessionID, emit: emit, convs: convs, holder: holder}
+}
+
+// Info 返回工具元信息。
+func (t *PlanTool) Info(_ context.Context) (*schema.ToolInfo, error) {
+	return &schema.ToolInfo{
+		Name: "create_plan",
+		Desc: "面对复杂/多步运维任务时，先提交一份执行计划（目标 + 步骤列表）供用户审批，" +
+			"批准后按步骤逐步执行。简单单条命令任务不要使用本工具，直接用 execute_command。",
+		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+			"goal": {Type: schema.String, Desc: "任务目标", Required: true},
+			"steps": {Type: schema.Array, Desc: "执行步骤列表", Required: true,
+				ElemInfo: &schema.ParameterInfo{Type: schema.String}},
+		}),
+	}, nil
+}
+
+// InvokableRun 实现计划审批：首次 emit ai:plan 并 Interrupt；Resume 数据 "rejected" 表示拒绝。
+func (t *PlanTool) InvokableRun(ctx context.Context, argsJSON string, _ ...einotool.Option) (string, error) {
+	var args struct {
+		Goal  string   `json:"goal"`
+		Steps []string `json:"steps"`
+	}
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "计划参数解析失败，请重新以 JSON 提交计划。", nil
+	}
+	plan := PlanInfo{Goal: args.Goal, Steps: args.Steps}
+
+	wasInterrupted, _, _ := einotool.GetInterruptState[PlanInfo](ctx)
+	if !wasInterrupted {
+		if t.emit != nil {
+			t.emit(t.sessionID, "ai:plan", plan)
+		}
+		return "", einotool.Interrupt(ctx, plan)
+	}
+	isTarget, hasData, data := einotool.GetResumeContext[string](ctx)
+	if !isTarget || !hasData {
+		return "", einotool.Interrupt(ctx, plan)
+	}
+	if data == "rejected" {
+		t.savePlanMessage("用户拒绝了该计划，未开始执行。请不要重复同一计划，重新规划（调整目标/步骤）或询问用户更多信息。", "rejected")
+		return "计划被拒绝，请重新规划或询问用户", nil
+	}
+	t.savePlanMessage("计划已批准，请按步骤逐步执行（每步先文本说明，再通过 execute_command 提议命令等待审批）。", "approved")
+	return "计划已批准，开始执行。请严格按步骤逐步进行，每步通过 execute_command 提议命令。", nil
+}
+
+// savePlanMessage 落库 create_plan 的 tool 消息（配对 tool_call_id，避免历史孤立 tool_calls）。
+func (t *PlanTool) savePlanMessage(content, approvalStatus string) {
+	toolCallID := ""
+	if tc := t.holder.Take(); tc != nil {
+		toolCallID = tc.ID
+	}
+	if t.convs == nil {
+		return
+	}
+	if err := t.convs.SaveMessage(convstore.Message{
+		SessionID:      t.sessionID,
+		Role:           history.RoleTool,
+		Content:        content,
+		ToolCallID:     toolCallID,
+		ToolName:       "create_plan",
+		ApprovalStatus: approvalStatus,
+	}); err != nil {
+		log.Printf("einoagent: save plan tool message: %v", err)
+	}
 }
 
 // SSHTool 把 SSH 执行器包装为 eino InvokableTool。

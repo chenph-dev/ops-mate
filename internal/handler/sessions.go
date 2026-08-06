@@ -42,6 +42,16 @@ func (h *SessionsHandler) RejectCommand(sid string) error {
 	return h.sessionManager.RejectCommand(sid)
 }
 
+// ApprovePlan 批准执行计划（计划模式）。
+func (h *SessionsHandler) ApprovePlan(sid string) error {
+	return h.sessionManager.ApprovePlan(sid)
+}
+
+// RejectPlan 拒绝执行计划（计划模式）。
+func (h *SessionsHandler) RejectPlan(sid string) error {
+	return h.sessionManager.RejectPlan(sid)
+}
+
 func (h *SessionsHandler) CancelRun(sid string) error {
 	return h.sessionManager.CancelRun(sid)
 }

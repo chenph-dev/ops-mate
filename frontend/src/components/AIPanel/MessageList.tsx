@@ -4,12 +4,14 @@ import { CopyOutlined, SettingOutlined } from "@ant-design/icons";
 import { useNavigate } from "react-router-dom";
 import { ClipboardSetText } from "@wailsjs/runtime/runtime";
 import CommandCard from "@/components/CommandCard";
+import PlanCard from "@/components/PlanCard";
 import MarkdownContent from "@/components/MarkdownContent";
 import type {
   ApprovalStatus,
   CommandSuggestion,
   Message,
 } from "./types";
+import type { PlanInfo } from "@/hooks/useSessions";
 import ToolOutputBlock from "./ToolOutputBlock";
 
 /** 空态示例 prompt：点击填充输入框（暗示半自动模型：可提议命令需审批）。 */
@@ -25,6 +27,8 @@ interface MessageListProps {
   streamingText: string;
   pendingCommand: CommandSuggestion | null;
   commandStatus: ApprovalStatus | null;
+  pendingPlan: PlanInfo | null;
+  planStatus: ApprovalStatus | null;
   lastError: string | null;
   busy: boolean;
   configured: boolean;
@@ -34,8 +38,41 @@ interface MessageListProps {
   runOutput: string;
   onApprove: (command: string) => Promise<void>;
   onReject: () => Promise<void>;
+  onApprovePlan: () => Promise<void>;
+  onRejectPlan: () => Promise<void>;
   onSelectSuggestion: (text: string) => void;
   onRunInTerminal: (command: string) => void;
+}
+
+/** 从 assistant 消息的 toolCalls JSON 解析出执行计划（create_plan），并据相邻 tool 消息推断审批状态。 */
+function parseToolCallPlan(
+  msg: Message,
+  nextMsg?: Message,
+): (PlanInfo & { status: ApprovalStatus }) | null {
+  if (!msg.toolCalls) return null;
+  try {
+    const calls = JSON.parse(msg.toolCalls) as Array<{
+      id?: string;
+      name?: string;
+      arguments: string;
+    }>;
+    if (calls.length === 0) return null;
+    const first = calls[0];
+    if (first.name !== "create_plan") return null;
+    const args = JSON.parse(first.arguments) as {
+      goal?: string;
+      steps?: string[];
+    };
+    if (!args.goal || !Array.isArray(args.steps)) return null;
+    // 有相邻且同 ID 的 tool 消息 = 该计划已被处理过；审批状态直接读落库字段。
+    let status: ApprovalStatus = "pending";
+    if (nextMsg?.role === "tool" && nextMsg.toolCallId === first.id) {
+      status = nextMsg.approvalStatus === "rejected" ? "rejected" : "approved";
+    }
+    return { goal: args.goal, steps: args.steps, status };
+  } catch {
+    return null;
+  }
 }
 
 /** 从 assistant 消息的 toolCalls JSON 解析出命令建议，并据相邻 tool 消息推断审批状态。 */
@@ -77,6 +114,8 @@ export default function MessageList({
   streamingText,
   pendingCommand,
   commandStatus,
+  pendingPlan,
+  planStatus,
   lastError,
   busy,
   configured,
@@ -86,6 +125,8 @@ export default function MessageList({
   runOutput,
   onApprove,
   onReject,
+  onApprovePlan,
+  onRejectPlan,
   onSelectSuggestion,
   onRunInTerminal,
 }: MessageListProps): React.JSX.Element {
@@ -161,6 +202,18 @@ export default function MessageList({
             command={suggested}
             history
             status={suggested.status}
+          />
+        );
+      }
+      const plan = parseToolCallPlan(msg, messages[index + 1]);
+      if (plan) {
+        // 历史执行计划（回放模式，无操作按钮，显示审批状态）
+        return (
+          <PlanCard
+            key={msg.id}
+            plan={{ goal: plan.goal, steps: plan.steps }}
+            history
+            status={plan.status}
           />
         );
       }
@@ -245,7 +298,7 @@ export default function MessageList({
         <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
           <Spin size="small" />
         </div>
-      ) : messages.length === 0 && !streamingText && !pendingCommand && !runningCommand ? (
+      ) : messages.length === 0 && !streamingText && !pendingCommand && !pendingPlan && !runningCommand ? (
         <div
           style={{
             display: "flex",
@@ -334,6 +387,18 @@ export default function MessageList({
               onApprove={(cmd) => void onApprove(cmd)}
               onReject={() => void onReject()}
               onRunInTerminal={onRunInTerminal}
+            />
+          )}
+
+          {/* 计划审批卡（计划模式）：批准后模型按计划逐步执行。
+              状态走独立 planStatus，避免被后续 ai:command 的命令审批状态污染。 */}
+          {pendingPlan && (
+            <PlanCard
+              plan={pendingPlan}
+              busy={planStatus === "approved"}
+              status={planStatus ?? "pending"}
+              onApprove={() => void onApprovePlan()}
+              onReject={() => void onRejectPlan()}
             />
           )}
 

@@ -8,6 +8,7 @@ import type {
   Message,
   SessionState,
 } from "./types";
+import type { PlanInfo } from "@/hooks/useSessions";
 import { STATE_LABEL } from "./types";
 import PanelHeader from "./PanelHeader";
 import MessageList from "./MessageList";
@@ -20,6 +21,8 @@ export interface AIPanelProps {
   streamingText: string;
   pendingCommand: CommandSuggestion | null;
   commandStatus: ApprovalStatus | null;
+  pendingPlan: PlanInfo | null;
+  planStatus: ApprovalStatus | null;
   sessionState: SessionState;
   lastError: string | null;
   runningCommand: string | null;
@@ -38,6 +41,8 @@ export interface AIPanelProps {
   onRunInTerminal: (command: string) => void;
   onApprove: (command: string) => Promise<void>;
   onReject: () => Promise<void>;
+  onApprovePlan: () => Promise<void>;
+  onRejectPlan: () => Promise<void>;
   onCancel: () => Promise<void>;
   onNewConversation: () => Promise<void>;
 }
@@ -49,6 +54,8 @@ export default function AIPanel({
   streamingText,
   pendingCommand,
   commandStatus,
+  pendingPlan,
+  planStatus,
   sessionState,
   lastError,
   runningCommand,
@@ -67,6 +74,8 @@ export default function AIPanel({
   onRunInTerminal,
   onApprove,
   onReject,
+  onApprovePlan,
+  onRejectPlan,
   onCancel,
   onNewConversation,
 }: AIPanelProps): React.JSX.Element | null {
@@ -251,6 +260,8 @@ export default function AIPanel({
         streamingText={streamingText}
         pendingCommand={pendingCommand}
         commandStatus={commandStatus}
+        pendingPlan={pendingPlan}
+        planStatus={planStatus}
         lastError={lastError}
         busy={busy}
         configured={configured}
@@ -260,6 +271,8 @@ export default function AIPanel({
         runOutput={runOutput}
         onApprove={onApprove}
         onReject={onReject}
+        onApprovePlan={onApprovePlan}
+        onRejectPlan={onRejectPlan}
         onSelectSuggestion={(text) => {
           setInput(text);
           requestAnimationFrame(() => inputRef.current?.focus());
