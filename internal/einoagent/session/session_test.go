@@ -58,6 +58,7 @@ func newSessionFixture(t *testing.T, responses []*schema.Message) *sessionFixtur
 	}
 	f.mgr = NewSessionManager(app, cfg,
 		func(hid string) sshexec.Exec { return f.ex },
+		nil, // hostNameFor（测试不注入主机名）
 		rec.Emit,
 	)
 	f.mgr.modelFactory = func(ctx context.Context, c configstore.AIConfig) (einomodel.ToolCallingChatModel, error) {

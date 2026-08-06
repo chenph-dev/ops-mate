@@ -37,7 +37,16 @@ func main() {
 	// AI 模型不在启动时构建（配置可能为空/变更）——
 	// SessionManager 在每轮对话开始时按最新配置懒构建（热更新）。
 	sessionManager := session.NewSessionManager(app, cfgStore,
-		executorFor(hostsStore), emitEvent)
+		executorFor(hostsStore),
+		// 解析主机名，注入系统提示词模板
+		func(hostID string) (string, error) {
+			meta, err := hostsStore.HostMetaByID(hostID)
+			if err != nil {
+				return "", err
+			}
+			return meta.Name, nil
+		},
+		emitEvent)
 
 	// SFTP 管理器：按 hostID 懒建立/复用连接，应用退出时关闭。
 	sftpManager := sftppkg.NewManager(

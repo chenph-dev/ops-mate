@@ -8,11 +8,13 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/cloudwego/eino/callbacks"
 	einomodel "github.com/cloudwego/eino/components/model"
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
+	"ops-mate/internal/einoagent/callback"
 	"ops-mate/internal/einoagent/checkpoint"
 	"ops-mate/internal/einoagent/graph"
 	"ops-mate/internal/einoagent/history"
@@ -33,6 +35,9 @@ const (
 	StateAwaitingApproval = "AwaitingApproval"
 	StateRunning          = "Running"
 )
+
+// maxHistoryMessages 注入模型的会话历史条数上限（超出省略早期，控制上下文）。
+const maxHistoryMessages = 30
 
 // runState 内部状态机。
 type runState int
@@ -105,7 +110,9 @@ type SessionManager struct {
 	mem         *memorystore.MemoryStore
 	cfg         *configstore.ConfigStore
 	executorFor func(hostID string) sshexec.Exec
+	hostNameFor func(hostID string) (string, error) // 解析主机名（注入系统提示词）
 	emit        func(sessionID, event string, data any)
+	logHandler  callbacks.Handler // 智能体调用观测日志
 
 	// modelFactory 构造基础模型；可注入以便测试。
 	// 默认走 einoagent.agentmodel.NewChatModel（eino-ext provider）。
@@ -116,11 +123,12 @@ type SessionManager struct {
 	configVersion int
 }
 
-// NewSessionManager 构造会话管理器。
+// NewSessionManager 构造会话管理器。hostNameFor 可为 nil（此时系统提示词不含主机名）。
 func NewSessionManager(
 	app *store.DB,
 	cfg *configstore.ConfigStore,
 	executorFor func(hostID string) sshexec.Exec,
+	hostNameFor func(hostID string) (string, error),
 	emit func(sessionID, event string, data any),
 ) *SessionManager {
 	return &SessionManager{
@@ -129,7 +137,9 @@ func NewSessionManager(
 		mem:         memorystore.NewMemoryStore(app),
 		cfg:         cfg,
 		executorFor: executorFor,
+		hostNameFor: hostNameFor,
 		emit:        emit,
+		logHandler:  callback.NewLogHandler(),
 		modelFactory: func(ctx context.Context, c configstore.AIConfig) (einomodel.ToolCallingChatModel, error) {
 			return agentmodel.NewChatModel(ctx, c)
 		},
@@ -377,7 +387,10 @@ func (m *SessionManager) run(s *agentSession, ctx context.Context, input []*sche
 		invokeCtx = compose.ResumeWithData(ctx, id, resumeData)
 	}
 
-	_, err := s.graph.Invoke(invokeCtx, input, compose.WithCheckPointID(s.id))
+	// 每次 Invoke 挂载观测日志（模型/工具调用完成打日志，含 token 用量）
+	_, err := s.graph.Invoke(invokeCtx, input,
+		compose.WithCheckPointID(s.id),
+		compose.WithCallbacks(m.logHandler))
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -477,32 +490,53 @@ func (m *SessionManager) onAssistant(s *agentSession) func(msg *schema.Message) 
 	}
 }
 
-// buildInput 组装模型输入：系统提示 + 记忆注入 + DB 历史。
+// buildInput 组装模型输入：系统提示（模板） + 记忆注入 + DB 历史。
+// 会话历史超上限时截取最近 N 条并提示模型早期已省略（控制上下文防爆炸）。
 func (m *SessionManager) buildInput(s *agentSession, userText string) ([]*schema.Message, error) {
 	hist, err := m.convs.LoadMessages(s.id)
 	if err != nil {
 		return nil, fmt.Errorf("加载历史失败: %w", err)
+	}
+	// 上下文控制：超过上限时保留最近 maxHistoryMessages 条（早期省略，
+	// HistoryToEino 会丢弃截断点处孤立的 tool 配对，不会导致模型端 400）
+	var omitted *schema.Message
+	if len(hist) > maxHistoryMessages {
+		truncated := len(hist) - maxHistoryMessages
+		hist = hist[len(hist)-maxHistoryMessages:]
+		omitted = schema.AssistantMessage(
+			fmt.Sprintf("[已省略较早的 %d 条对话以控制上下文]", truncated), nil)
 	}
 	msgs, err := history.HistoryToEino(hist)
 	if err != nil {
 		return nil, err
 	}
 
-	input := make([]*schema.Message, 0, len(msgs)+2)
-	input = append(input, prompt.SystemMessage())
-
-	// FTS5 记忆注入（失败不阻断主流程）
+	// 模板参数：主机名 + 记忆（失败不阻断主流程）
+	params := map[string]any{"HostName": "", "Memory": ""}
+	if m.hostNameFor != nil {
+		if name, err := m.hostNameFor(s.hostID); err == nil {
+			params["HostName"] = name
+		}
+	}
 	if recall, err := m.mem.Recall(s.hostID, userText); err == nil && len(recall.PastCommands) > 0 {
 		var note strings.Builder
-		note.WriteString("该主机过去执行过的相关命令记录（供参考）：\n")
 		for _, c := range recall.PastCommands {
 			note.WriteString("- ")
 			note.WriteString(c.Command)
 			note.WriteString("\n")
 		}
-		input = append(input, schema.UserMessage(note.String()))
+		params["Memory"] = strings.TrimSuffix(note.String(), "\n")
+	}
+	sysMsgs, err := prompt.BuildSystemMessages(context.Background(), params)
+	if err != nil {
+		return nil, fmt.Errorf("渲染系统提示词: %w", err)
 	}
 
+	input := make([]*schema.Message, 0, len(msgs)+len(sysMsgs)+2)
+	input = append(input, sysMsgs...)
+	if omitted != nil {
+		input = append(input, omitted)
+	}
 	input = append(input, msgs...)
 	return input, nil
 }
