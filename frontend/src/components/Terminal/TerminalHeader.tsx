@@ -3,6 +3,7 @@ import {
   ClearOutlined,
   CopyOutlined,
   DisconnectOutlined,
+  FolderOpenOutlined,
   ReloadOutlined,
   RobotOutlined,
   SearchOutlined,
@@ -22,6 +23,7 @@ interface TerminalHeaderProps {
   aiOpen: boolean;
   onToggleAI: () => void;
   onRefresh: () => void;
+  onOpenSftp: () => void;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onSearch: () => void;
@@ -43,6 +45,7 @@ export default function TerminalHeader({
   aiOpen,
   onToggleAI,
   onRefresh,
+  onOpenSftp,
   onZoomIn,
   onZoomOut,
   onSearch,
@@ -105,6 +108,14 @@ export default function TerminalHeader({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Tooltip title="打开 SFTP 文件浏览">
+          <Button
+            type="text"
+            size="small"
+            icon={<FolderOpenOutlined />}
+            onClick={onOpenSftp}
+          />
+        </Tooltip>
         <Tooltip title={aiOpen ? '收起智能体面板' : '打开智能体面板'}>
           <Button
             type={aiOpen ? 'primary' : 'text'}

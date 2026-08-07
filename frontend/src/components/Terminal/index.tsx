@@ -34,6 +34,7 @@ interface TerminalProps {
   aiOpen: boolean;
   onToggleAI: () => void;
   onRefresh: () => void;
+  onOpenSftp: () => void;
   onData: (data: string) => void;
   onResize: (cols: number, rows: number) => void;
   setOutputHandler: (cb: (data: Uint8Array) => void) => void;
@@ -43,7 +44,7 @@ interface TerminalProps {
 const DEFAULT_FONT_SIZE = 13;
 const MIN_FONT_SIZE = 9;
 const MAX_FONT_SIZE = 24;
-// 与 useTerminal.ts 保持一致，用于状态栏显示重连计数上限
+// 与 useTerminalSessions.ts 保持一致，用于状态栏显示重连计数上限
 const MAX_RECONNECT_RETRIES = 5;
 
 export default function Terminal({
@@ -58,6 +59,7 @@ export default function Terminal({
   aiOpen,
   onToggleAI,
   onRefresh,
+  onOpenSftp,
   onData,
   onResize,
   setOutputHandler,
@@ -431,6 +433,7 @@ export default function Terminal({
         aiOpen={aiOpen}
         onToggleAI={onToggleAI}
         onRefresh={onRefresh}
+        onOpenSftp={onOpenSftp}
         onZoomIn={handleZoomIn}
         onZoomOut={handleZoomOut}
         onSearch={(): void => {

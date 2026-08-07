@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { App as AntdApp, Input, Segmented } from 'antd';
+import { App as AntdApp, Button, Input } from 'antd';
 import type { hoststore } from '@wailsjs/go/models';
 
 type TreeNode = hoststore.TreeNode;
@@ -7,12 +7,14 @@ type HostInput = hoststore.HostInput;
 import { useHosts } from '@/hooks/useHosts';
 import { useSessions } from '@/hooks/useSessions';
 import { useThemeToggle } from '@/context/ThemeContext';
-import { useTerminal } from '@/hooks/useTerminal';
+import { useTerminalSessions } from '@/hooks/useTerminalSessions';
 import HostList from '@/components/HostList';
 import HostForm from '@/components/HostForm';
 import SftpPanel from '@/components/SftpPanel';
 import Terminal from '@/components/Terminal';
 import AIPanel from '@/components/AIPanel';
+
+const MAX_TABS = 6;
 
 /** TreeNode → 编辑表单值：TreeNode 不含凭据，secret 留空（空则后端保留原密码）。 */
 function toHostInput(node: TreeNode): HostInput {
@@ -25,6 +27,10 @@ function toHostInput(node: TreeNode): HostInput {
     authType: node.authType ?? 'password',
     secret: '',
   };
+}
+
+function hostAddrOf(node: TreeNode): string {
+  return `${node.user}@${node.addr}:${node.port}`;
 }
 
 export default function HostsPage(): React.JSX.Element {
@@ -59,6 +65,14 @@ export default function HostsPage(): React.JSX.Element {
     null,
   );
 
+  // 多标签终端会话
+  const terminal = useTerminalSessions();
+  // 当前激活标签及其主机（AI 面板绑定激活标签，不随标签重复）
+  const activeTab =
+    terminal.tabs.find((t) => t.key === terminal.activeKey) ?? null;
+  const activeHostID = activeTab?.hostID ?? null;
+  const sessions = useSessions(activeHostID);
+
   // 分隔条左右拖动调整左侧主机列表宽度，实时持久化。
   const onSidebarResize = useCallback(
     (e: React.MouseEvent<HTMLDivElement>): void => {
@@ -85,38 +99,48 @@ export default function HostsPage(): React.JSX.Element {
     [sidebarWidth],
   );
 
-  const sessions = useSessions(selectedHost?.id ?? null);
-  const terminal = useTerminal(selectedHost?.id ?? null);
+  // 审批卡「在终端执行」：把 AI 提议的命令发到当前激活标签终端并回车执行。
+  // 普通函数（非 useCallback）：需读取每轮 render 最新的 terminal/activeTab，无 memo 价值。
+  const runInTerminal = (cmd: string): void => {
+    if (!activeTab?.connected) {
+      message.info('终端未连接，请先双击主机打开终端');
+      return;
+    }
+    terminal.sendData(activeTab.key, cmd + '\r');
+  };
 
-  // 审批卡「在终端执行」：把 AI 提议的命令直接发到右侧终端并回车执行。
-  const runInTerminal = useCallback(
-    (cmd: string): void => {
-      if (!terminal.connected) {
-        message.info('终端未连接，请先双击主机打开终端');
-        return;
-      }
-      terminal.sendData(cmd + '\r');
-    },
-    // terminal 对象每次 render 重建，但 connected/sendData 各自稳定，逐项声明依赖
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [terminal.connected, terminal.sendData, message],
-  );
+  // latest-ref：effect 里通过最新引用取 terminal/sessions，避免依赖对象触发 exhaustive-deps
+  const terminalRef = useRef(terminal);
+  useEffect(() => {
+    terminalRef.current = terminal;
+  });
+  const attachRef = useRef(sessions.attach);
+  useEffect(() => {
+    attachRef.current = sessions.attach;
+  });
 
-  // 页面卸载时关闭终端会话（terminal.close 是稳定引用，仅卸载时执行一次）
+  // 页面卸载时关闭全部终端会话（terminalRef 为稳定 ref，空依赖即可）
   useEffect(() => {
     return () => {
-      terminal.close();
+      terminalRef.current.closeAll();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terminal.close]);
+  }, []);
 
-  // 选中主机时接入 AI 会话（懒创建 + 加载历史）
+  // 激活标签变化时接入对应主机的 AI 会话（懒创建 + 加载历史）
   useEffect(() => {
-    if (selectedHost && selectedHost.nodeType === 'host') {
-      void sessions.attach();
+    if (activeHostID) {
+      void attachRef.current();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedHost?.id]);
+  }, [activeHostID]);
+
+  // 普通函数（非 useCallback）：需读取每轮 render 最新的 terminal 状态，无 memo 价值。
+  const openTerminal = (node: TreeNode): void => {
+    if (terminal.tabs.length >= MAX_TABS) {
+      message.warning(`标签数量已达上限（${MAX_TABS}）`);
+      return;
+    }
+    terminal.open(node.id, node.name, hostAddrOf(node));
+  };
 
   const handleAddFolder = useCallback(
     (parentId: string) => {
@@ -176,49 +200,28 @@ export default function HostsPage(): React.JSX.Element {
     [deleteNode, modal],
   );
 
-  // 右键「连接」菜单：与双击一致，真正打开终端
-  const handleTest = useCallback(
-    async (node: TreeNode) => {
-      setSelectedHost(node);
-      try {
-        await terminal.open(node.id);
-      } catch (err) {
-        message.error(`连接失败: ${err}`);
-      }
-    },
-    [terminal, message],
-  );
-
-  // 右键「SFTP 文件」：切到 SFTP 视图浏览该主机文件
-  const handleSftp = useCallback((node: TreeNode) => {
+  // 右键「连接」菜单：与双击一致，新建终端标签（普通函数，依赖最新 openTerminal）
+  const handleTest = (node: TreeNode): void => {
     setSelectedHost(node);
-    setView('sftp');
-  }, []);
+    openTerminal(node);
+  };
 
-  // 终端工具栏「刷新连接」：重连当前选中主机。
-  // terminal 对象每次 render 重建但 open 稳定，selectedHost?.id 是意图依赖。
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
-  const handleRefreshTerminal = useCallback(() => {
-    if (selectedHost?.id) {
-      void terminal.open(selectedHost.id);
-    }
-  }, [selectedHost?.id, terminal]);
+  // 右键「SFTP 文件」：确保该主机成为激活标签后切到 SFTP 视图（SFTP 绑定激活标签主机）
+  const handleSftp = (node: TreeNode): void => {
+    setSelectedHost(node);
+    openTerminal(node);
+    setView('sftp');
+  };
 
   const handleSelect = useCallback((node: TreeNode) => {
     setSelectedHost(node);
   }, []);
 
-  const handleDoubleClick = useCallback(
-    async (node: TreeNode) => {
-      setSelectedHost(node);
-      try {
-        await terminal.open(node.id);
-      } catch (err) {
-        message.error(`连接失败: ${err}`);
-      }
-    },
-    [terminal, message],
-  );
+  // 双击主机：新建终端标签（普通函数，依赖最新 openTerminal）
+  const handleDoubleClick = (node: TreeNode): void => {
+    setSelectedHost(node);
+    openTerminal(node);
+  };
 
   return (
     <div
@@ -271,26 +274,62 @@ export default function HostsPage(): React.JSX.Element {
           minWidth: 0,
         }}
       >
-        {/* 视图切换 */}
+        {/* 标签栏：横跨整个右列顶部，终端区与 AI 面板在其下对齐（SFTP 时隐藏） */}
         <div
           style={{
+            display: view === 'sftp' ? 'none' : 'flex',
+            gap: 4,
+            alignItems: 'center',
             padding: '4px 8px',
             borderBottom: '1px solid var(--antd-color-border-secondary)',
             background: 'var(--antd-color-bg-layout)',
             flexShrink: 0,
+            overflowX: 'auto',
           }}
         >
-          <Segmented
-            size="small"
-            value={view}
-            onChange={(v) => setView(v as 'terminal' | 'sftp')}
-            options={[
-              { label: '终端', value: 'terminal' },
-              { label: 'SFTP', value: 'sftp', disabled: !selectedHost },
-            ]}
-          />
+          {terminal.tabs.length === 0 && (
+            <span style={{ fontSize: 12, color: '#999' }}>
+              双击左侧主机打开终端
+            </span>
+          )}
+          {terminal.tabs.map((t) => {
+            const active = t.key === terminal.activeKey;
+            return (
+              <div
+                key={t.key}
+                onClick={() => terminal.activate(t.key)}
+                style={{
+                  cursor: 'pointer',
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  fontSize: 12,
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  gap: 4,
+                  alignItems: 'center',
+                  background: active
+                    ? 'var(--antd-color-primary)'
+                    : 'transparent',
+                  color: active ? '#fff' : 'inherit',
+                  border: '1px solid var(--antd-color-border-secondary)',
+                }}
+              >
+                <span>{t.hostName}</span>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    terminal.closeTab(t.key);
+                  }}
+                  style={{ cursor: 'pointer', opacity: 0.7, fontSize: 12 }}
+                >
+                  ×
+                </span>
+              </div>
+            );
+          })}
         </div>
-        {/* 终端视图：始终挂载（保留 xterm 输出），display 控制显隐，避免切换时重挂清空 */}
+
+        {/* 终端视图：始终挂载（保留各标签 xterm 输出），display 控制显隐 */}
         <div
           style={{
             position: 'relative',
@@ -300,32 +339,42 @@ export default function HostsPage(): React.JSX.Element {
             minWidth: 0,
           }}
         >
-          {/* 终端区域：占据智能体面板之外的剩余宽度 */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <Terminal
-              isDark={isDark}
-              hostID={selectedHost?.id}
-              connected={terminal.connected}
-              connecting={terminal.connecting}
-              reconnecting={terminal.reconnecting}
-              reconnectCount={terminal.reconnectCount}
-              hostName={selectedHost?.name ?? ''}
-              hostAddr={
-                selectedHost
-                  ? `${selectedHost.user}@${selectedHost.addr}:${selectedHost.port}`
-                  : ''
-              }
-              onData={terminal.sendData}
-              onResize={terminal.resize}
-              setOutputHandler={terminal.setOutputHandler}
-              onDisconnect={() => terminal.close()}
-              aiOpen={!aiCollapsed}
-              onToggleAI={() => setAiCollapsed(!aiCollapsed)}
-              onRefresh={handleRefreshTerminal}
-            />
+          {/* 终端区：每个标签一个 Terminal，全部挂载，非激活隐藏 */}
+          <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+            {terminal.tabs.map((t) => (
+              <div
+                key={t.key}
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  display: t.key === terminal.activeKey ? 'block' : 'none',
+                }}
+              >
+                <Terminal
+                  isDark={isDark}
+                  hostID={t.hostID}
+                  connected={t.connected}
+                  connecting={t.connecting}
+                  reconnecting={t.reconnecting}
+                  reconnectCount={t.reconnectCount}
+                  hostName={t.hostName}
+                  hostAddr={t.hostAddr}
+                  onData={(d) => terminal.sendData(t.key, d)}
+                  onResize={(c, r) => terminal.resize(t.key, c, r)}
+                  setOutputHandler={(cb) =>
+                    terminal.setOutputHandler(t.key, cb)
+                  }
+                  onDisconnect={() => terminal.closeTab(t.key)}
+                  aiOpen={!aiCollapsed}
+                  onToggleAI={() => setAiCollapsed(!aiCollapsed)}
+                  onRefresh={() => terminal.refresh(t.key)}
+                  onOpenSftp={() => setView('sftp')}
+                />
+              </div>
+            ))}
           </div>
 
-          {/* 智能体面板：收起时渲染右下角按钮（不占位），展开时并排固定宽度 */}
+          {/* 智能体面板：绑定当前激活标签的主机；收起时渲染右下角按钮（不占位） */}
           <AIPanel
             activeSession={sessions.activeSession}
             messages={sessions.messages}
@@ -340,8 +389,8 @@ export default function HostsPage(): React.JSX.Element {
             runningCommand={sessions.runningCommand}
             runElapsed={sessions.runElapsed}
             runOutput={sessions.runOutput}
-            sshConnected={terminal.connected}
-            hostName={selectedHost?.name ?? ''}
+            sshConnected={activeTab?.connected ?? false}
+            hostName={activeTab?.hostName ?? ''}
             collapsed={aiCollapsed}
             onRefreshConversations={sessions.refreshConversations}
             onSwitchConversation={sessions.switchConversation}
@@ -360,13 +409,40 @@ export default function HostsPage(): React.JSX.Element {
           />
         </div>
 
-        {/* SFTP 视图：条件挂载（切走卸载，重进重新加载根目录） */}
+        {/* SFTP 视图：绑定当前激活标签的主机；条件挂载（切走卸载，重进重新加载根目录） */}
         {view === 'sftp' && (
-          <div style={{ flex: 1, minHeight: 0, padding: '4px 5px' }}>
-            <SftpPanel
-              hostId={selectedHost?.id ?? null}
-              hostName={selectedHost?.name ?? ''}
-            />
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              style={{
+                padding: '4px 8px',
+                borderBottom: '1px solid var(--antd-color-border-secondary)',
+                background: 'var(--antd-color-bg-layout)',
+                flexShrink: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <Button size="small" onClick={() => setView('terminal')}>
+                返回终端
+              </Button>
+              <span style={{ fontSize: 12 }}>
+                SFTP · {activeTab?.hostName ?? '未选择主机'}
+              </span>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, padding: '4px 5px' }}>
+              <SftpPanel
+                hostId={activeTab?.hostID ?? null}
+                hostName={activeTab?.hostName ?? ''}
+              />
+            </div>
           </div>
         )}
       </div>
