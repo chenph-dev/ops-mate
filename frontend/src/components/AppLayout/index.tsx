@@ -1,4 +1,4 @@
-import { Button, Tooltip, Layout, theme } from 'antd';
+import { Button, Tooltip, Popover, Layout, theme } from 'antd';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   MinusOutlined,
@@ -18,7 +18,7 @@ import {
   Quit,
   EventsOn,
 } from '@wailsjs/runtime/runtime';
-import { routes } from './menuConfig';
+import { routes, leafRoutes } from './menuConfig';
 import logo from '@/assets/images/logo-universal.png';
 import { useEffect, useState, useCallback } from 'react';
 
@@ -70,7 +70,7 @@ export default function AppLayout(): React.JSX.Element {
     };
   }, [refreshWindowHeight]);
 
-  const selectedKey = routes.find((r) =>
+  const selectedKey = leafRoutes(routes).find((r) =>
     location.pathname.startsWith(r.path),
   )?.path;
 
@@ -147,27 +147,83 @@ export default function AppLayout(): React.JSX.Element {
               height: '100%',
             }}
           >
-            {routes.map((r) => (
-              <Tooltip key={r.path} placement="right" title={r.label}>
-                <Button
-                  type="text"
-                  size="small"
-                  icon={<span style={{ fontSize: 18 }}>{r.icon}</span>}
-                  onClick={() => navigate(r.path)}
-                  style={{
-                    width: 34,
-                    height: 34,
-                    border: 'none',
-                    borderRadius: 4,
-                    borderLeft:
-                      selectedKey === r.path
-                        ? `3px solid ${token.colorPrimary}`
-                        : '3px solid transparent',
-                    marginBottom: 6,
-                  }}
-                />
-              </Tooltip>
-            ))}
+            {routes.map((r) =>
+              r.children?.length ? (
+                // 分组：父级图标点击弹出子菜单聚合项
+                <Popover
+                  key={r.path}
+                  placement="right"
+                  trigger="click"
+                  content={
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 2,
+                      }}
+                    >
+                      {r.children.map((c) => (
+                        <Button
+                          key={c.path}
+                          type="text"
+                          size="small"
+                          icon={c.icon}
+                          onClick={() => navigate(c.path)}
+                          style={{
+                            justifyContent: 'flex-start',
+                            fontWeight: location.pathname.startsWith(c.path)
+                              ? 600
+                              : 400,
+                          }}
+                        >
+                          {c.label}
+                        </Button>
+                      ))}
+                    </div>
+                  }
+                >
+                  <Tooltip placement="right" title={r.label}>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<span style={{ fontSize: 18 }}>{r.icon}</span>}
+                      style={{
+                        width: 34,
+                        height: 34,
+                        border: 'none',
+                        borderRadius: 4,
+                        borderLeft: r.children.some((c) =>
+                          location.pathname.startsWith(c.path),
+                        )
+                          ? `3px solid ${token.colorPrimary}`
+                          : '3px solid transparent',
+                        marginBottom: 6,
+                      }}
+                    />
+                  </Tooltip>
+                </Popover>
+              ) : (
+                <Tooltip key={r.path} placement="right" title={r.label}>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<span style={{ fontSize: 18 }}>{r.icon}</span>}
+                    onClick={() => navigate(r.path)}
+                    style={{
+                      width: 34,
+                      height: 34,
+                      border: 'none',
+                      borderRadius: 4,
+                      borderLeft:
+                        selectedKey === r.path
+                          ? `3px solid ${token.colorPrimary}`
+                          : '3px solid transparent',
+                      marginBottom: 6,
+                    }}
+                  />
+                </Tooltip>
+              ),
+            )}
           </div>
         </Sider>
 

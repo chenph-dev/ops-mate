@@ -1,45 +1,75 @@
-// Package callback 提供智能体调用的观测日志（基于 eino callbacks）。
+// Package callback 提供智能体调用的审计日志（基于 eino callbacks，落库 ai_call_logs）。
 package callback
 
 import (
 	"context"
-	"fmt"
-	"log"
+	"time"
 
 	"github.com/cloudwego/eino/callbacks"
+	"github.com/cloudwego/eino/components"
 	"github.com/cloudwego/eino/components/model"
+
+	logsstore "ops-mate/internal/store/logs"
 )
 
-// NewLogHandler 构造智能体调用日志 handler：
-// 每次模型/工具调用结束打印一行（含 token 用量），失败打印错误。
+// NewLogHandler 构造智能体调用审计 handler：
+// 每次模型/工具调用结束落库一条记录（含 token 用量、耗时、成败）。
+// sessionID 由调用方传入（每次 run 独立创建，避免共享实例无法区分会话）。
 // 通过 compose.WithCallbacks 挂到 Graph 节点，由组件内部触发。
-func NewLogHandler() callbacks.Handler {
+func NewLogHandler(logs *logsstore.LogsStore, sessionID string) callbacks.Handler {
 	builder := callbacks.NewHandlerBuilder()
 	builder.OnEndFn(func(ctx context.Context, info *callbacks.RunInfo, output callbacks.CallbackOutput) context.Context {
-		name := "组件"
-		if info != nil && info.Name != "" {
-			name = info.Name
+		log := logsstore.CallLog{
+			SessionID: sessionID, Ts: time.Now().Unix(), OK: true,
+			Component: componentOf(info), Name: nameOf(info), Provider: typeOf(info),
 		}
-		var usage string
 		if o, ok := output.(*model.CallbackOutput); ok && o.TokenUsage != nil {
-			u := o.TokenUsage
-			usage = logUsage(u.PromptTokens, u.CompletionTokens, u.TotalTokens)
+			log.TokensIn = o.TokenUsage.PromptTokens
+			log.TokensOut = o.TokenUsage.CompletionTokens
+			log.TokensTotal = o.TokenUsage.TotalTokens
 		}
-		log.Printf("einoagent: 调用 %s 完成%s", name, usage)
+		if logs != nil {
+			_ = logs.SaveLog(log)
+		}
 		return ctx
 	})
 	builder.OnErrorFn(func(ctx context.Context, info *callbacks.RunInfo, err error) context.Context {
-		name := "组件"
-		if info != nil && info.Name != "" {
-			name = info.Name
+		log := logsstore.CallLog{
+			SessionID: sessionID, Ts: time.Now().Unix(), OK: false,
+			Component: componentOf(info), Name: nameOf(info), Provider: typeOf(info),
+			Error: err.Error(),
 		}
-		log.Printf("einoagent: 调用 %s 失败: %v", name, err)
+		if logs != nil {
+			_ = logs.SaveLog(log)
+		}
 		return ctx
 	})
 	return builder.Build()
 }
 
-func logUsage(in, out, total int) string {
-	// 仅有部分 provider 提供完整用量，缺失的字段以 0 展示
-	return fmt.Sprintf(" tokens(in=%d out=%d total=%d)", in, out, total)
+func nameOf(info *callbacks.RunInfo) string {
+	if info != nil && info.Name != "" {
+		return info.Name
+	}
+	return "unknown"
+}
+
+func typeOf(info *callbacks.RunInfo) string {
+	if info != nil {
+		return info.Type
+	}
+	return ""
+}
+
+func componentOf(info *callbacks.RunInfo) string {
+	if info != nil {
+		// 归一为 "model" / "tool"（其余组件归为 "other"，实际主要是模型/工具节点）。
+		switch info.Component {
+		case components.ComponentOfChatModel:
+			return "model"
+		case components.ComponentOfTool:
+			return "tool"
+		}
+	}
+	return "other"
 }

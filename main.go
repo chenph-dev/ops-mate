@@ -18,6 +18,7 @@ import (
 	cfgstore "ops-mate/internal/store/config"
 	convstore "ops-mate/internal/store/conversations"
 	hoststore "ops-mate/internal/store/hosts"
+	logsstore "ops-mate/internal/store/logs"
 )
 
 //go:embed all:frontend/dist
@@ -33,6 +34,7 @@ func main() {
 	cfgStore := cfgstore.NewConfigStore(app)
 	hostsStore := hoststore.NewHostsStore(app)
 	convStore := convstore.NewConvStore(app)
+	logsStore := logsstore.NewLogsStore(app)
 
 	// AI 模型不在启动时构建（配置可能为空/变更）——
 	// SessionManager 在每轮对话开始时按最新配置懒构建（热更新）。
@@ -106,6 +108,7 @@ func main() {
 			handler.NewSessionsHandler(convStore, sessionManager),
 			handler.NewTerminalHandler(hostsStore),
 			handler.NewSftpHandler(sftpManager),
+			handler.NewLogsHandler(logsStore),
 		},
 	})
 

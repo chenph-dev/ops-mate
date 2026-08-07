@@ -14,12 +14,10 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/cloudwego/eino/callbacks"
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
-	"ops-mate/internal/einoagent/callback"
 	"ops-mate/internal/einoagent/checkpoint"
 	agentmodel "ops-mate/internal/einoagent/model"
 	agenttools "ops-mate/internal/einoagent/tools"
@@ -27,6 +25,7 @@ import (
 	"ops-mate/internal/store"
 	configstore "ops-mate/internal/store/config"
 	convstore "ops-mate/internal/store/conversations"
+	logsstore "ops-mate/internal/store/logs"
 	memorystore "ops-mate/internal/store/memory"
 )
 
@@ -116,7 +115,7 @@ type SessionManager struct {
 	executorFor func(hostID string) sshexec.Exec
 	hostNameFor func(hostID string) (string, error) // 解析主机名（注入系统提示词）
 	emit        func(sessionID, event string, data any)
-	logHandler  callbacks.Handler // 智能体调用观测日志
+	logs        *logsstore.LogsStore // AI 调用审计日志
 
 	// modelFactory 构造基础模型；可注入以便测试。
 	// 默认走 einoagent.agentmodel.NewChatModel（eino-ext provider）。
@@ -143,7 +142,7 @@ func NewSessionManager(
 		executorFor: executorFor,
 		hostNameFor: hostNameFor,
 		emit:        emit,
-		logHandler:  callback.NewLogHandler(),
+		logs:        logsstore.NewLogsStore(app),
 		modelFactory: func(ctx context.Context, c configstore.AIConfig) (einomodel.ToolCallingChatModel, error) {
 			return agentmodel.NewChatModel(ctx, c)
 		},

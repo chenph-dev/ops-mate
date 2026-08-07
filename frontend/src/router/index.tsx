@@ -2,9 +2,10 @@ import { Suspense } from 'react';
 import { createHashRouter, Navigate, type RouteObject } from 'react-router-dom';
 import { Spin } from 'antd';
 import AppLayout from '@/components/AppLayout';
-import { routes } from '@/components/AppLayout/menuConfig';
+import { routes, leafRoutes } from '@/components/AppLayout/menuConfig';
 
-const childRoutes: RouteObject[] = routes.map((r) => ({
+// 只从叶子路由项生成 RouteObject（分组仅为菜单聚合，不参与路由）。
+const childRoutes: RouteObject[] = leafRoutes(routes).map((r) => ({
   path: r.path,
   element: (
     <Suspense fallback={<Spin style={{ marginTop: 48 }} />}>

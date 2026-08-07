@@ -9,6 +9,7 @@ import (
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
+	"ops-mate/internal/einoagent/callback"
 	"ops-mate/internal/einoagent/graph"
 	"ops-mate/internal/einoagent/history"
 	agentmodel "ops-mate/internal/einoagent/model"
@@ -26,10 +27,12 @@ func (m *SessionManager) run(s *agentSession, ctx context.Context, input []*sche
 		invokeCtx = compose.ResumeWithData(ctx, id, resumeData)
 	}
 
-	// 每次 Invoke 挂载观测日志（模型/工具调用完成打日志，含 token 用量）
+	// 每次 Invoke 挂载审计日志（模型/工具调用完成落库 ai_call_logs，含 token 用量）。
+	// 按会话独立创建 handler，使每条记录能关联 sessionID。
+	logHandler := callback.NewLogHandler(m.logs, s.id)
 	_, err := s.graph.Invoke(invokeCtx, input,
 		compose.WithCheckPointID(s.id),
-		compose.WithCallbacks(m.logHandler))
+		compose.WithCallbacks(logHandler))
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
