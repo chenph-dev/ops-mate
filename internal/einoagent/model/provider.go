@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	einomodel "github.com/cloudwego/eino/components/model"
 	claudemodel "github.com/cloudwego/eino-ext/components/model/claude"
 	ollamamodel "github.com/cloudwego/eino-ext/components/model/ollama"
 	openaimodel "github.com/cloudwego/eino-ext/components/model/openai"
+	einomodel "github.com/cloudwego/eino/components/model"
 
 	"ops-mate/internal/store/config"
 )

@@ -8,11 +8,11 @@ import (
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
-	agentmodel "ops-mate/internal/einoagent/model"
-	agenttools "ops-mate/internal/einoagent/tools"
-	"ops-mate/internal/einoagent/testutil"
-	"ops-mate/internal/sshexec"
 	"ops-mate/internal/einoagent/checkpoint"
+	agentmodel "ops-mate/internal/einoagent/model"
+	"ops-mate/internal/einoagent/testutil"
+	agenttools "ops-mate/internal/einoagent/tools"
+	"ops-mate/internal/sshexec"
 )
 
 // approvalFixture 组装：ScriptedModel + SSHTool(fake executor) + Graph + checkpoint。

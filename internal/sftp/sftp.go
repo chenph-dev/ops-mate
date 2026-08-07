@@ -96,7 +96,7 @@ func NewManager(
 	return &Manager{
 		clients: map[string]*sftp.Client{}, tasks: map[string]*Task{},
 		hostFor: hostFor, progress: progress, start: start,
-		sem:     make(chan struct{}, maxConcurrent),
+		sem: make(chan struct{}, maxConcurrent),
 	}
 }
 

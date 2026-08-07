@@ -11,11 +11,11 @@ import (
 
 // configModel GORM 模型，对应 ai_config 单行表。
 type configModel struct {
-	ID               int    `gorm:"column:id;primaryKey"`
-	Provider         string `gorm:"column:provider"`
-	Model            string `gorm:"column:model"`
-	BaseURL          string `gorm:"column:base_url"`
-	APIKeyEncrypted  []byte `gorm:"column:api_key_encrypted"`
+	ID              int    `gorm:"column:id;primaryKey"`
+	Provider        string `gorm:"column:provider"`
+	Model           string `gorm:"column:model"`
+	BaseURL         string `gorm:"column:base_url"`
+	APIKeyEncrypted []byte `gorm:"column:api_key_encrypted"`
 }
 
 func (configModel) TableName() string { return "ai_config" }

@@ -11,6 +11,8 @@ frontend/wailsjs/
 
 # Dependencies
 node_modules
+# pnpm 校验和缓存（package.json 的 md5，随机器/pnpm 版本变化，不入库）
+package.json.md5
 
 # IDE
 .idea/

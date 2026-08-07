@@ -143,7 +143,7 @@ func (s *HostsStore) ListHosts() ([]HostMeta, error) {
 		out = append(out, HostMeta{
 			ID: h.ID, Name: h.Name, NodeType: h.NodeType,
 			ParentID: strPtrVal(h.ParentID),
-			Addr: h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
+			Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
 		})
 	}
 	return out, nil
@@ -163,7 +163,7 @@ func (s *HostsStore) ListTree() ([]TreeNode, error) {
 		nodeMap[h.ID] = &TreeNode{
 			ID: h.ID, Key: h.ID, Name: h.Name, NodeType: h.NodeType,
 			ParentID: strPtrVal(h.ParentID),
-			Addr: h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
+			Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
 		}
 	}
 
@@ -237,7 +237,7 @@ func (s *HostsStore) HostMetaByID(id string) (*HostMeta, error) {
 	return &HostMeta{
 		ID: h.ID, Name: h.Name, NodeType: h.NodeType,
 		ParentID: strPtrVal(h.ParentID),
-		Addr: h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
+		Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
 	}, nil
 }
 

@@ -11,11 +11,11 @@ import (
 
 	"ops-mate/internal/einoagent/history"
 	"ops-mate/internal/einoagent/testutil"
+	"ops-mate/internal/sshexec"
+	"ops-mate/internal/store"
 	configstore "ops-mate/internal/store/config"
 	convstore "ops-mate/internal/store/conversations"
 	hoststore "ops-mate/internal/store/hosts"
-	"ops-mate/internal/sshexec"
-	"ops-mate/internal/store"
 )
 
 // --- 测试基建 ---
