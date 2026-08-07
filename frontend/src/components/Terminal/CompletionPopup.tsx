@@ -1,11 +1,11 @@
-import { useEffect, useRef } from "react";
-import { theme } from "antd";
+import { useEffect, useRef } from 'react';
+import { theme } from 'antd';
 
 interface CommandMatch {
   name: string;
   desc: string;
   text: string;
-  type: "command" | "template";
+  type: 'command' | 'template';
 }
 
 interface CompletionPopupProps {
@@ -30,13 +30,13 @@ export default function CompletionPopup({
 
   // 选中项变化时滚动到可视区，避免方向键选择超出弹窗可视范围
   useEffect(() => {
-    selectedRef.current?.scrollIntoView({ block: "nearest" });
+    selectedRef.current?.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex]);
 
   return (
     <div
       style={{
-        position: "fixed",
+        position: 'fixed',
         left: x,
         top: y,
         zIndex: 9999,
@@ -46,8 +46,8 @@ export default function CompletionPopup({
         boxShadow: token.boxShadowSecondary,
         minWidth: 240,
         maxHeight: 240,
-        overflow: "auto",
-        padding: "4px 0",
+        overflow: 'auto',
+        padding: '4px 0',
         fontSize: 13,
       }}
       onMouseDown={(e): void => e.preventDefault()}
@@ -63,11 +63,11 @@ export default function CompletionPopup({
             ref={selected ? selectedRef : undefined}
             onClick={(): void => onSelect(match)}
             style={{
-              padding: "5px 12px",
-              cursor: "pointer",
+              padding: '5px 12px',
+              cursor: 'pointer',
               background: selected ? token.colorPrimaryBg : undefined,
-              display: "flex",
-              alignItems: "baseline",
+              display: 'flex',
+              alignItems: 'baseline',
               gap: 10,
             }}
           >
@@ -75,7 +75,7 @@ export default function CompletionPopup({
               style={{
                 fontFamily:
                   '"Cascadia Code", "Fira Code", "Consolas", "Monaco", monospace',
-                whiteSpace: "nowrap",
+                whiteSpace: 'nowrap',
                 color: token.colorText,
               }}
             >
@@ -87,9 +87,9 @@ export default function CompletionPopup({
                 style={{
                   color: token.colorTextSecondary,
                   fontSize: 12,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                   flex: 1,
                   minWidth: 0,
                 }}
@@ -103,7 +103,7 @@ export default function CompletionPopup({
       {matches.length > 0 && (
         <div
           style={{
-            padding: "3px 12px",
+            padding: '3px 12px',
             fontSize: 11,
             color: token.colorTextTertiary,
             borderTop: `1px solid ${token.colorBorderSecondary}`,

@@ -1,4 +1,4 @@
-import { theme } from "antd";
+import { theme } from 'antd';
 
 interface StatusBarProps {
   statusText: string;
@@ -18,9 +18,9 @@ export default function StatusBar({
   return (
     <div
       style={{
-        padding: "4px 10px",
-        display: "flex",
-        alignItems: "center",
+        padding: '4px 10px',
+        display: 'flex',
+        alignItems: 'center',
         gap: 16,
         borderTop: `1px solid ${token.colorBorderSecondary}`,
         flexShrink: 0,
@@ -34,7 +34,7 @@ export default function StatusBar({
         {dims.cols}×{dims.rows}
       </span>
       <span>字号 {fontSize}</span>
-      <span style={{ marginLeft: "auto" }}>{hostAddr || "未连接"}</span>
+      <span style={{ marginLeft: 'auto' }}>{hostAddr || '未连接'}</span>
     </div>
   );
 }

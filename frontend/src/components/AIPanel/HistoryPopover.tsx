@@ -1,7 +1,18 @@
-import { useState } from "react";
-import { App as AntdApp, Button, Input, Popconfirm, Popover, Tooltip } from "antd";
-import { DeleteOutlined, EditOutlined, HistoryOutlined } from "@ant-design/icons";
-import type { convstore } from "@wailsjs/go/models";
+import { useState } from 'react';
+import {
+  App as AntdApp,
+  Button,
+  Input,
+  Popconfirm,
+  Popover,
+  Tooltip,
+} from 'antd';
+import {
+  DeleteOutlined,
+  EditOutlined,
+  HistoryOutlined,
+} from '@ant-design/icons';
+import type { convstore } from '@wailsjs/go/models';
 
 interface HistoryPopoverProps {
   conversations: convstore.Conversation[];
@@ -33,7 +44,7 @@ export default function HistoryPopover({
   const handleRename = (conv: convstore.Conversation): void => {
     let title = conv.title;
     modal.confirm({
-      title: "重命名会话",
+      title: '重命名会话',
       content: (
         <Input
           autoFocus
@@ -58,14 +69,14 @@ export default function HistoryPopover({
       title="历史对话"
       styles={{ content: { padding: 4, width: 240 } }}
       content={
-        <div style={{ maxHeight: 300, overflow: "auto" }}>
+        <div style={{ maxHeight: 300, overflow: 'auto' }}>
           {conversations.length === 0 ? (
             <div
               style={{
-                padding: "8px 4px",
+                padding: '8px 4px',
                 fontSize: 12,
-                textAlign: "center",
-                color: "var(--antd-color-text-secondary)",
+                textAlign: 'center',
+                color: 'var(--antd-color-text-secondary)',
               }}
             >
               暂无历史对话
@@ -80,32 +91,32 @@ export default function HistoryPopover({
                 }}
                 title={conv.title}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: 4,
-                  padding: "4px",
+                  padding: '4px',
                   borderRadius: 4,
-                  cursor: "pointer",
+                  cursor: 'pointer',
                 }}
               >
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div
                     style={{
                       fontSize: 12,
-                      lineHeight: "18px",
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
+                      lineHeight: '18px',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
                     }}
                   >
-                    {activeSession === conv.id ? "当前 · " : ""}
+                    {activeSession === conv.id ? '当前 · ' : ''}
                     {conv.title}
                   </div>
                   <div
                     style={{
                       fontSize: 10,
-                      lineHeight: "14px",
-                      color: "var(--antd-color-text-secondary)",
+                      lineHeight: '14px',
+                      color: 'var(--antd-color-text-secondary)',
                     }}
                   >
                     {new Date(conv.updatedAt * 1000).toLocaleString()}

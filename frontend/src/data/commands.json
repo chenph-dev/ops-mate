@@ -75,7 +75,10 @@
       { "text": "journalctl -u ", "desc": "查看指定服务日志" },
       { "text": "journalctl -f", "desc": "实时跟踪日志" },
       { "text": "journalctl -n 100", "desc": "查看最近 100 条日志" },
-      { "text": "journalctl --since \"1 hour ago\"", "desc": "查看最近一小时日志" }
+      {
+        "text": "journalctl --since \"1 hour ago\"",
+        "desc": "查看最近一小时日志"
+      }
     ]
   },
   {
@@ -160,8 +163,16 @@
     ]
   },
   { "name": "mv", "desc": "移动或重命名文件" },
-  { "name": "mkdir", "desc": "创建目录", "templates": [{ "text": "mkdir -p ", "desc": "递归创建目录" }] },
-  { "name": "ln", "desc": "创建链接", "templates": [{ "text": "ln -s ", "desc": "创建符号链接" }] },
+  {
+    "name": "mkdir",
+    "desc": "创建目录",
+    "templates": [{ "text": "mkdir -p ", "desc": "递归创建目录" }]
+  },
+  {
+    "name": "ln",
+    "desc": "创建链接",
+    "templates": [{ "text": "ln -s ", "desc": "创建符号链接" }]
+  },
   { "name": "touch", "desc": "创建空文件或更新修改时间" },
   {
     "name": "sed",
@@ -189,7 +200,11 @@
       { "text": "curl -H \"Authorization: Bearer ", "desc": "带认证头请求" }
     ]
   },
-  { "name": "wget", "desc": "命令行下载工具", "templates": [{ "text": "wget ", "desc": "下载文件" }] },
+  {
+    "name": "wget",
+    "desc": "命令行下载工具",
+    "templates": [{ "text": "wget ", "desc": "下载文件" }]
+  },
   {
     "name": "ssh",
     "desc": "安全远程登录",
@@ -208,8 +223,18 @@
       { "text": "scp -r ", "desc": "递归复制目录" }
     ]
   },
-  { "name": "ssh-keygen", "desc": "生成 SSH 密钥", "templates": [{ "text": "ssh-keygen -t ed25519", "desc": "生成 ed25519 密钥" }] },
-  { "name": "ssh-copy-id", "desc": "复制公钥到远程主机", "templates": [{ "text": "ssh-copy-id ", "desc": "上传公钥" }] },
+  {
+    "name": "ssh-keygen",
+    "desc": "生成 SSH 密钥",
+    "templates": [
+      { "text": "ssh-keygen -t ed25519", "desc": "生成 ed25519 密钥" }
+    ]
+  },
+  {
+    "name": "ssh-copy-id",
+    "desc": "复制公钥到远程主机",
+    "templates": [{ "text": "ssh-copy-id ", "desc": "上传公钥" }]
+  },
   {
     "name": "ps",
     "desc": "查看进程状态",
@@ -227,7 +252,11 @@
     ]
   },
   { "name": "htop", "desc": "交互式进程查看器" },
-  { "name": "kill", "desc": "终止进程", "templates": [{ "text": "kill -9 ", "desc": "强制终止进程" }] },
+  {
+    "name": "kill",
+    "desc": "终止进程",
+    "templates": [{ "text": "kill -9 ", "desc": "强制终止进程" }]
+  },
   { "name": "killall", "desc": "按名称终止进程" },
   {
     "name": "df",
@@ -237,8 +266,16 @@
       { "text": "df -T", "desc": "显示文件系统类型" }
     ]
   },
-  { "name": "du", "desc": "查看目录大小", "templates": [{ "text": "du -sh ", "desc": "汇总显示目录大小" }] },
-  { "name": "free", "desc": "查看内存使用", "templates": [{ "text": "free -h", "desc": "人类可读显示" }] },
+  {
+    "name": "du",
+    "desc": "查看目录大小",
+    "templates": [{ "text": "du -sh ", "desc": "汇总显示目录大小" }]
+  },
+  {
+    "name": "free",
+    "desc": "查看内存使用",
+    "templates": [{ "text": "free -h", "desc": "人类可读显示" }]
+  },
   {
     "name": "tail",
     "desc": "查看文件尾部",
@@ -247,12 +284,20 @@
       { "text": "tail -n 100 ", "desc": "查看最后 100 行" }
     ]
   },
-  { "name": "head", "desc": "查看文件头部", "templates": [{ "text": "head -n 20 ", "desc": "查看前 20 行" }] },
+  {
+    "name": "head",
+    "desc": "查看文件头部",
+    "templates": [{ "text": "head -n 20 ", "desc": "查看前 20 行" }]
+  },
   { "name": "less", "desc": "分页查看文件" },
   { "name": "more", "desc": "分页查看文件" },
   { "name": "sort", "desc": "排序文本行" },
   { "name": "uniq", "desc": "去重或计数相邻行" },
-  { "name": "wc", "desc": "统计行/词/字节", "templates": [{ "text": "wc -l ", "desc": "统计行数" }] },
+  {
+    "name": "wc",
+    "desc": "统计行/词/字节",
+    "templates": [{ "text": "wc -l ", "desc": "统计行数" }]
+  },
   {
     "name": "xargs",
     "desc": "从标准输入构建命令",
@@ -315,7 +360,11 @@
       { "text": "crontab -l", "desc": "列出定时任务" }
     ]
   },
-  { "name": "nohup", "desc": "忽略挂起信号运行命令", "templates": [{ "text": "nohup  &", "desc": "后台运行并忽略退出信号" }] },
+  {
+    "name": "nohup",
+    "desc": "忽略挂起信号运行命令",
+    "templates": [{ "text": "nohup  &", "desc": "后台运行并忽略退出信号" }]
+  },
   {
     "name": "tmux",
     "desc": "终端复用器",
@@ -340,11 +389,19 @@
   { "name": "source", "desc": "执行脚本并生效环境" },
   { "name": "pwd", "desc": "显示当前目录" },
   { "name": "whoami", "desc": "显示当前用户" },
-  { "name": "uname", "desc": "显示系统信息", "templates": [{ "text": "uname -a", "desc": "显示全部系统信息" }] },
+  {
+    "name": "uname",
+    "desc": "显示系统信息",
+    "templates": [{ "text": "uname -a", "desc": "显示全部系统信息" }]
+  },
   { "name": "date", "desc": "显示或设置日期时间" },
   { "name": "sleep", "desc": "暂停指定时间" },
   { "name": "time", "desc": "测量命令执行时间" },
-  { "name": "watch", "desc": "定时执行命令", "templates": [{ "text": "watch -n 1 ", "desc": "每秒执行一次" }] },
+  {
+    "name": "watch",
+    "desc": "定时执行命令",
+    "templates": [{ "text": "watch -n 1 ", "desc": "每秒执行一次" }]
+  },
   { "name": "which", "desc": "查找可执行文件路径" },
   { "name": "whereis", "desc": "定位二进制/源码/手册" },
   { "name": "file", "desc": "识别文件类型" },
@@ -359,11 +416,23 @@
       { "text": "cut -c1-10 ", "desc": "截取第 1-10 个字符" }
     ]
   },
-  { "name": "tr", "desc": "字符转换", "templates": [{ "text": "tr 'a-z' 'A-Z'", "desc": "小写转大写" }] },
-  { "name": "tee", "desc": "输出到屏幕和文件", "templates": [{ "text": " | tee ", "desc": "同时输出到文件" }] },
+  {
+    "name": "tr",
+    "desc": "字符转换",
+    "templates": [{ "text": "tr 'a-z' 'A-Z'", "desc": "小写转大写" }]
+  },
+  {
+    "name": "tee",
+    "desc": "输出到屏幕和文件",
+    "templates": [{ "text": " | tee ", "desc": "同时输出到文件" }]
+  },
   { "name": "gzip", "desc": "gzip 压缩" },
   { "name": "gunzip", "desc": "gzip 解压" },
-  { "name": "zip", "desc": "zip 压缩", "templates": [{ "text": "zip -r ", "desc": "递归压缩目录" }] },
+  {
+    "name": "zip",
+    "desc": "zip 压缩",
+    "templates": [{ "text": "zip -r ", "desc": "递归压缩目录" }]
+  },
   { "name": "unzip", "desc": "zip 解压" },
   {
     "name": "rsync",
@@ -407,11 +476,19 @@
     ]
   },
   { "name": "ifconfig", "desc": "查看/配置网络接口" },
-  { "name": "ping", "desc": "测试网络连通", "templates": [{ "text": "ping -c 4 ", "desc": "发送 4 个包" }] },
+  {
+    "name": "ping",
+    "desc": "测试网络连通",
+    "templates": [{ "text": "ping -c 4 ", "desc": "发送 4 个包" }]
+  },
   { "name": "traceroute", "desc": "追踪路由路径" },
   { "name": "dig", "desc": "DNS 查询工具" },
   { "name": "nslookup", "desc": "DNS 查询工具" },
-  { "name": "nmap", "desc": "网络扫描工具", "templates": [{ "text": "nmap -p 1-65535 ", "desc": "扫描端口" }] },
+  {
+    "name": "nmap",
+    "desc": "网络扫描工具",
+    "templates": [{ "text": "nmap -p 1-65535 ", "desc": "扫描端口" }]
+  },
   {
     "name": "iptables",
     "desc": "Linux 防火墙",
@@ -445,7 +522,11 @@
       { "text": "mysql -h ", "desc": "连接远程 MySQL" }
     ]
   },
-  { "name": "psql", "desc": "PostgreSQL 客户端", "templates": [{ "text": "psql -U ", "desc": "指定用户连接" }] },
+  {
+    "name": "psql",
+    "desc": "PostgreSQL 客户端",
+    "templates": [{ "text": "psql -U ", "desc": "指定用户连接" }]
+  },
   { "name": "redis-cli", "desc": "Redis 命令行客户端" },
   { "name": "mongosh", "desc": "MongoDB 命令行客户端" },
   {
@@ -490,7 +571,11 @@
       { "text": "conda install ", "desc": "安装包" }
     ]
   },
-  { "name": "node", "desc": "Node.js 运行时", "templates": [{ "text": "node ", "desc": "运行 JS 文件" }] },
+  {
+    "name": "node",
+    "desc": "Node.js 运行时",
+    "templates": [{ "text": "node ", "desc": "运行 JS 文件" }]
+  },
   {
     "name": "npm",
     "desc": "Node.js 包管理",
@@ -550,7 +635,11 @@
       { "text": "make clean", "desc": "清理构建产物" }
     ]
   },
-  { "name": "cmake", "desc": "跨平台构建系统", "templates": [{ "text": "cmake . && make", "desc": "生成并构建" }] },
+  {
+    "name": "cmake",
+    "desc": "跨平台构建系统",
+    "templates": [{ "text": "cmake . && make", "desc": "生成并构建" }]
+  },
   {
     "name": "terraform",
     "desc": "基础设施即代码工具",
@@ -569,6 +658,20 @@
       { "text": "ansible-playbook --check ", "desc": "空运行检查" }
     ]
   },
-  { "name": "vagrant", "desc": "虚拟机管理工具", "templates": [{ "text": "vagrant up", "desc": "启动虚拟机" }, { "text": "vagrant ssh", "desc": "SSH 进入虚拟机" }] },
-  { "name": "helm", "desc": "Kubernetes 包管理", "templates": [{ "text": "helm list", "desc": "列出 Release" }, { "text": "helm install ", "desc": "安装 Chart" }] }
+  {
+    "name": "vagrant",
+    "desc": "虚拟机管理工具",
+    "templates": [
+      { "text": "vagrant up", "desc": "启动虚拟机" },
+      { "text": "vagrant ssh", "desc": "SSH 进入虚拟机" }
+    ]
+  },
+  {
+    "name": "helm",
+    "desc": "Kubernetes 包管理",
+    "templates": [
+      { "text": "helm list", "desc": "列出 Release" },
+      { "text": "helm install ", "desc": "安装 Chart" }
+    ]
+  }
 ]

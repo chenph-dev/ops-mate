@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState } from 'react';
 
 /** 后端落库的 tool 执行元数据（Message.toolResult，见 internal/einoagent/tools/toolMeta）。 */
 interface ToolMeta {
@@ -18,7 +18,7 @@ export default function ToolOutputBlock({
   toolResult?: string;
 }): React.JSX.Element {
   const [open, setOpen] = useState(false);
-  const lineCount = content.split("\n").filter((l) => l.trim() !== "").length;
+  const lineCount = content.split('\n').filter((l) => l.trim() !== '').length;
   const meta = useMemo(() => {
     if (!toolResult) return null;
     try {
@@ -28,21 +28,21 @@ export default function ToolOutputBlock({
     }
   }, [toolResult]);
 
-  const cmdText = meta?.command ? `$ ${meta.command}` : "命令输出";
+  const cmdText = meta?.command ? `$ ${meta.command}` : '命令输出';
   const durText =
-    meta?.durationMs != null ? `${(meta.durationMs / 1000).toFixed(1)}s` : "";
+    meta?.durationMs != null ? `${(meta.durationMs / 1000).toFixed(1)}s` : '';
   const statusEl =
-    meta?.status === "rejected" ? (
-      <span style={{ color: "var(--antd-color-error)" }}>已拒绝</span>
+    meta?.status === 'rejected' ? (
+      <span style={{ color: 'var(--antd-color-error)' }}>已拒绝</span>
     ) : meta?.cancelled ? (
-      <span style={{ color: "var(--antd-color-warning)" }}>已取消</span>
+      <span style={{ color: 'var(--antd-color-warning)' }}>已取消</span>
     ) : meta?.exitCode !== undefined ? (
       <span
         style={{
           color:
             meta.exitCode === 0
-              ? "var(--antd-color-text-secondary)"
-              : "var(--antd-color-warning)",
+              ? 'var(--antd-color-text-secondary)'
+              : 'var(--antd-color-warning)',
         }}
       >
         exit {meta.exitCode}
@@ -53,46 +53,52 @@ export default function ToolOutputBlock({
     <div style={{ marginBottom: 6 }}>
       <div
         onClick={() => setOpen(!open)}
-        title={open ? "收起输出" : "展开输出"}
+        title={open ? '收起输出' : '展开输出'}
         style={{
           fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
           fontSize: 11,
-          background: "rgba(0,0,0,0.25)",
-          border: "1px solid var(--antd-color-border-secondary)",
+          background: 'rgba(0,0,0,0.25)',
+          border: '1px solid var(--antd-color-border-secondary)',
           borderRadius: 4,
-          padding: "2px 8px",
-          cursor: "pointer",
-          color: "var(--antd-color-text-secondary)",
-          userSelect: "none",
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          display: "flex",
-          alignItems: "center",
+          padding: '2px 8px',
+          cursor: 'pointer',
+          color: 'var(--antd-color-text-secondary)',
+          userSelect: 'none',
+          whiteSpace: 'nowrap',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          display: 'flex',
+          alignItems: 'center',
           gap: 4,
         }}
       >
-        <span style={{ flexShrink: 0 }}>{open ? "▾" : "▸"}</span>
+        <span style={{ flexShrink: 0 }}>{open ? '▾' : '▸'}</span>
         <span
           style={{
-            overflow: "hidden",
-            textOverflow: "ellipsis",
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
             minWidth: 0,
           }}
         >
           {cmdText}
         </span>
         {statusEl && (
-          <span style={{ flexShrink: 0, color: "var(--antd-color-text-secondary)" }}>
+          <span
+            style={{ flexShrink: 0, color: 'var(--antd-color-text-secondary)' }}
+          >
             · {statusEl}
           </span>
         )}
         {durText && (
-          <span style={{ flexShrink: 0, color: "var(--antd-color-text-secondary)" }}>
+          <span
+            style={{ flexShrink: 0, color: 'var(--antd-color-text-secondary)' }}
+          >
             · {durText}
           </span>
         )}
-        <span style={{ flexShrink: 0, color: "var(--antd-color-text-secondary)" }}>
+        <span
+          style={{ flexShrink: 0, color: 'var(--antd-color-text-secondary)' }}
+        >
           （{lineCount} 行）
         </span>
       </div>
@@ -101,16 +107,16 @@ export default function ToolOutputBlock({
           style={{
             fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
             fontSize: 11,
-            background: "rgba(0,0,0,0.25)",
-            border: "1px solid var(--antd-color-border-secondary)",
-            borderTop: "none",
-            borderRadius: "0 0 4px 4px",
-            padding: "6px 8px",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-all",
-            color: "var(--antd-color-text)",
+            background: 'rgba(0,0,0,0.25)',
+            border: '1px solid var(--antd-color-border-secondary)',
+            borderTop: 'none',
+            borderRadius: '0 0 4px 4px',
+            padding: '6px 8px',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
+            color: 'var(--antd-color-text)',
             maxHeight: 240,
-            overflow: "auto",
+            overflow: 'auto',
           }}
         >
           {content}

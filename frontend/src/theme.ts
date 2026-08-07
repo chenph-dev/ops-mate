@@ -1,6 +1,6 @@
-import { theme as antdTheme } from "antd";
-import type { ThemeConfig } from "antd";
-import type { ITheme } from "@xterm/xterm";
+import { theme as antdTheme } from 'antd';
+import type { ThemeConfig } from 'antd';
+import type { ITheme } from '@xterm/xterm';
 
 /**
  * 全局 antd 主题配置 —— 单一来源。
@@ -14,17 +14,17 @@ import type { ITheme } from "@xterm/xterm";
 export function buildTheme(isDark: boolean): ThemeConfig {
   return {
     algorithm: isDark ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
-    cssVar: { prefix: "antd" },
+    cssVar: { prefix: 'antd' },
     hashed: false,
     token: {
-      colorPrimary: "#1677ff",
+      colorPrimary: '#1677ff',
       borderRadius: 6,
     },
     components: {
       // 布局：左侧 Sider + 顶栏底色
       Layout: {
-        headerBg: isDark ? "#001529" : "#f0f2f5",
-        siderBg: isDark ? "#001529" : "#f0f2f5",
+        headerBg: isDark ? '#001529' : '#f0f2f5',
+        siderBg: isDark ? '#001529' : '#f0f2f5',
       },
       // 弹窗：新建目录 / 删除确认等
       Modal: {
@@ -32,7 +32,7 @@ export function buildTheme(isDark: boolean): ThemeConfig {
       },
       // 主机树
       Tree: {
-        nodeHoverBg: "rgba(22, 119, 255, 0.08)",
+        nodeHoverBg: 'rgba(22, 119, 255, 0.08)',
         indentSize: 8,
         switcherSize: 20,
         titleHeight: 20,
@@ -51,25 +51,25 @@ export function buildTheme(isDark: boolean): ThemeConfig {
  */
 export function terminalTheme(isDark: boolean): ITheme {
   return {
-    background: isDark ? "#1e1e1e" : "#ffffff",
-    foreground: isDark ? "#d4d4d4" : "#333333",
-    cursor: isDark ? "#d4d4d4" : "#333333",
-    selectionBackground: isDark ? "#264f78" : "#add6ff",
-    black: "#000000",
-    red: "#cd3131",
-    green: "#0dbc79",
-    yellow: "#e5e510",
-    blue: "#2472c8",
-    magenta: "#bc3fbc",
-    cyan: "#11a8cd",
-    white: "#e5e5e5",
-    brightBlack: "#666666",
-    brightRed: "#f14c4c",
-    brightGreen: "#23d18b",
-    brightYellow: "#f5f543",
-    brightBlue: "#3b8eea",
-    brightMagenta: "#d670d6",
-    brightCyan: "#29b8db",
-    brightWhite: "#ffffff",
+    background: isDark ? '#1e1e1e' : '#ffffff',
+    foreground: isDark ? '#d4d4d4' : '#333333',
+    cursor: isDark ? '#d4d4d4' : '#333333',
+    selectionBackground: isDark ? '#264f78' : '#add6ff',
+    black: '#000000',
+    red: '#cd3131',
+    green: '#0dbc79',
+    yellow: '#e5e510',
+    blue: '#2472c8',
+    magenta: '#bc3fbc',
+    cyan: '#11a8cd',
+    white: '#e5e5e5',
+    brightBlack: '#666666',
+    brightRed: '#f14c4c',
+    brightGreen: '#23d18b',
+    brightYellow: '#f5f543',
+    brightBlue: '#3b8eea',
+    brightMagenta: '#d670d6',
+    brightCyan: '#29b8db',
+    brightWhite: '#ffffff',
   };
 }

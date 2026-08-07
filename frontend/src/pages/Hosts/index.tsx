@@ -30,13 +30,23 @@ function toHostInput(node: TreeNode): HostInput {
 export default function HostsPage(): React.JSX.Element {
   const { message, modal } = AntdApp.useApp();
   const { isDark } = useThemeToggle();
-  const { tree, addHost, updateHost, getHostSecret, testConnection, createFolder, deleteNode } = useHosts();
+  const {
+    tree,
+    addHost,
+    updateHost,
+    getHostSecret,
+    testConnection,
+    createFolder,
+    deleteNode,
+  } = useHosts();
   const [selectedHost, setSelectedHost] = useState<TreeNode | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formParentId, setFormParentId] = useState('');
   // 节点编辑：非空表示编辑该主机，空表示新增
   const [editingHostId, setEditingHostId] = useState<string | null>(null);
-  const [formInitialValues, setFormInitialValues] = useState<HostInput | null>(null);
+  const [formInitialValues, setFormInitialValues] = useState<HostInput | null>(
+    null,
+  );
   // 右侧视图：终端+AI / SFTP
   const [view, setView] = useState<'terminal' | 'sftp'>('terminal');
   const [aiCollapsed, setAiCollapsed] = useState(true);
@@ -45,7 +55,9 @@ export default function HostsPage(): React.JSX.Element {
     return saved >= 160 && saved <= 480 ? saved : 200;
   });
   const [sidebarResizeHover, setSidebarResizeHover] = useState(false);
-  const sidebarResizeRef = useRef<{ startX: number; startW: number } | null>(null);
+  const sidebarResizeRef = useRef<{ startX: number; startW: number } | null>(
+    null,
+  );
 
   // 分隔条左右拖动调整左侧主机列表宽度，实时持久化。
   const onSidebarResize = useCallback(
@@ -106,24 +118,27 @@ export default function HostsPage(): React.JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedHost?.id]);
 
-  const handleAddFolder = useCallback((parentId: string) => {
-    let name = '';
-    modal.confirm({
-      title: '新建目录',
-      content: (
-        <Input
-          autoFocus
-          placeholder="输入目录名称"
-          onChange={(e) => (name = e.target.value)}
-        />
-      ),
-      onOk: async () => {
-        if (name.trim()) {
-          await createFolder(name.trim(), parentId);
-        }
-      },
-    });
-  }, [createFolder, modal]);
+  const handleAddFolder = useCallback(
+    (parentId: string) => {
+      let name = '';
+      modal.confirm({
+        title: '新建目录',
+        content: (
+          <Input
+            autoFocus
+            placeholder="输入目录名称"
+            onChange={(e) => (name = e.target.value)}
+          />
+        ),
+        onOk: async () => {
+          if (name.trim()) {
+            await createFolder(name.trim(), parentId);
+          }
+        },
+      });
+    },
+    [createFolder, modal],
+  );
 
   const handleAddHost = useCallback((parentId: string) => {
     setEditingHostId(null);
@@ -149,13 +164,17 @@ export default function HostsPage(): React.JSX.Element {
     [getHostSecret],
   );
 
-  const handleDelete = useCallback(async (node: TreeNode) => {
-    modal.confirm({
-      title: `确定删除"${node.name}"？`,
-      content: node.nodeType === 'folder' ? '目录内的所有主机将被一并删除。' : '',
-      onOk: () => deleteNode(node.id),
-    });
-  }, [deleteNode, modal]);
+  const handleDelete = useCallback(
+    async (node: TreeNode) => {
+      modal.confirm({
+        title: `确定删除"${node.name}"？`,
+        content:
+          node.nodeType === 'folder' ? '目录内的所有主机将被一并删除。' : '',
+        onOk: () => deleteNode(node.id),
+      });
+    },
+    [deleteNode, modal],
+  );
 
   // 右键「连接」菜单：与双击一致，真正打开终端
   const handleTest = useCallback(
@@ -189,14 +208,17 @@ export default function HostsPage(): React.JSX.Element {
     setSelectedHost(node);
   }, []);
 
-  const handleDoubleClick = useCallback(async (node: TreeNode) => {
-    setSelectedHost(node);
-    try {
-      await terminal.open(node.id);
-    } catch (err) {
-      message.error(`连接失败: ${err}`);
-    }
-  }, [terminal, message]);
+  const handleDoubleClick = useCallback(
+    async (node: TreeNode) => {
+      setSelectedHost(node);
+      try {
+        await terminal.open(node.id);
+      } catch (err) {
+        message.error(`连接失败: ${err}`);
+      }
+    },
+    [terminal, message],
+  );
 
   return (
     <div
@@ -278,76 +300,76 @@ export default function HostsPage(): React.JSX.Element {
             minWidth: 0,
           }}
         >
-            {/* 终端区域：占据智能体面板之外的剩余宽度 */}
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <Terminal
-                isDark={isDark}
-                hostID={selectedHost?.id}
-                connected={terminal.connected}
-                connecting={terminal.connecting}
-                reconnecting={terminal.reconnecting}
-                reconnectCount={terminal.reconnectCount}
-                hostName={selectedHost?.name ?? ''}
-                hostAddr={
-                  selectedHost
-                    ? `${selectedHost.user}@${selectedHost.addr}:${selectedHost.port}`
-                    : ''
-                }
-                onData={terminal.sendData}
-                onResize={terminal.resize}
-                setOutputHandler={terminal.setOutputHandler}
-                onDisconnect={() => terminal.close()}
-                aiOpen={!aiCollapsed}
-                onToggleAI={() => setAiCollapsed(!aiCollapsed)}
-                onRefresh={handleRefreshTerminal}
-              />
-            </div>
-
-            {/* 智能体面板：收起时渲染右下角按钮（不占位），展开时并排固定宽度 */}
-            <AIPanel
-              activeSession={sessions.activeSession}
-              messages={sessions.messages}
-              conversations={sessions.conversations}
-              streamingText={sessions.streamingText}
-              pendingCommand={sessions.pendingCommand}
-              commandStatus={sessions.commandStatus}
-              pendingPlan={sessions.pendingPlan}
-              planStatus={sessions.planStatus}
-              sessionState={sessions.sessionState}
-              lastError={sessions.lastError}
-              runningCommand={sessions.runningCommand}
-              runElapsed={sessions.runElapsed}
-              runOutput={sessions.runOutput}
-              sshConnected={terminal.connected}
+          {/* 终端区域：占据智能体面板之外的剩余宽度 */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <Terminal
+              isDark={isDark}
+              hostID={selectedHost?.id}
+              connected={terminal.connected}
+              connecting={terminal.connecting}
+              reconnecting={terminal.reconnecting}
+              reconnectCount={terminal.reconnectCount}
               hostName={selectedHost?.name ?? ''}
-              collapsed={aiCollapsed}
-              onRefreshConversations={sessions.refreshConversations}
-              onSwitchConversation={sessions.switchConversation}
-              onDeleteConversation={sessions.deleteConversation}
-              onRenameConversation={sessions.renameConversation}
-              onToggleCollapse={() => setAiCollapsed(!aiCollapsed)}
-              onSendMessage={sessions.sendMessage}
-              onClearMessages={sessions.clearMessages}
-              onRunInTerminal={runInTerminal}
-              onApprove={sessions.approve}
-              onReject={sessions.reject}
-              onApprovePlan={sessions.approvePlan}
-              onRejectPlan={sessions.rejectPlan}
-              onCancel={sessions.cancel}
-              onNewConversation={sessions.newConversation}
+              hostAddr={
+                selectedHost
+                  ? `${selectedHost.user}@${selectedHost.addr}:${selectedHost.port}`
+                  : ''
+              }
+              onData={terminal.sendData}
+              onResize={terminal.resize}
+              setOutputHandler={terminal.setOutputHandler}
+              onDisconnect={() => terminal.close()}
+              aiOpen={!aiCollapsed}
+              onToggleAI={() => setAiCollapsed(!aiCollapsed)}
+              onRefresh={handleRefreshTerminal}
             />
           </div>
 
-      {/* SFTP 视图：条件挂载（切走卸载，重进重新加载根目录） */}
-      {view === 'sftp' && (
-        <div style={{ flex: 1, minHeight: 0, padding: '4px 5px' }}>
-          <SftpPanel
-            hostId={selectedHost?.id ?? null}
+          {/* 智能体面板：收起时渲染右下角按钮（不占位），展开时并排固定宽度 */}
+          <AIPanel
+            activeSession={sessions.activeSession}
+            messages={sessions.messages}
+            conversations={sessions.conversations}
+            streamingText={sessions.streamingText}
+            pendingCommand={sessions.pendingCommand}
+            commandStatus={sessions.commandStatus}
+            pendingPlan={sessions.pendingPlan}
+            planStatus={sessions.planStatus}
+            sessionState={sessions.sessionState}
+            lastError={sessions.lastError}
+            runningCommand={sessions.runningCommand}
+            runElapsed={sessions.runElapsed}
+            runOutput={sessions.runOutput}
+            sshConnected={terminal.connected}
             hostName={selectedHost?.name ?? ''}
+            collapsed={aiCollapsed}
+            onRefreshConversations={sessions.refreshConversations}
+            onSwitchConversation={sessions.switchConversation}
+            onDeleteConversation={sessions.deleteConversation}
+            onRenameConversation={sessions.renameConversation}
+            onToggleCollapse={() => setAiCollapsed(!aiCollapsed)}
+            onSendMessage={sessions.sendMessage}
+            onClearMessages={sessions.clearMessages}
+            onRunInTerminal={runInTerminal}
+            onApprove={sessions.approve}
+            onReject={sessions.reject}
+            onApprovePlan={sessions.approvePlan}
+            onRejectPlan={sessions.rejectPlan}
+            onCancel={sessions.cancel}
+            onNewConversation={sessions.newConversation}
           />
         </div>
-      )}
-    </div>
+
+        {/* SFTP 视图：条件挂载（切走卸载，重进重新加载根目录） */}
+        {view === 'sftp' && (
+          <div style={{ flex: 1, minHeight: 0, padding: '4px 5px' }}>
+            <SftpPanel
+              hostId={selectedHost?.id ?? null}
+              hostName={selectedHost?.name ?? ''}
+            />
+          </div>
+        )}
+      </div>
 
       {/* 主机表单弹窗 */}
       <HostForm

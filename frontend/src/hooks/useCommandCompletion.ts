@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { Terminal as XTerm } from "@xterm/xterm";
-import rawCommands from "@/data/commands.json";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Terminal as XTerm } from '@xterm/xterm';
+import rawCommands from '@/data/commands.json';
 
 export interface CommandTemplate {
   text: string;
@@ -17,12 +17,12 @@ interface CommandMatch {
   name: string;
   desc: string;
   text: string;
-  type: "command" | "template";
+  type: 'command' | 'template';
 }
 
 export interface CompletionState {
   open: boolean;
-  mode: "command" | "template";
+  mode: 'command' | 'template';
   matches: CommandMatch[];
   selectedIndex: number;
   prefix: string;
@@ -48,7 +48,7 @@ function buildCommandMap(
     const existing = map.get(key);
     map.set(key, {
       ...entry,
-      desc: entry.desc || existing?.desc || "",
+      desc: entry.desc || existing?.desc || '',
     });
   }
   return map;
@@ -58,7 +58,7 @@ function getCursorPixelPosition(xterm: XTerm): { x: number; y: number } | null {
   const element = xterm.element;
   if (!element) return null;
 
-  const screen = element.querySelector(".xterm-screen") as HTMLElement | null;
+  const screen = element.querySelector('.xterm-screen') as HTMLElement | null;
   if (!screen) return null;
 
   const screenRect = screen.getBoundingClientRect();
@@ -101,14 +101,14 @@ export function useCommandCompletion(
   const commandsMapRef = useRef<Map<string, CommandEntry>>(
     buildCommandMap(staticCommands, []),
   );
-  const inputBufferRef = useRef("");
+  const inputBufferRef = useRef('');
 
   const [completion, setCompletion] = useState<CompletionState>({
     open: false,
-    mode: "command",
+    mode: 'command',
     matches: [],
     selectedIndex: 0,
-    prefix: "",
+    prefix: '',
     position: null,
   });
 
@@ -123,10 +123,7 @@ export function useCommandCompletion(
   const computeMatches = useCallback(
     (buffer: string) => {
       const trimmed = buffer.trimStart();
-      if (
-        trimmed.length < MIN_PREFIX_LEN ||
-        /[|;&<>()`$]/.test(trimmed)
-      ) {
+      if (trimmed.length < MIN_PREFIX_LEN || /[|;&<>()`$]/.test(trimmed)) {
         setCompletion((prev) =>
           prev.open
             ? { ...prev, open: false, matches: [], selectedIndex: 0 }
@@ -149,7 +146,7 @@ export function useCommandCompletion(
               name: entry.name,
               desc: entry.desc,
               text: entry.name,
-              type: "command",
+              type: 'command',
             });
           }
           if (matches.length >= MAX_MATCHES) break;
@@ -157,7 +154,7 @@ export function useCommandCompletion(
         matches.sort((a, b) => a.name.localeCompare(b.name));
         setCompletion({
           open: matches.length > 0,
-          mode: "command",
+          mode: 'command',
           matches,
           selectedIndex: 0,
           prefix: trimmed,
@@ -188,7 +185,7 @@ export function useCommandCompletion(
             name: template.text,
             desc: template.desc,
             text: template.text,
-            type: "template",
+            type: 'template',
           });
         }
         if (matches.length >= MAX_MATCHES) break;
@@ -196,7 +193,7 @@ export function useCommandCompletion(
       matches.sort((a, b) => a.name.localeCompare(b.name));
       setCompletion({
         open: matches.length > 0,
-        mode: "template",
+        mode: 'template',
         matches,
         selectedIndex: 0,
         prefix: trimmed,
@@ -211,7 +208,7 @@ export function useCommandCompletion(
     const trimmed = current.trimStart();
     if (match.text !== trimmed) {
       // 退格删除已输入前缀，再写入完整匹配文本
-      const backspaces = "\x7f".repeat(trimmed.length);
+      const backspaces = '\x7f'.repeat(trimmed.length);
       sendDataRef.current(backspaces + match.text);
       inputBufferRef.current = match.text;
     }
@@ -238,19 +235,19 @@ export function useCommandCompletion(
         const code = ch.charCodeAt(0);
         if (code === 0x0d || code === 0x0a) {
           // Enter / 换行：命令已执行，重置
-          buffer = "";
+          buffer = '';
         } else if (code === 0x7f) {
           // Backspace
           buffer = buffer.slice(0, -1);
         } else if (code === 0x03 || code === 0x15) {
           // Ctrl+C / Ctrl+U
-          buffer = "";
+          buffer = '';
         } else if (code === 0x09) {
           // Tab：不加入缓冲区，交给 key handler 处理
           continue;
         } else if (code === 0x1b) {
           // Escape 或控制序列（方向键等）：关闭补全并清空缓冲区
-          buffer = "";
+          buffer = '';
         } else if (isPrintable(code)) {
           buffer += ch;
         }
@@ -272,15 +269,15 @@ export function useCommandCompletion(
       // xterm 的 attachCustomKeyEventHandler 对 keydown/keypress/keyup 都会回调。
       // 若不区分事件类型，keyup 的 ArrowDown/ArrowUp 会再次触发选中移动，
       // 导致按一次方向键选中项跳两行。这里仅处理 keydown。
-      if (e.type !== "keydown") return true;
+      if (e.type !== 'keydown') return true;
       if (!completion.open) return true;
 
-      if (e.key === "Tab" || e.key === "Enter") {
+      if (e.key === 'Tab' || e.key === 'Enter') {
         e.preventDefault();
         acceptSelected();
         return false;
       }
-      if (e.key === "ArrowDown") {
+      if (e.key === 'ArrowDown') {
         e.preventDefault();
         setCompletion((prev) => ({
           ...prev,
@@ -291,7 +288,7 @@ export function useCommandCompletion(
         }));
         return false;
       }
-      if (e.key === "ArrowUp") {
+      if (e.key === 'ArrowUp') {
         e.preventDefault();
         setCompletion((prev) => ({
           ...prev,
@@ -303,7 +300,7 @@ export function useCommandCompletion(
         }));
         return false;
       }
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         closeCompletion();
         return false;
       }
@@ -361,10 +358,7 @@ export function useCommandCompletion(
     (e: KeyboardEvent) => handleKeyEventRef.current(e),
     [],
   );
-  const onCursorMoveStable = useCallback(
-    () => onCursorMoveRef.current(),
-    [],
-  );
+  const onCursorMoveStable = useCallback(() => onCursorMoveRef.current(), []);
   const closeCompletionStable = useCallback(
     () => closeCompletionRef.current(),
     [],

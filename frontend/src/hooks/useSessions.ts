@@ -41,11 +41,7 @@ export interface PlanInfo {
 }
 
 export type SessionState =
-  | 'Thinking'
-  | 'AwaitingApproval'
-  | 'Running'
-  | 'Idle'
-  | null;
+  'Thinking' | 'AwaitingApproval' | 'Running' | 'Idle' | null;
 
 /** 命令审批状态：待审批 / 已批准 / 已拒绝 */
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
@@ -93,8 +89,11 @@ export function useSessions(hostId: string | null): {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingText, setStreamingText] = useState('');
-  const [pendingCommand, setPendingCommand] = useState<CommandSuggestion | null>(null);
-  const [commandStatus, setCommandStatus] = useState<ApprovalStatus | null>(null);
+  const [pendingCommand, setPendingCommand] =
+    useState<CommandSuggestion | null>(null);
+  const [commandStatus, setCommandStatus] = useState<ApprovalStatus | null>(
+    null,
+  );
   const [pendingPlan, setPendingPlan] = useState<PlanInfo | null>(null);
   // 计划审批独立状态：不复用 commandStatus——否则计划批准后模型执行第一条命令，
   // ai:command 会把 commandStatus 重置为 pending，已批准的计划卡会退回"待审批"。
@@ -169,16 +168,19 @@ export function useSessions(hostId: string | null): {
   }, [hostId]);
 
   /** 切换到指定历史会话并加载其消息（之后可继续对话）。 */
-  const switchConversation = useCallback(async (sid: string): Promise<void> => {
-    setActiveSession(sid);
-    setPendingCommand(null);
-    setCommandStatus(null);
-    setPlanStatus(null);
-    setSessionState(null);
-    setLastError(null);
-    setStreamingText('');
-    await resync(sid);
-  }, [resync]);
+  const switchConversation = useCallback(
+    async (sid: string): Promise<void> => {
+      setActiveSession(sid);
+      setPendingCommand(null);
+      setCommandStatus(null);
+      setPlanStatus(null);
+      setSessionState(null);
+      setLastError(null);
+      setStreamingText('');
+      await resync(sid);
+    },
+    [resync],
+  );
 
   /** 主机选中时调用：懒获取/创建会话并加载历史。 */
   const attach = useCallback(async (): Promise<void> => {
@@ -223,14 +225,17 @@ export function useSessions(hostId: string | null): {
   }, [hostId]);
 
   /** 重命名会话（历史菜单手动改名）。 */
-  const renameConversation = useCallback(async (sid: string, title: string): Promise<void> => {
-    try {
-      await RenameConversation(sid, title);
-      await refreshConversations();
-    } catch {
-      // 重命名失败不影响主流程
-    }
-  }, [refreshConversations]);
+  const renameConversation = useCallback(
+    async (sid: string, title: string): Promise<void> => {
+      try {
+        await RenameConversation(sid, title);
+        await refreshConversations();
+      } catch {
+        // 重命名失败不影响主流程
+      }
+    },
+    [refreshConversations],
+  );
 
   /** 清空当前会话全部消息（快捷命令 /clear）。 */
   const clearMessages = useCallback(async (): Promise<void> => {
@@ -252,56 +257,62 @@ export function useSessions(hostId: string | null): {
     }
   }, [activeSession]);
 
-  const sendMessage = useCallback(async (text: string): Promise<void> => {
-    if (!activeSession) return;
-    const localId = nextLocalId();
-    // 乐观更新：用户消息立即显示在对话流中（不等模型输出完）；
-    // 后端 resync（Idle/run:result）后由真实落库消息整体替换，内容一致无缝。
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: localId,
-        sessionId: activeSession,
-        role: 'user',
-        content: text,
-        toolResult: '',
-        toolCalls: '',
-        toolCallId: '',
-        toolName: '',
-        approvalStatus: '',
-        ts: Math.floor(Date.now() / 1000),
-      },
-    ]);
-    setStreamingText('');
-    // 后端 SendMessage 在「会话进行中」「AI 后端不可用」等场景直接返回 error 而不发 ai:error 事件，
-    // 这里捕获并展示，避免静默失败（表现为"发送没反应"）。
-    try {
-      await SendMessage(activeSession, text);
-      setLastError(null);
-    } catch (e) {
-      // 发送失败：移除乐观消息，避免残留一条后端未落库的本地消息
-      setMessages((prev) => prev.filter((m) => m.id !== localId));
-      setLastError(typeof e === 'string' ? e : '发送失败，请查看后端日志');
-    }
-  }, [activeSession]);
+  const sendMessage = useCallback(
+    async (text: string): Promise<void> => {
+      if (!activeSession) return;
+      const localId = nextLocalId();
+      // 乐观更新：用户消息立即显示在对话流中（不等模型输出完）；
+      // 后端 resync（Idle/run:result）后由真实落库消息整体替换，内容一致无缝。
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: localId,
+          sessionId: activeSession,
+          role: 'user',
+          content: text,
+          toolResult: '',
+          toolCalls: '',
+          toolCallId: '',
+          toolName: '',
+          approvalStatus: '',
+          ts: Math.floor(Date.now() / 1000),
+        },
+      ]);
+      setStreamingText('');
+      // 后端 SendMessage 在「会话进行中」「AI 后端不可用」等场景直接返回 error 而不发 ai:error 事件，
+      // 这里捕获并展示，避免静默失败（表现为"发送没反应"）。
+      try {
+        await SendMessage(activeSession, text);
+        setLastError(null);
+      } catch (e) {
+        // 发送失败：移除乐观消息，避免残留一条后端未落库的本地消息
+        setMessages((prev) => prev.filter((m) => m.id !== localId));
+        setLastError(typeof e === 'string' ? e : '发送失败，请查看后端日志');
+      }
+    },
+    [activeSession],
+  );
 
   // 防重复提交：双击/连点只提交一次，避免第二次后端报"无待审批"后把已批准状态打回 pending
   const approveBusyRef = useRef(false);
   const rejectBusyRef = useRef(false);
 
-  const approve = useCallback(async (command: string): Promise<void> => {
-    if (!activeSession || approveBusyRef.current) return;
-    approveBusyRef.current = true;
-    // 卡片保留，状态切为"已批准"，执行完成后由历史卡接管
-    setCommandStatus('approved');
-    try {
-      await ApproveCommand(activeSession, command);
-    } catch {
-      setCommandStatus('pending');
-    } finally {
-      approveBusyRef.current = false;
-    }
-  }, [activeSession]);
+  const approve = useCallback(
+    async (command: string): Promise<void> => {
+      if (!activeSession || approveBusyRef.current) return;
+      approveBusyRef.current = true;
+      // 卡片保留，状态切为"已批准"，执行完成后由历史卡接管
+      setCommandStatus('approved');
+      try {
+        await ApproveCommand(activeSession, command);
+      } catch {
+        setCommandStatus('pending');
+      } finally {
+        approveBusyRef.current = false;
+      }
+    },
+    [activeSession],
+  );
 
   const reject = useCallback(async (): Promise<void> => {
     if (!activeSession || rejectBusyRef.current) return;
@@ -355,7 +366,8 @@ export function useSessions(hostId: string | null): {
 
   // Wails 事件订阅（sessionId 过滤）
   useEffect(() => {
-    const isMine = (e: AgentEvent): boolean => e.sessionId === sessionRef.current;
+    const isMine = (e: AgentEvent): boolean =>
+      e.sessionId === sessionRef.current;
 
     const offText = EventsOn('ai:text', (raw: AgentEvent) => {
       if (!isMine(raw)) return;

@@ -1,0 +1,6 @@
+node_modules
+dist
+wailsjs
+package.json
+package.json.md5
+pnpm-lock.yaml

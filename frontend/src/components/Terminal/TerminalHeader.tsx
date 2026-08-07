@@ -1,4 +1,4 @@
-import { Button, Tooltip, theme } from "antd";
+import { Button, Tooltip, theme } from 'antd';
 import {
   ClearOutlined,
   CopyOutlined,
@@ -8,7 +8,7 @@ import {
   SearchOutlined,
   ZoomInOutlined,
   ZoomOutOutlined,
-} from "@ant-design/icons";
+} from '@ant-design/icons';
 
 interface TerminalHeaderProps {
   hostName: string;
@@ -54,35 +54,35 @@ export default function TerminalHeader({
   return (
     <div
       style={{
-        padding: "4px 10px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
+        padding: '4px 10px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         borderBottom: `1px solid ${token.colorBorderSecondary}`,
         flexShrink: 0,
         background: token.colorBgElevated,
       }}
     >
       <div
-        style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}
+        style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}
       >
         <span
           style={{
             fontSize: 11,
             color: token.colorTextSecondary,
-            whiteSpace: "nowrap",
+            whiteSpace: 'nowrap',
           }}
         >
           终端
         </span>
-        <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: "nowrap" }}>
-          {hostName || "未选择主机"}
+        <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+          {hostName || '未选择主机'}
         </span>
         <span
           style={{
             fontSize: 11,
             color: connected ? token.colorSuccess : token.colorTextSecondary,
-            whiteSpace: "nowrap",
+            whiteSpace: 'nowrap',
           }}
         >
           {statusDot} {statusText}
@@ -93,9 +93,9 @@ export default function TerminalHeader({
               style={{
                 fontSize: 11,
                 color: token.colorTextTertiary,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
               {hostAddr}
@@ -104,10 +104,10 @@ export default function TerminalHeader({
         )}
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 2 }}>
-        <Tooltip title={aiOpen ? "收起智能体面板" : "打开智能体面板"}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Tooltip title={aiOpen ? '收起智能体面板' : '打开智能体面板'}>
           <Button
-            type={aiOpen ? "primary" : "text"}
+            type={aiOpen ? 'primary' : 'text'}
             size="small"
             icon={<RobotOutlined />}
             onClick={onToggleAI}
@@ -140,13 +140,28 @@ export default function TerminalHeader({
           />
         </Tooltip>
         <Tooltip title="搜索 (Ctrl+F)">
-          <Button type="text" size="small" icon={<SearchOutlined />} onClick={onSearch} />
+          <Button
+            type="text"
+            size="small"
+            icon={<SearchOutlined />}
+            onClick={onSearch}
+          />
         </Tooltip>
         <Tooltip title="清空">
-          <Button type="text" size="small" icon={<ClearOutlined />} onClick={onClear} />
+          <Button
+            type="text"
+            size="small"
+            icon={<ClearOutlined />}
+            onClick={onClear}
+          />
         </Tooltip>
         <Tooltip title="复制选中内容">
-          <Button type="text" size="small" icon={<CopyOutlined />} onClick={() => void onCopy()} />
+          <Button
+            type="text"
+            size="small"
+            icon={<CopyOutlined />}
+            onClick={() => void onCopy()}
+          />
         </Tooltip>
         {connected && (
           <Tooltip title="断开连接">

@@ -1,10 +1,10 @@
-import React, { lazy, type ComponentType } from "react";
-import type { ItemType, MenuItemType } from "antd/es/menu/interface";
+import React, { lazy, type ComponentType } from 'react';
+import type { ItemType, MenuItemType } from 'antd/es/menu/interface';
 import {
   DesktopOutlined,
   CloudServerOutlined,
   InfoCircleOutlined,
-} from "@ant-design/icons";
+} from '@ant-design/icons';
 
 /** 路由项定义 — 同时驱动菜单和路由 */
 export interface RouteItem {
@@ -21,22 +21,22 @@ const lazyPage = (
 
 export const routes: RouteItem[] = [
   {
-    path: "/hosts",
-    label: "主机",
+    path: '/hosts',
+    label: '主机',
     icon: <DesktopOutlined />,
-    component: lazyPage(() => import("@/pages/Hosts")),
+    component: lazyPage(() => import('@/pages/Hosts')),
   },
   {
-    path: "/config",
-    label: "LLM模型配置",
+    path: '/config',
+    label: 'LLM模型配置',
     icon: <CloudServerOutlined />,
-    component: lazyPage(() => import("@/pages/Config")),
+    component: lazyPage(() => import('@/pages/Config')),
   },
   {
-    path: "/about",
-    label: "关于",
+    path: '/about',
+    label: '关于',
     icon: <InfoCircleOutlined />,
-    component: lazyPage(() => import("@/pages/About")),
+    component: lazyPage(() => import('@/pages/About')),
   },
 ];
 

@@ -29,14 +29,14 @@ export default function TerminalContextMenu({
   return (
     <div
       style={{
-        position: "fixed",
+        position: 'fixed',
         left: x,
         top: y,
         zIndex: 9999,
         background: colorBgElevated,
         borderRadius: borderRadiusLG,
         boxShadow: boxShadowSecondary,
-        padding: "4px 0",
+        padding: '4px 0',
         minWidth: 140,
       }}
       onClick={onClose}
@@ -45,8 +45,8 @@ export default function TerminalContextMenu({
         <div
           key={item.key}
           style={{
-            padding: "6px 16px",
-            cursor: "pointer",
+            padding: '6px 16px',
+            cursor: 'pointer',
             fontSize: 13,
             color: colorText,
           }}

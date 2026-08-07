@@ -1,8 +1,8 @@
-import { useState } from "react";
-import { Button, Tag, Input, Tooltip, theme } from "antd";
-import { CodeOutlined, EditOutlined } from "@ant-design/icons";
-import type { ApprovalStatus, CommandSuggestion } from "@/hooks/useSessions";
-import { isHighRiskCommand } from "./risk";
+import { useState } from 'react';
+import { Button, Tag, Input, Tooltip, theme } from 'antd';
+import { CodeOutlined, EditOutlined } from '@ant-design/icons';
+import type { ApprovalStatus, CommandSuggestion } from '@/hooks/useSessions';
+import { isHighRiskCommand } from './risk';
 
 interface CommandCardProps {
   command: CommandSuggestion;
@@ -19,9 +19,9 @@ interface CommandCardProps {
 }
 
 const STATUS_META: Record<ApprovalStatus, { text: string; color: string }> = {
-  pending: { text: "待审批", color: "processing" },
-  approved: { text: "已批准", color: "success" },
-  rejected: { text: "已拒绝", color: "error" },
+  pending: { text: '待审批', color: 'processing' },
+  approved: { text: '已批准', color: 'success' },
+  rejected: { text: '已拒绝', color: 'error' },
 };
 
 /** 命令审批卡：状态+原因一行、命令、操作按钮（紧凑布局）。 */
@@ -42,9 +42,9 @@ export default function CommandCard({
   // 未编辑时以后端守卫判定为准（历史/展示模式忠实于当时判定）。
   const isHighRisk = editing
     ? isHighRiskCommand(draft)
-    : command.assessedRisk === "high" || command.risk === "high";
+    : command.assessedRisk === 'high' || command.risk === 'high';
   // 已批准/已拒绝后不再可操作（执行中或结果已定）
-  const done = status === "approved" || status === "rejected";
+  const done = status === 'approved' || status === 'rejected';
 
   const handleApprove = (): void => {
     // 高风险二次确认：首次点击只进入确认态，二次点击才批准
@@ -60,16 +60,16 @@ export default function CommandCard({
       style={{
         border: `1px solid ${isHighRisk ? token.colorError : token.colorBorderSecondary}`,
         borderRadius: 6,
-        padding: "6px 8px",
+        padding: '6px 8px',
         background: token.colorBgElevated,
-        margin: "2px 0",
+        margin: '2px 0',
       }}
     >
       {/* 头部一行：审批状态 + 原因 + 风险 */}
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
+          display: 'flex',
+          alignItems: 'center',
           gap: 6,
           marginBottom: 4,
         }}
@@ -77,7 +77,7 @@ export default function CommandCard({
         {status && (
           <Tag
             color={STATUS_META[status].color}
-            style={{ margin: 0, fontSize: 11, lineHeight: "16px" }}
+            style={{ margin: 0, fontSize: 11, lineHeight: '16px' }}
           >
             {STATUS_META[status].text}
           </Tag>
@@ -87,17 +87,20 @@ export default function CommandCard({
           style={{
             flex: 1,
             minWidth: 0,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
             fontSize: 11,
             color: token.colorTextSecondary,
           }}
         >
-          原因: {command.why || "—"}
+          原因: {command.why || '—'}
         </span>
         {isHighRisk && (
-          <Tag color="error" style={{ margin: 0, fontSize: 11, lineHeight: "16px" }}>
+          <Tag
+            color="error"
+            style={{ margin: 0, fontSize: 11, lineHeight: '16px' }}
+          >
             高风险
           </Tag>
         )}
@@ -109,7 +112,7 @@ export default function CommandCard({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           autoSize={{ minRows: 1, maxRows: 3 }}
-          style={{ fontFamily: "monospace", fontSize: 11 }}
+          style={{ fontFamily: 'monospace', fontSize: 11 }}
         />
       ) : (
         <div
@@ -117,10 +120,10 @@ export default function CommandCard({
             fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
             fontSize: 11,
             background: token.colorFillSecondary,
-            padding: "3px 6px",
+            padding: '3px 6px',
             borderRadius: 4,
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-all",
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all',
             color: token.colorText,
           }}
         >
@@ -132,8 +135,8 @@ export default function CommandCard({
       {!history && !done && (
         <div
           style={{
-            display: "flex",
-            justifyContent: "flex-end",
+            display: 'flex',
+            justifyContent: 'flex-end',
             gap: 4,
             marginTop: 6,
           }}
@@ -148,7 +151,7 @@ export default function CommandCard({
               />
             </Tooltip>
           )}
-          <Tooltip title={editing ? "完成编辑" : "修改命令"}>
+          <Tooltip title={editing ? '完成编辑' : '修改命令'}>
             <Button
               size="small"
               icon={<EditOutlined />}
@@ -159,7 +162,7 @@ export default function CommandCard({
               }}
               disabled={busy}
             >
-              {editing ? "完成" : "编辑"}
+              {editing ? '完成' : '编辑'}
             </Button>
           </Tooltip>
           <Button size="small" onClick={() => onReject?.()} disabled={busy}>
@@ -172,7 +175,7 @@ export default function CommandCard({
             loading={busy}
             onClick={handleApprove}
           >
-            {isHighRisk && confirming ? "再次确认" : "批准"}
+            {isHighRisk && confirming ? '再次确认' : '批准'}
           </Button>
         </div>
       )}

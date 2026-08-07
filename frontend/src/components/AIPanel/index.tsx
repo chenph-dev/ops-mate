@@ -1,18 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { InputRef } from "antd";
-import { GetAIConfig } from "@wailsjs/go/handler/AIConfigHandler";
-import type { configstore, convstore } from "@wailsjs/go/models";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { InputRef } from 'antd';
+import { GetAIConfig } from '@wailsjs/go/handler/AIConfigHandler';
+import type { configstore, convstore } from '@wailsjs/go/models';
 import type {
   ApprovalStatus,
   CommandSuggestion,
   Message,
   SessionState,
-} from "./types";
-import type { PlanInfo } from "@/hooks/useSessions";
-import { STATE_LABEL } from "./types";
-import PanelHeader from "./PanelHeader";
-import MessageList from "./MessageList";
-import PanelInput from "./PanelInput";
+} from './types';
+import type { PlanInfo } from '@/hooks/useSessions';
+import { STATE_LABEL } from './types';
+import PanelHeader from './PanelHeader';
+import MessageList from './MessageList';
+import PanelInput from './PanelInput';
 
 export interface AIPanelProps {
   activeSession: string | null;
@@ -79,13 +79,13 @@ export default function AIPanel({
   onCancel,
   onNewConversation,
 }: AIPanelProps): React.JSX.Element | null {
-  const [input, setInput] = useState("");
+  const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [aiCfg, setAiCfg] = useState<configstore.AIConfig | null>(null);
   const [cfgLoading, setCfgLoading] = useState(true);
   const [resizeHover, setResizeHover] = useState(false);
   const [panelWidth, setPanelWidth] = useState<number>(() => {
-    const saved = Number(localStorage.getItem("ai-panel-width"));
+    const saved = Number(localStorage.getItem('ai-panel-width'));
     return saved >= 280 && saved <= 600 ? saved : 420;
   });
   const resizeRef = useRef<{ startX: number; startW: number } | null>(null);
@@ -105,23 +105,23 @@ export default function AIPanel({
           600,
         );
         setPanelWidth(next);
-        localStorage.setItem("ai-panel-width", String(next));
+        localStorage.setItem('ai-panel-width', String(next));
       };
       const onUp = (): void => {
         resizeRef.current = null;
-        window.removeEventListener("mousemove", onMove);
-        window.removeEventListener("mouseup", onUp);
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
       };
-      window.addEventListener("mousemove", onMove);
-      window.addEventListener("mouseup", onUp);
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
     },
     [panelWidth],
   );
 
   const configured = !!aiCfg && !!aiCfg.provider && !!aiCfg.model;
-  const busy = sessionState === "Thinking" || sessionState === "Running";
+  const busy = sessionState === 'Thinking' || sessionState === 'Running';
   const inputDisabled =
-    busy || sessionState === "AwaitingApproval" || !configured;
+    busy || sessionState === 'AwaitingApproval' || !configured;
 
   // 展开抽屉时拉取 LLM 模型配置：已配置在标题显示模型；未配置给出提醒与跳转。
   // 从「LLM模型配置」页保存后返回本页，AIPanel 重新挂载，collapsed 回到初始态，
@@ -147,13 +147,13 @@ export default function AIPanel({
   const handleSend = async (): Promise<void> => {
     const text = input.trim();
     if (!text || sending || inputDisabled) return;
-    setInput("");
+    setInput('');
     // 斜杠快捷命令：不发给模型
-    if (text === "/clear") {
+    if (text === '/clear') {
       await onClearMessages();
       return;
     }
-    if (text === "/new") {
+    if (text === '/new') {
       await onNewConversation();
       return;
     }
@@ -166,7 +166,7 @@ export default function AIPanel({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent): void => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       void handleSend();
     }
@@ -174,9 +174,9 @@ export default function AIPanel({
 
   // 斜杠命令菜单项点击：清空输入并直接执行对应快捷命令。
   const handleSlashCommand = (cmd: string): void => {
-    setInput("");
-    if (cmd === "/clear") void onClearMessages();
-    else if (cmd === "/new") void onNewConversation();
+    setInput('');
+    if (cmd === '/clear') void onClearMessages();
+    else if (cmd === '/new') void onNewConversation();
   };
 
   // 折叠态：入口已移到终端右上角工具栏（TerminalHeader 的 AI 开关按钮），
@@ -189,16 +189,16 @@ export default function AIPanel({
     <div
       style={{
         width: panelWidth,
-        height: "100%",
+        height: '100%',
         flexShrink: 0,
-        display: "flex",
-        flexDirection: "column",
-        position: "relative",
-        background: "var(--antd-color-bg-elevated)",
+        display: 'flex',
+        flexDirection: 'column',
+        position: 'relative',
+        background: 'var(--antd-color-bg-elevated)',
         // 与终端风格一致：同边框、同圆角，overflow hidden 裁切内容到圆角内
-        border: "1px solid var(--antd-color-border-secondary)",
+        border: '1px solid var(--antd-color-border-secondary)',
         borderRadius: 8,
-        overflow: "hidden",
+        overflow: 'hidden',
         marginLeft: 5,
       }}
     >
@@ -209,15 +209,13 @@ export default function AIPanel({
         onMouseLeave={() => setResizeHover(false)}
         title="拖动调整宽度"
         style={{
-          position: "absolute",
+          position: 'absolute',
           left: 0,
           top: 0,
           bottom: 0,
           width: 5,
-          cursor: "ew-resize",
-          background: resizeHover
-            ? "var(--antd-color-primary)"
-            : "transparent",
+          cursor: 'ew-resize',
+          background: resizeHover ? 'var(--antd-color-primary)' : 'transparent',
           opacity: resizeHover ? 0.5 : 0,
           zIndex: 2,
         }}
@@ -244,12 +242,12 @@ export default function AIPanel({
       {!sshConnected && (
         <div
           style={{
-            padding: "4px 10px",
+            padding: '4px 10px',
             fontSize: 11,
             lineHeight: 1.5,
-            background: "var(--antd-color-warning-bg)",
-            borderBottom: "1px solid var(--antd-color-warning-border)",
-            color: "var(--antd-color-warning-text)",
+            background: 'var(--antd-color-warning-bg)',
+            borderBottom: '1px solid var(--antd-color-warning-border)',
+            color: 'var(--antd-color-warning-text)',
           }}
         >
           ⚠ SSH 连接已断开，AI 命令无法在主机执行。请先在终端建立连接。

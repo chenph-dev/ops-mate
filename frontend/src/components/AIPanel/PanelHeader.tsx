@@ -1,13 +1,13 @@
-import { Button, Tag, Tooltip } from "antd";
+import { Button, Tag, Tooltip } from 'antd';
 import {
   RobotOutlined,
   CompressOutlined,
   PlusOutlined,
   StopOutlined,
-} from "@ant-design/icons";
-import type { configstore, convstore } from "@wailsjs/go/models";
-import type { SessionState } from "./types";
-import HistoryPopover from "./HistoryPopover";
+} from '@ant-design/icons';
+import type { configstore, convstore } from '@wailsjs/go/models';
+import type { SessionState } from './types';
+import HistoryPopover from './HistoryPopover';
 
 interface PanelHeaderProps {
   hostName: string;
@@ -50,19 +50,19 @@ export default function PanelHeader({
   return (
     <div
       style={{
-        padding: "6px 10px",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        borderBottom: "1px solid var(--antd-color-border-secondary)",
+        padding: '6px 10px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderBottom: '1px solid var(--antd-color-border-secondary)',
         flexShrink: 0,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <RobotOutlined style={{ color: "var(--antd-color-primary)" }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <RobotOutlined style={{ color: 'var(--antd-color-primary)' }} />
         <span style={{ fontSize: 12, fontWeight: 600 }}>智能体</span>
         <span
-          style={{ fontSize: 11, color: "var(--antd-color-text-secondary)" }}
+          style={{ fontSize: 11, color: 'var(--antd-color-text-secondary)' }}
         >
           · {hostName}
         </span>
@@ -70,7 +70,7 @@ export default function PanelHeader({
           <span
             style={{
               fontSize: 11,
-              color: "var(--antd-color-text-secondary)",
+              color: 'var(--antd-color-text-secondary)',
             }}
           >
             · {aiCfg.model}
@@ -81,10 +81,10 @@ export default function PanelHeader({
         {stateMeta && <Tag color={stateMeta.color}>{stateMeta.text}</Tag>}
       </div>
       <div
-        style={{ display: "flex", gap: 4 }}
+        style={{ display: 'flex', gap: 4 }}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        {(sessionState === "Running" || sessionState === "Thinking") && (
+        {(sessionState === 'Running' || sessionState === 'Thinking') && (
           <Tooltip title="取消本次（执行中/思考中均可中止）">
             <Button
               type="text"

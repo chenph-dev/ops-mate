@@ -1,5 +1,5 @@
-import { Button, Tooltip, Layout, theme } from "antd";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Button, Tooltip, Layout, theme } from 'antd';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   MinusOutlined,
   BorderOutlined,
@@ -7,8 +7,8 @@ import {
   CloseOutlined,
   SunOutlined,
   MoonOutlined,
-} from "@ant-design/icons";
-import { useThemeToggle } from "@/context/ThemeContext";
+} from '@ant-design/icons';
+import { useThemeToggle } from '@/context/ThemeContext';
 import {
   WindowMinimise,
   WindowMaximise,
@@ -17,10 +17,10 @@ import {
   WindowGetSize,
   Quit,
   EventsOn,
-} from "@wailsjs/runtime/runtime";
-import { routes } from "./menuConfig";
-import logo from "@/assets/images/logo-universal.png";
-import { useEffect, useState, useCallback } from "react";
+} from '@wailsjs/runtime/runtime';
+import { routes } from './menuConfig';
+import logo from '@/assets/images/logo-universal.png';
+import { useEffect, useState, useCallback } from 'react';
 
 const { Header, Sider, Content } = Layout;
 
@@ -41,8 +41,8 @@ export default function AppLayout(): React.JSX.Element {
   useEffect(() => {
     // 浏览器 resize 兜底：window.innerHeight 连续更新，作为 Wails 事件的补充
     const onResize = (): void => setWinHeight(window.innerHeight);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
   }, []);
 
   useEffect(() => {
@@ -50,16 +50,16 @@ export default function AppLayout(): React.JSX.Element {
     refreshWindowHeight();
     // 所有窗口尺寸变化统一走 Wails 原生事件，直接读事件载荷里的新尺寸（w/h），
     // 避免在事件触发瞬间调用 WindowGetSize 拿到旧值
-    const offResize = EventsOn("wails:window:resized", (data) => {
+    const offResize = EventsOn('wails:window:resized', (data) => {
       const h = (data as { h?: number } | undefined)?.h;
-      if (typeof h === "number") setWinHeight(h);
+      if (typeof h === 'number') setWinHeight(h);
       else refreshWindowHeight();
     });
-    const offMax = EventsOn("wails:window:maximized", () => {
+    const offMax = EventsOn('wails:window:maximized', () => {
       setIsMaximised(true);
       refreshWindowHeight();
     });
-    const offUnmax = EventsOn("wails:window:unmaximized", () => {
+    const offUnmax = EventsOn('wails:window:unmaximized', () => {
       setIsMaximised(false);
       refreshWindowHeight();
     });
@@ -87,33 +87,33 @@ export default function AppLayout(): React.JSX.Element {
   };
 
   return (
-    <Layout style={{ height: winHeight, overflow: "hidden" }}>
+    <Layout style={{ height: winHeight, overflow: 'hidden' }}>
       {/* 顶部栏 */}
       <Header
         className="titlebar-drag-region"
         style={{
-          padding: "0 8px",
+          padding: '0 8px',
           height: 38,
-          lineHeight: "38px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          lineHeight: '38px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
         }}
       >
         {/* 左侧：Logo + 名称 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <img src={logo} alt="logo" style={{ width: 22, height: 22 }} />
-          <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>
+          <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap' }}>
             ops-mate
           </span>
         </div>
 
         {/* 右侧：主题切换 + 窗口控制 */}
-        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
           <WindowButton
             icon={isDark ? <SunOutlined /> : <MoonOutlined />}
             onClick={toggleTheme}
-            title={isDark ? "切换浅色" : "切换深色"}
+            title={isDark ? '切换浅色' : '切换深色'}
           />
           <WindowButton
             icon={<MinusOutlined />}
@@ -123,7 +123,7 @@ export default function AppLayout(): React.JSX.Element {
           <WindowButton
             icon={isMaximised ? <SwitcherOutlined /> : <BorderOutlined />}
             onClick={handleToggleMaximize}
-            title={isMaximised ? "还原" : "最大化"}
+            title={isMaximised ? '还原' : '最大化'}
           />
           <WindowButton
             icon={<CloseOutlined />}
@@ -137,14 +137,14 @@ export default function AppLayout(): React.JSX.Element {
       {/* 下方：左侧菜单条 + 主内容 */}
       <Layout hasSider style={{ flex: 1, minHeight: 0 }}>
         {/* 左侧图标菜单条 */}
-        <Sider width={44} theme={isDark ? "dark" : "light"}>
+        <Sider width={44} theme={isDark ? 'dark' : 'light'}>
           <div
             style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
               paddingTop: 4,
-              height: "100%",
+              height: '100%',
             }}
           >
             {routes.map((r) => (
@@ -157,12 +157,12 @@ export default function AppLayout(): React.JSX.Element {
                   style={{
                     width: 34,
                     height: 34,
-                    border: "none",
+                    border: 'none',
                     borderRadius: 4,
                     borderLeft:
                       selectedKey === r.path
                         ? `3px solid ${token.colorPrimary}`
-                        : "3px solid transparent",
+                        : '3px solid transparent',
                     marginBottom: 6,
                   }}
                 />
@@ -172,7 +172,7 @@ export default function AppLayout(): React.JSX.Element {
         </Sider>
 
         {/* 主内容区 */}
-        <Content style={{ padding: 16, overflow: "auto", minHeight: 0 }}>
+        <Content style={{ padding: 16, overflow: 'auto', minHeight: 0 }}>
           <Outlet />
         </Content>
       </Layout>
@@ -198,15 +198,15 @@ function WindowButton({
       icon={icon}
       title={title}
       onClick={onClick}
-      className={isDanger ? "window-btn danger" : "window-btn"}
+      className={isDanger ? 'window-btn danger' : 'window-btn'}
       style={{
         width: 28,
         height: 28,
-        border: "none",
+        border: 'none',
         borderRadius: 0,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     />
   );

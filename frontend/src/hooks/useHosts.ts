@@ -55,45 +55,75 @@ export function useHosts(): {
     };
   }, []);
 
-  const addHost = useCallback(async (input: HostInput) => {
-    const id = await SaveHost(input);
-    await refresh();
-    return id;
-  }, [refresh]);
+  const addHost = useCallback(
+    async (input: HostInput) => {
+      const id = await SaveHost(input);
+      await refresh();
+      return id;
+    },
+    [refresh],
+  );
 
-  const updateHost = useCallback(async (id: string, input: HostInput) => {
-    await UpdateHost(id, input);
-    await refresh();
-  }, [refresh]);
+  const updateHost = useCallback(
+    async (id: string, input: HostInput) => {
+      await UpdateHost(id, input);
+      await refresh();
+    },
+    [refresh],
+  );
 
   const getHostSecret = useCallback(async (id: string): Promise<string> => {
     return GetHostSecret(id);
   }, []);
 
-  const removeHost = useCallback(async (id: string) => {
-    await DeleteNode(id);
-    await refresh();
-  }, [refresh]);
+  const removeHost = useCallback(
+    async (id: string) => {
+      await DeleteNode(id);
+      await refresh();
+    },
+    [refresh],
+  );
 
   const testConnection = useCallback(async (input: HostInput) => {
     return TestConnection(input);
   }, []);
 
-  const createFolder = useCallback(async (name: string, parentId: string) => {
-    const id = await CreateFolder(name, parentId);
-    await refresh();
-    return id;
-  }, [refresh]);
+  const createFolder = useCallback(
+    async (name: string, parentId: string) => {
+      const id = await CreateFolder(name, parentId);
+      await refresh();
+      return id;
+    },
+    [refresh],
+  );
 
-  const moveNode = useCallback(async (nodeId: string, newParentId: string) => {
-    await MoveNode(nodeId, newParentId);
-    await refresh();
-  }, [refresh]);
+  const moveNode = useCallback(
+    async (nodeId: string, newParentId: string) => {
+      await MoveNode(nodeId, newParentId);
+      await refresh();
+    },
+    [refresh],
+  );
 
-  const deleteNode = useCallback(async (nodeId: string) => {
-    await DeleteNode(nodeId);
-    await refresh();
-  }, [refresh]);
+  const deleteNode = useCallback(
+    async (nodeId: string) => {
+      await DeleteNode(nodeId);
+      await refresh();
+    },
+    [refresh],
+  );
 
-  return { tree, loading, refresh, addHost, updateHost, getHostSecret, removeHost, testConnection, createFolder, moveNode, deleteNode };
+  return {
+    tree,
+    loading,
+    refresh,
+    addHost,
+    updateHost,
+    getHostSecret,
+    removeHost,
+    testConnection,
+    createFolder,
+    moveNode,
+    deleteNode,
+  };
 }

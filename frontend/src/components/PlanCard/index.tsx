@@ -1,11 +1,11 @@
-import { Button, Tag, theme } from "antd";
-import { ExperimentOutlined } from "@ant-design/icons";
-import type { PlanInfo } from "@/hooks/useSessions";
+import { Button, Tag, theme } from 'antd';
+import { ExperimentOutlined } from '@ant-design/icons';
+import type { PlanInfo } from '@/hooks/useSessions';
 
 const STATUS_META: Record<string, { text: string; color: string }> = {
-  pending: { text: "待审批", color: "processing" },
-  approved: { text: "已批准", color: "success" },
-  rejected: { text: "已拒绝", color: "error" },
+  pending: { text: '待审批', color: 'processing' },
+  approved: { text: '已批准', color: 'success' },
+  rejected: { text: '已拒绝', color: 'error' },
 };
 
 interface PlanCardProps {
@@ -30,30 +30,35 @@ export default function PlanCard({
   onReject,
 }: PlanCardProps): React.JSX.Element {
   const { token } = theme.useToken();
-  const meta = STATUS_META[status ?? ""] ?? STATUS_META.pending;
-  const done = status === "approved" || status === "rejected";
+  const meta = STATUS_META[status ?? ''] ?? STATUS_META.pending;
+  const done = status === 'approved' || status === 'rejected';
 
   return (
     <div
       style={{
         border: `1px solid ${token.colorPrimaryBorder}`,
         borderRadius: 6,
-        padding: "6px 8px",
+        padding: '6px 8px',
         background: token.colorBgElevated,
-        margin: "2px 0",
+        margin: '2px 0',
       }}
     >
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
+          display: 'flex',
+          alignItems: 'center',
           gap: 6,
           marginBottom: 4,
         }}
       >
-        <ExperimentOutlined style={{ color: token.colorPrimary, fontSize: 12 }} />
+        <ExperimentOutlined
+          style={{ color: token.colorPrimary, fontSize: 12 }}
+        />
         <span style={{ fontWeight: 600, fontSize: 12 }}>执行计划</span>
-        <Tag color={meta.color} style={{ margin: 0, fontSize: 11, lineHeight: "16px" }}>
+        <Tag
+          color={meta.color}
+          style={{ margin: 0, fontSize: 11, lineHeight: '16px' }}
+        >
           {meta.text}
         </Tag>
       </div>
@@ -85,8 +90,8 @@ export default function PlanCard({
       {!history && !done && (
         <div
           style={{
-            display: "flex",
-            justifyContent: "flex-end",
+            display: 'flex',
+            justifyContent: 'flex-end',
             gap: 4,
             marginTop: 6,
           }}

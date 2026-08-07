@@ -100,7 +100,12 @@ export function useSftp(hostId: string | null): {
   useEffect(() => {
     const off = EventsOn(
       'sftp:progress',
-      (raw: { taskID?: string; done?: number; total?: number; status?: string }) => {
+      (raw: {
+        taskID?: string;
+        done?: number;
+        total?: number;
+        status?: string;
+      }) => {
         const d = raw;
         if (!d?.taskID) return;
         setTasks((prev) =>
@@ -174,26 +179,38 @@ export function useSftp(hostId: string | null): {
     [hostId, loadTasks],
   );
 
-  const pauseTask = useCallback(async (id: string) => {
-    await PauseTask(id);
-    await loadTasks();
-  }, [loadTasks]);
+  const pauseTask = useCallback(
+    async (id: string) => {
+      await PauseTask(id);
+      await loadTasks();
+    },
+    [loadTasks],
+  );
 
-  const resumeTask = useCallback(async (id: string) => {
-    await ResumeTask(id);
-    await loadTasks();
-  }, [loadTasks]);
+  const resumeTask = useCallback(
+    async (id: string) => {
+      await ResumeTask(id);
+      await loadTasks();
+    },
+    [loadTasks],
+  );
 
-  const cancelTask = useCallback(async (id: string) => {
-    await CancelTask(id);
-    await loadTasks();
-  }, [loadTasks]);
+  const cancelTask = useCallback(
+    async (id: string) => {
+      await CancelTask(id);
+      await loadTasks();
+    },
+    [loadTasks],
+  );
 
   /** 移除任务记录（清理已结束/已取消任务）。 */
-  const removeTask = useCallback(async (id: string) => {
-    await RemoveTask(id);
-    await loadTasks();
-  }, [loadTasks]);
+  const removeTask = useCallback(
+    async (id: string) => {
+      await RemoveTask(id);
+      await loadTasks();
+    },
+    [loadTasks],
+  );
 
   return {
     path,

@@ -1,45 +1,45 @@
-import { useState, type ReactNode } from "react";
-import ReactMarkdown, { type Components } from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { ClipboardSetText } from "@wailsjs/runtime/runtime";
+import { useState, type ReactNode } from 'react';
+import ReactMarkdown, { type Components } from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { ClipboardSetText } from '@wailsjs/runtime/runtime';
 
 const MONO = '"Cascadia Code", "Fira Code", "Consolas", monospace';
 
 /** 从 React 元素递归提取纯文本（用于代码块复制）。 */
 function getText(node: ReactNode): string {
-  if (typeof node === "string" || typeof node === "number") return String(node);
-  if (Array.isArray(node)) return node.map(getText).join("");
-  if (node && typeof node === "object" && "props" in node) {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(getText).join('');
+  if (node && typeof node === 'object' && 'props' in node) {
     const p = (node as { props?: { children?: ReactNode } }).props;
     return getText(p?.children);
   }
-  return "";
+  return '';
 }
 
 /** 代码块：等宽深色背景 + 右上角复制按钮。 */
 function CodeBlock({ children }: { children: ReactNode }): React.JSX.Element {
   const [copied, setCopied] = useState(false);
   const handleCopy = (): void => {
-    const text = getText(children).replace(/\n$/, "");
+    const text = getText(children).replace(/\n$/, '');
     void ClipboardSetText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     });
   };
   return (
-    <div style={{ position: "relative", margin: "4px 0" }}>
+    <div style={{ position: 'relative', margin: '4px 0' }}>
       <pre
         style={{
           fontFamily: MONO,
           fontSize: 11,
           lineHeight: 1.5,
-          background: "rgba(0,0,0,0.3)",
-          border: "1px solid var(--antd-color-border-secondary)",
+          background: 'rgba(0,0,0,0.3)',
+          border: '1px solid var(--antd-color-border-secondary)',
           borderRadius: 4,
-          padding: "6px 8px",
-          overflow: "auto",
+          padding: '6px 8px',
+          overflow: 'auto',
           margin: 0,
-          color: "var(--antd-color-text)",
+          color: 'var(--antd-color-text)',
         }}
       >
         {children}
@@ -47,20 +47,20 @@ function CodeBlock({ children }: { children: ReactNode }): React.JSX.Element {
       <button
         onClick={() => void handleCopy()}
         style={{
-          position: "absolute",
+          position: 'absolute',
           top: 4,
           right: 4,
           fontSize: 10,
-          padding: "1px 6px",
-          background: "var(--antd-color-bg-elevated)",
-          border: "1px solid var(--antd-color-border)",
+          padding: '1px 6px',
+          background: 'var(--antd-color-bg-elevated)',
+          border: '1px solid var(--antd-color-border)',
           borderRadius: 4,
-          color: "var(--antd-color-text-secondary)",
-          cursor: "pointer",
+          color: 'var(--antd-color-text-secondary)',
+          cursor: 'pointer',
           opacity: 0.8,
         }}
       >
-        {copied ? "已复制" : "复制"}
+        {copied ? '已复制' : '复制'}
       </button>
     </div>
   );
@@ -74,13 +74,13 @@ const components: Components = {
     // 块级代码：带 language 前缀，或跨行（fenced 无语言标注时）
     const isBlock = Boolean(
       (className && /language-[\w-]+/.test(className)) ||
-        (node?.position && node.position.start.line !== node.position.end.line),
+      (node?.position && node.position.start.line !== node.position.end.line),
     );
     if (isBlock) {
       return (
         <code
           className={className}
-          style={{ fontFamily: MONO, fontSize: 11, whiteSpace: "pre" }}
+          style={{ fontFamily: MONO, fontSize: 11, whiteSpace: 'pre' }}
           {...props}
         >
           {children}
@@ -93,10 +93,10 @@ const components: Components = {
         style={{
           fontFamily: MONO,
           fontSize: 11,
-          background: "rgba(0,0,0,0.25)",
-          padding: "1px 4px",
+          background: 'rgba(0,0,0,0.25)',
+          padding: '1px 4px',
           borderRadius: 3,
-          color: "var(--antd-color-text)",
+          color: 'var(--antd-color-text)',
         }}
         {...props}
       >
@@ -108,10 +108,10 @@ const components: Components = {
     return (
       <p
         style={{
-          margin: "0 0 4px",
+          margin: '0 0 4px',
           fontSize: 12,
           lineHeight: 1.5,
-          color: "var(--antd-color-text)",
+          color: 'var(--antd-color-text)',
         }}
       >
         {children}
@@ -122,11 +122,11 @@ const components: Components = {
     return (
       <ul
         style={{
-          margin: "2px 0",
+          margin: '2px 0',
           paddingLeft: 18,
           fontSize: 12,
           lineHeight: 1.6,
-          color: "var(--antd-color-text)",
+          color: 'var(--antd-color-text)',
         }}
       >
         {children}
@@ -137,11 +137,11 @@ const components: Components = {
     return (
       <ol
         style={{
-          margin: "2px 0",
+          margin: '2px 0',
           paddingLeft: 18,
           fontSize: 12,
           lineHeight: 1.6,
-          color: "var(--antd-color-text)",
+          color: 'var(--antd-color-text)',
         }}
       >
         {children}
@@ -169,7 +169,7 @@ const components: Components = {
         href={href}
         target="_blank"
         rel="noreferrer"
-        style={{ color: "var(--antd-color-primary)" }}
+        style={{ color: 'var(--antd-color-primary)' }}
       >
         {children}
       </a>
@@ -179,10 +179,10 @@ const components: Components = {
     return (
       <blockquote
         style={{
-          margin: "4px 0",
+          margin: '4px 0',
           paddingLeft: 8,
-          borderLeft: "3px solid var(--antd-color-border-secondary)",
-          color: "var(--antd-color-text-secondary)",
+          borderLeft: '3px solid var(--antd-color-border-secondary)',
+          color: 'var(--antd-color-text-secondary)',
         }}
       >
         {children}
@@ -191,13 +191,13 @@ const components: Components = {
   },
   table({ children }) {
     return (
-      <div style={{ overflow: "auto", margin: "4px 0" }}>
+      <div style={{ overflow: 'auto', margin: '4px 0' }}>
         <table
           style={{
-            borderCollapse: "collapse",
+            borderCollapse: 'collapse',
             fontSize: 11,
             lineHeight: 1.5,
-            width: "100%",
+            width: '100%',
           }}
         >
           {children}
@@ -209,11 +209,11 @@ const components: Components = {
     return (
       <th
         style={{
-          border: "1px solid var(--antd-color-border-secondary)",
-          padding: "3px 8px",
+          border: '1px solid var(--antd-color-border-secondary)',
+          padding: '3px 8px',
           fontWeight: 600,
-          textAlign: "left",
-          background: "rgba(0,0,0,0.2)",
+          textAlign: 'left',
+          background: 'rgba(0,0,0,0.2)',
         }}
       >
         {children}
@@ -224,8 +224,8 @@ const components: Components = {
     return (
       <td
         style={{
-          border: "1px solid var(--antd-color-border-secondary)",
-          padding: "3px 8px",
+          border: '1px solid var(--antd-color-border-secondary)',
+          padding: '3px 8px',
         }}
       >
         {children}
@@ -236,9 +236,9 @@ const components: Components = {
     return (
       <hr
         style={{
-          border: "none",
-          borderTop: "1px solid var(--antd-color-border-secondary)",
-          margin: "6px 0",
+          border: 'none',
+          borderTop: '1px solid var(--antd-color-border-secondary)',
+          margin: '6px 0',
         }}
       />
     );
@@ -249,8 +249,8 @@ function headingStyle(fontSize: number): React.CSSProperties {
   return {
     fontSize,
     fontWeight: 600,
-    margin: "6px 0 4px",
-    color: "var(--antd-color-text)",
+    margin: '6px 0 4px',
+    color: 'var(--antd-color-text)',
   };
 }
 

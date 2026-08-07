@@ -1,23 +1,25 @@
-import { Button, Dropdown, Input } from "antd";
-import { SendOutlined } from "@ant-design/icons";
-import type { Ref } from "react";
-import type { InputRef } from "antd";
+import { Button, Dropdown, Input } from 'antd';
+import { SendOutlined } from '@ant-design/icons';
+import type { Ref } from 'react';
+import type { InputRef } from 'antd';
 
 /** 斜杠快捷命令菜单：新增命令只需在此追加。 */
 const SLASH_COMMANDS: { name: string; desc: string }[] = [
-  { name: "/clear", desc: "清空当前会话" },
-  { name: "/new", desc: "新建会话" },
+  { name: '/clear', desc: '清空当前会话' },
+  { name: '/new', desc: '新建会话' },
 ];
 
 /** 斜杠命令菜单项样式。 */
 const slashMenuItems = SLASH_COMMANDS.map((cmd) => ({
   key: cmd.name,
   label: (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <span style={{ fontFamily: 'monospace', color: "var(--antd-color-primary)" }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+      <span
+        style={{ fontFamily: 'monospace', color: 'var(--antd-color-primary)' }}
+      >
         {cmd.name}
       </span>
-      <span style={{ color: "var(--antd-color-text-secondary)", fontSize: 12 }}>
+      <span style={{ color: 'var(--antd-color-text-secondary)', fontSize: 12 }}>
         {cmd.desc}
       </span>
     </div>
@@ -55,20 +57,20 @@ export default function PanelInput({
   onSlashCommand,
 }: PanelInputProps): React.JSX.Element {
   // 输入以 / 开头时弹出斜杠快捷命令菜单
-  const showCmdMenu = input.startsWith("/");
+  const showCmdMenu = input.startsWith('/');
 
   return (
     <div
       style={{
-        padding: "6px 8px",
-        borderTop: "1px solid var(--antd-color-border-secondary)",
+        padding: '6px 8px',
+        borderTop: '1px solid var(--antd-color-border-secondary)',
         flexShrink: 0,
       }}
     >
       {/* Dropdown 渲染到 portal，不受父容器 overflow:hidden 裁剪 */}
       <Dropdown
         open={showCmdMenu}
-        trigger={["click"]}
+        trigger={['click']}
         placement="bottomLeft"
         menu={{
           items: slashMenuItems,
@@ -82,10 +84,10 @@ export default function PanelInput({
           onKeyDown={onKeyDown}
           placeholder={
             !configured
-              ? "请先配置 AI 后端"
+              ? '请先配置 AI 后端'
               : inputDisabled
-                ? "等待本轮对话结束..."
-                : "输入问题..."
+                ? '等待本轮对话结束...'
+                : '输入问题...'
           }
           disabled={inputDisabled}
           style={{ fontSize: 12 }}

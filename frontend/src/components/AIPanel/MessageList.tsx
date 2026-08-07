@@ -1,25 +1,21 @@
-import { useEffect, useRef } from "react";
-import { Button, Spin } from "antd";
-import { CopyOutlined, SettingOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router-dom";
-import { ClipboardSetText } from "@wailsjs/runtime/runtime";
-import CommandCard from "@/components/CommandCard";
-import PlanCard from "@/components/PlanCard";
-import MarkdownContent from "@/components/MarkdownContent";
-import type {
-  ApprovalStatus,
-  CommandSuggestion,
-  Message,
-} from "./types";
-import type { PlanInfo } from "@/hooks/useSessions";
-import ToolOutputBlock from "./ToolOutputBlock";
+import { useEffect, useRef } from 'react';
+import { Button, Spin } from 'antd';
+import { CopyOutlined, SettingOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
+import { ClipboardSetText } from '@wailsjs/runtime/runtime';
+import CommandCard from '@/components/CommandCard';
+import PlanCard from '@/components/PlanCard';
+import MarkdownContent from '@/components/MarkdownContent';
+import type { ApprovalStatus, CommandSuggestion, Message } from './types';
+import type { PlanInfo } from '@/hooks/useSessions';
+import ToolOutputBlock from './ToolOutputBlock';
 
 /** 空态示例 prompt：点击填充输入框（暗示半自动模型：可提议命令需审批）。 */
 const SUGGESTIONS = [
-  "检查磁盘使用情况并给出清理建议",
-  "查看系统负载和内存占用",
-  "查看最近 10 条系统错误日志",
-  "列出 Docker 容器运行状态",
+  '检查磁盘使用情况并给出清理建议',
+  '查看系统负载和内存占用',
+  '查看最近 10 条系统错误日志',
+  '列出 Docker 容器运行状态',
 ];
 
 interface MessageListProps {
@@ -58,16 +54,16 @@ function parseToolCallPlan(
     }>;
     if (calls.length === 0) return null;
     const first = calls[0];
-    if (first.name !== "create_plan") return null;
+    if (first.name !== 'create_plan') return null;
     const args = JSON.parse(first.arguments) as {
       goal?: string;
       steps?: string[];
     };
     if (!args.goal || !Array.isArray(args.steps)) return null;
     // 有相邻且同 ID 的 tool 消息 = 该计划已被处理过；审批状态直接读落库字段。
-    let status: ApprovalStatus = "pending";
-    if (nextMsg?.role === "tool" && nextMsg.toolCallId === first.id) {
-      status = nextMsg.approvalStatus === "rejected" ? "rejected" : "approved";
+    let status: ApprovalStatus = 'pending';
+    if (nextMsg?.role === 'tool' && nextMsg.toolCallId === first.id) {
+      status = nextMsg.approvalStatus === 'rejected' ? 'rejected' : 'approved';
     }
     return { goal: args.goal, steps: args.steps, status };
   } catch {
@@ -93,15 +89,15 @@ function parseToolCallCommand(
     };
     if (!args.command) return null;
     // 有相邻且同 ID 的 tool 消息 = 该命令已被处理过；审批状态直接读落库字段。
-    let status: ApprovalStatus = "pending";
-    if (nextMsg?.role === "tool" && nextMsg.toolCallId === calls[0].id) {
-      status = nextMsg.approvalStatus === "rejected" ? "rejected" : "approved";
+    let status: ApprovalStatus = 'pending';
+    if (nextMsg?.role === 'tool' && nextMsg.toolCallId === calls[0].id) {
+      status = nextMsg.approvalStatus === 'rejected' ? 'rejected' : 'approved';
     }
     return {
       command: args.command,
-      why: args.why ?? "",
-      risk: "",
-      assessedRisk: "",
+      why: args.why ?? '',
+      risk: '',
+      assessedRisk: '',
       status,
     };
   } catch {
@@ -154,16 +150,16 @@ export default function MessageList({
   }, [messages, streamingText, pendingCommand, runningCommand]);
 
   const renderMessage = (msg: Message, index: number): React.JSX.Element => {
-    if (msg.role === "user") {
+    if (msg.role === 'user') {
       return (
         <div
           key={msg.id}
           style={{
-            display: "flex",
-            justifyContent: "flex-end",
+            display: 'flex',
+            justifyContent: 'flex-end',
             marginBottom: 6,
             gap: 4,
-            alignItems: "center",
+            alignItems: 'center',
           }}
         >
           <Button
@@ -175,15 +171,15 @@ export default function MessageList({
           />
           <div
             style={{
-              maxWidth: "85%",
-              padding: "5px 10px",
+              maxWidth: '85%',
+              padding: '5px 10px',
               borderRadius: 8,
               fontSize: 12,
               lineHeight: 1.5,
-              background: "var(--antd-color-primary)",
-              color: "#fff",
-              whiteSpace: "pre-wrap",
-              wordBreak: "break-all",
+              background: 'var(--antd-color-primary)',
+              color: '#fff',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-all',
             }}
           >
             {msg.content}
@@ -192,7 +188,7 @@ export default function MessageList({
       );
     }
 
-    if (msg.role === "assistant") {
+    if (msg.role === 'assistant') {
       const suggested = parseToolCallCommand(msg, messages[index + 1]);
       if (suggested) {
         // 历史命令提议（回放模式，无操作按钮，显示审批状态）
@@ -221,19 +217,19 @@ export default function MessageList({
         <div
           key={msg.id}
           style={{
-            display: "flex",
-            justifyContent: "flex-start",
+            display: 'flex',
+            justifyContent: 'flex-start',
             marginBottom: 6,
             gap: 4,
-            alignItems: "flex-start",
+            alignItems: 'flex-start',
           }}
         >
           <div
             style={{
-              maxWidth: "85%",
-              padding: "5px 10px",
+              maxWidth: '85%',
+              padding: '5px 10px',
               borderRadius: 8,
-              background: "var(--antd-color-fill-secondary)",
+              background: 'var(--antd-color-fill-secondary)',
             }}
           >
             {/* 已完成的智能体消息：Markdown 渲染（表格/代码块/列表） */}
@@ -261,16 +257,19 @@ export default function MessageList({
   };
 
   return (
-    <div ref={msgRef} style={{ flex: 1, overflow: "auto", padding: "8px 12px" }}>
+    <div
+      ref={msgRef}
+      style={{ flex: 1, overflow: 'auto', padding: '8px 12px' }}
+    >
       {!configured && !cfgLoading ? (
         // 未配置 AI：引导去配置页
         <div
           style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            height: "100%",
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
             gap: 12,
             padding: 24,
           }}
@@ -278,39 +277,43 @@ export default function MessageList({
           <div
             style={{
               fontSize: 12,
-              color: "var(--antd-color-text-secondary)",
-              textAlign: "center",
+              color: 'var(--antd-color-text-secondary)',
+              textAlign: 'center',
             }}
           >
-            尚未配置 LLM 模型。请在「LLM模型配置」页设置
-            LLM 模型供应商、Base URL、API Key 与模型。
+            尚未配置 LLM 模型。请在「LLM模型配置」页设置 LLM 模型供应商、Base
+            URL、API Key 与模型。
           </div>
           <Button
             type="primary"
             size="small"
             icon={<SettingOutlined />}
-            onClick={() => navigate("/config")}
+            onClick={() => navigate('/config')}
           >
             前往配置
           </Button>
         </div>
       ) : cfgLoading ? (
-        <div style={{ display: "flex", justifyContent: "center", padding: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 24 }}>
           <Spin size="small" />
         </div>
-      ) : messages.length === 0 && !streamingText && !pendingCommand && !pendingPlan && !runningCommand ? (
+      ) : messages.length === 0 &&
+        !streamingText &&
+        !pendingCommand &&
+        !pendingPlan &&
+        !runningCommand ? (
         <div
           style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
             gap: 8,
             padding: 16,
           }}
         >
           <div
             style={{
-              color: "var(--antd-color-text-secondary)",
+              color: 'var(--antd-color-text-secondary)',
               fontSize: 12,
             }}
           >
@@ -318,11 +321,11 @@ export default function MessageList({
           </div>
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
               gap: 6,
               maxWidth: 360,
-              width: "100%",
+              width: '100%',
             }}
           >
             {SUGGESTIONS.map((s) => (
@@ -331,14 +334,14 @@ export default function MessageList({
                 onClick={() => onSelectSuggestion(s)}
                 title="点击填入输入框"
                 style={{
-                  border: "1px solid var(--antd-color-border-secondary)",
+                  border: '1px solid var(--antd-color-border-secondary)',
                   borderRadius: 6,
-                  padding: "6px 8px",
+                  padding: '6px 8px',
                   fontSize: 11,
                   lineHeight: 1.5,
-                  color: "var(--antd-color-text)",
-                  cursor: "pointer",
-                  background: "var(--antd-color-bg-elevated)",
+                  color: 'var(--antd-color-text)',
+                  cursor: 'pointer',
+                  background: 'var(--antd-color-bg-elevated)',
                 }}
               >
                 {s}
@@ -354,22 +357,22 @@ export default function MessageList({
           {streamingText && (
             <div
               style={{
-                display: "flex",
-                justifyContent: "flex-start",
+                display: 'flex',
+                justifyContent: 'flex-start',
                 marginBottom: 6,
               }}
             >
               <div
                 style={{
-                  maxWidth: "85%",
-                  padding: "5px 10px",
+                  maxWidth: '85%',
+                  padding: '5px 10px',
                   borderRadius: 8,
                   fontSize: 12,
                   lineHeight: 1.5,
-                  background: "var(--antd-color-fill-secondary)",
-                  color: "var(--antd-color-text)",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-all",
+                  background: 'var(--antd-color-fill-secondary)',
+                  color: 'var(--antd-color-text)',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all',
                 }}
               >
                 {streamingText}
@@ -382,8 +385,8 @@ export default function MessageList({
           {pendingCommand && (
             <CommandCard
               command={pendingCommand}
-              busy={commandStatus === "approved"}
-              status={commandStatus ?? "pending"}
+              busy={commandStatus === 'approved'}
+              status={commandStatus ?? 'pending'}
               onApprove={(cmd) => void onApprove(cmd)}
               onReject={() => void onReject()}
               onRunInTerminal={onRunInTerminal}
@@ -395,8 +398,8 @@ export default function MessageList({
           {pendingPlan && (
             <PlanCard
               plan={pendingPlan}
-              busy={planStatus === "approved"}
-              status={planStatus ?? "pending"}
+              busy={planStatus === 'approved'}
+              status={planStatus ?? 'pending'}
               onApprove={() => void onApprovePlan()}
               onReject={() => void onRejectPlan()}
             />
@@ -408,10 +411,10 @@ export default function MessageList({
               style={{
                 fontSize: 12,
                 color:
-                  lastError === "本次执行已取消"
-                    ? "var(--antd-color-text-secondary)"
-                    : "var(--antd-color-error)",
-                padding: "4px 8px",
+                  lastError === '本次执行已取消'
+                    ? 'var(--antd-color-text-secondary)'
+                    : 'var(--antd-color-error)',
+                padding: '4px 8px',
               }}
             >
               {lastError}
@@ -419,7 +422,7 @@ export default function MessageList({
           )}
 
           {busy && !streamingText && (
-            <div style={{ display: "flex", justifyContent: "flex-start" }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
               <Spin size="small" />
             </div>
           )}
@@ -429,8 +432,8 @@ export default function MessageList({
             <>
               <div
                 style={{
-                  display: "flex",
-                  alignItems: "center",
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: 6,
                   marginTop: 6,
                 }}
@@ -439,23 +442,27 @@ export default function MessageList({
                 <span
                   title={runningCommand}
                   style={{
-                    fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
+                    fontFamily:
+                      '"Cascadia Code", "Fira Code", "Consolas", monospace',
                     fontSize: 11,
-                    background: "rgba(0,0,0,0.25)",
-                    border: "1px solid var(--antd-color-border-secondary)",
+                    background: 'rgba(0,0,0,0.25)',
+                    border: '1px solid var(--antd-color-border-secondary)',
                     borderRadius: 4,
-                    padding: "2px 8px",
-                    color: "var(--antd-color-text-secondary)",
-                    maxWidth: "75%",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
+                    padding: '2px 8px',
+                    color: 'var(--antd-color-text-secondary)',
+                    maxWidth: '75%',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   $ {runningCommand}
                 </span>
                 <span
-                  style={{ fontSize: 11, color: "var(--antd-color-text-secondary)" }}
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--antd-color-text-secondary)',
+                  }}
                 >
                   {runElapsed}s
                 </span>
@@ -468,16 +475,16 @@ export default function MessageList({
                     fontFamily:
                       '"Cascadia Code", "Fira Code", "Consolas", monospace',
                     fontSize: 11,
-                    background: "rgba(0,0,0,0.25)",
-                    border: "1px solid var(--antd-color-border-secondary)",
+                    background: 'rgba(0,0,0,0.25)',
+                    border: '1px solid var(--antd-color-border-secondary)',
                     borderRadius: 4,
-                    padding: "4px 8px",
+                    padding: '4px 8px',
                     marginTop: 4,
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-all",
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
                     maxHeight: 160,
-                    overflow: "auto",
-                    color: "var(--antd-color-text)",
+                    overflow: 'auto',
+                    color: 'var(--antd-color-text)',
                   }}
                 >
                   {runOutput}

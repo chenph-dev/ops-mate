@@ -1,5 +1,5 @@
-import { Tree, theme } from "antd";
-import type { DataNode } from "antd/es/tree";
+import { Tree, theme } from 'antd';
+import type { DataNode } from 'antd/es/tree';
 import {
   DesktopOutlined,
   FolderOutlined,
@@ -8,9 +8,9 @@ import {
   EditOutlined,
   DeleteOutlined,
   LinkOutlined,
-} from "@ant-design/icons";
-import { useState, useCallback, useMemo } from "react";
-import type { hoststore } from "@wailsjs/go/models";
+} from '@ant-design/icons';
+import { useState, useCallback, useMemo } from 'react';
+import type { hoststore } from '@wailsjs/go/models';
 
 type TreeNode = hoststore.TreeNode;
 
@@ -54,51 +54,51 @@ function ContextMenu({
 }: ContextMenuProps): React.JSX.Element {
   const { token } = theme.useToken();
   const items =
-    node.nodeType === "folder"
+    node.nodeType === 'folder'
       ? [
           {
-            key: "add-folder",
+            key: 'add-folder',
             icon: <PlusOutlined />,
-            label: "新建子目录",
+            label: '新建子目录',
             onClick: onAddFolder,
           },
           {
-            key: "add-host",
+            key: 'add-host',
             icon: <PlusOutlined />,
-            label: "新建主机",
+            label: '新建主机',
             onClick: onAddHost,
           },
           {
-            key: "delete",
+            key: 'delete',
             icon: <DeleteOutlined />,
-            label: "删除",
+            label: '删除',
             danger: true,
             onClick: onDelete,
           },
         ]
       : [
           {
-            key: "connect",
+            key: 'connect',
             icon: <LinkOutlined />,
-            label: "连接",
+            label: '连接',
             onClick: onTest,
           },
           {
-            key: "sftp",
+            key: 'sftp',
             icon: <FolderOpenOutlined />,
-            label: "SFTP 文件",
+            label: 'SFTP 文件',
             onClick: onSftp,
           },
           {
-            key: "edit",
+            key: 'edit',
             icon: <EditOutlined />,
-            label: "编辑",
+            label: '编辑',
             onClick: onEdit,
           },
           {
-            key: "delete",
+            key: 'delete',
             icon: <DeleteOutlined />,
-            label: "删除",
+            label: '删除',
             danger: true,
             onClick: onDelete,
           },
@@ -107,14 +107,14 @@ function ContextMenu({
   return (
     <div
       style={{
-        position: "fixed",
+        position: 'fixed',
         left: x,
         top: y,
         zIndex: 9999,
         background: token.colorBgElevated,
         borderRadius: token.borderRadiusLG,
         boxShadow: token.boxShadowSecondary,
-        padding: "4px 0",
+        padding: '4px 0',
         minWidth: 140,
       }}
       onClick={onClose}
@@ -123,8 +123,8 @@ function ContextMenu({
         <div
           key={item.key}
           style={{
-            padding: "6px 16px",
-            cursor: "pointer",
+            padding: '6px 16px',
+            cursor: 'pointer',
             fontSize: 13,
             color: item.danger ? token.colorError : token.colorText,
           }}
@@ -167,9 +167,9 @@ export default function HostList({
       nodes.map((n) => ({
         key: n.id,
         title: n.name,
-        isLeaf: n.nodeType === "host",
+        isLeaf: n.nodeType === 'host',
         icon:
-          n.nodeType === "folder" ? <FolderOutlined /> : <DesktopOutlined />,
+          n.nodeType === 'folder' ? <FolderOutlined /> : <DesktopOutlined />,
         children:
           n.children && n.children.length > 0 ? convert(n.children) : undefined,
         data: n,
@@ -189,7 +189,7 @@ export default function HostList({
 
   const handleSelect = useCallback(
     (_keys: React.Key[], info: { node: TreeNodeData }) => {
-      if (info.node.data?.nodeType === "host") {
+      if (info.node.data?.nodeType === 'host') {
         onSelect(info.node.data);
       }
     },
@@ -198,7 +198,7 @@ export default function HostList({
 
   const handleDoubleClick = useCallback(
     (_event: React.MouseEvent, node: TreeNodeData) => {
-      if (node.data?.nodeType === "host") {
+      if (node.data?.nodeType === 'host') {
         onDoubleClick(node.data);
       }
     },
@@ -208,19 +208,19 @@ export default function HostList({
   return (
     <div
       style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
         borderRight: `1px solid ${token.colorBorderSecondary}`,
       }}
     >
       {/* 标题栏 */}
       <div
         style={{
-          padding: "8px 8px 4px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
+          padding: '8px 8px 4px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           borderBottom: `1px solid ${token.colorBorderSecondary}`,
         }}
       >
@@ -233,15 +233,15 @@ export default function HostList({
         >
           主机
         </span>
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: 'flex', gap: 4 }}>
           <span
             style={{
-              cursor: "pointer",
+              cursor: 'pointer',
               fontSize: 14,
               color: token.colorTextSecondary,
             }}
             title="新建目录"
-            onClick={() => onAddFolder("")}
+            onClick={() => onAddFolder('')}
           >
             <PlusOutlined />
           </span>
@@ -249,12 +249,12 @@ export default function HostList({
       </div>
 
       {/* 树形列表 */}
-      <div style={{ flex: 1, overflow: "auto", padding: "4px" }}>
+      <div style={{ flex: 1, overflow: 'auto', padding: '4px' }}>
         {treeNodes.length === 0 ? (
           <div
             style={{
               padding: 16,
-              textAlign: "center",
+              textAlign: 'center',
               color: token.colorTextSecondary,
               fontSize: 12,
             }}
@@ -270,7 +270,7 @@ export default function HostList({
             onSelect={handleSelect}
             onDoubleClick={handleDoubleClick}
             onRightClick={handleRightClick}
-            style={{ background: "transparent" }}
+            style={{ background: 'transparent' }}
           />
         )}
       </div>

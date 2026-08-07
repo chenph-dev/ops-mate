@@ -139,7 +139,10 @@ export function useTerminal(hostID: string | null): {
 
       // 没有 hostID 或已达最大重试次数时停止重连
       const currentHostID = hostIDRef.current;
-      if (!currentHostID || reconnectCountRef.current >= MAX_RECONNECT_RETRIES) {
+      if (
+        !currentHostID ||
+        reconnectCountRef.current >= MAX_RECONNECT_RETRIES
+      ) {
         setReconnecting(false);
         return;
       }
