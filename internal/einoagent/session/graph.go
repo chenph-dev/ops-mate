@@ -1,0 +1,142 @@
+package session
+
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	einotool "github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/compose"
+	"github.com/cloudwego/eino/schema"
+
+	"ops-mate/internal/einoagent/graph"
+	"ops-mate/internal/einoagent/history"
+	agentmodel "ops-mate/internal/einoagent/model"
+	agenttools "ops-mate/internal/einoagent/tools"
+	convstore "ops-mate/internal/store/conversations"
+)
+
+// run 执行 Graph（首次或 Resume），处理中断/错误/完成。
+func (m *SessionManager) run(s *agentSession, ctx context.Context, input []*schema.Message, resume bool, resumeData string) {
+	invokeCtx := ctx
+	if resume {
+		s.mu.Lock()
+		id := s.interruptID
+		s.mu.Unlock()
+		invokeCtx = compose.ResumeWithData(ctx, id, resumeData)
+	}
+
+	// 每次 Invoke 挂载观测日志（模型/工具调用完成打日志，含 token 用量）
+	_, err := s.graph.Invoke(invokeCtx, input,
+		compose.WithCheckPointID(s.id),
+		compose.WithCallbacks(m.logHandler))
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err != nil {
+		if info, ok := compose.ExtractInterruptInfo(err); ok && len(info.InterruptContexts) > 0 {
+			s.interruptID = info.InterruptContexts[0].ID
+			// 区分审批类型：create_plan 中断的是计划审批，否则是命令审批
+			s.approvalType = "command"
+			if _, isPlan := info.InterruptContexts[0].Info.(agenttools.PlanInfo); isPlan {
+				s.approvalType = "plan"
+			}
+			s.state = stAwaitingApproval
+			m.emitState(s.id, StateAwaitingApproval)
+			return
+		}
+		s.state = stIdle
+		s.interruptID = ""
+		// 非中断错误也清理 checkpoint：若残留，下一轮 Invoke 会从上一轮
+		// 中断/失败点恢复，导致 state 消息翻倍错乱。
+		_ = s.checkpoints.Delete(ctx, s.id)
+		// 整轮对话结束：清空 tool call 队列，防止取消/中断遗留混入下一轮导致配对错位。
+		// （AwaitingApproval 分支不清——当前待审批 tool_call 仍需 Take。）
+		s.toolCalls.Reset()
+		if errors.Is(err, context.Canceled) {
+			m.emitError(s.id, "本次执行已取消")
+		} else {
+			m.emitError(s.id, "AI 对话失败："+err.Error())
+		}
+		m.emitState(s.id, StateIdle)
+		return
+	}
+	s.state = stIdle
+	s.interruptID = ""
+	_ = s.checkpoints.Delete(ctx, s.id)
+	s.toolCalls.Reset()
+	m.emitState(s.id, StateIdle)
+}
+
+// ensureGraph 懒构建/按配置版本重建 Graph。
+func (m *SessionManager) ensureGraph(s *agentSession) error {
+	m.mu.Lock()
+	version := m.configVersion
+	m.mu.Unlock()
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.graph != nil && s.builtAt == version {
+		return nil
+	}
+
+	ctx := context.Background()
+	cfg, err := m.cfg.GetAIConfig()
+	if err != nil {
+		return fmt.Errorf("读取 AI 配置失败: %w", err)
+	}
+	if cfg.Provider == "" {
+		return fmt.Errorf("尚未配置 AI 后端，请先到「AI 配置」页设置")
+	}
+	base, err := m.modelFactory(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("构建模型失败: %w", err)
+	}
+
+	sshTool := agenttools.NewSSHTool(s.id, s.holder, m.emit, m.convs, s.toolCalls)
+	planTool := agenttools.NewPlanTool(s.id, m.emit, m.convs, s.toolCalls)
+	toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
+		Tools: []einotool.BaseTool{sshTool, planTool}, ExecuteSequentially: true,
+	})
+	if err != nil {
+		return fmt.Errorf("构建工具节点失败: %w", err)
+	}
+
+	wrapped := agentmodel.NewStreamingChatModel(base, s.id, m.emit, m.onAssistant(s))
+	// 两个工具都暴露给模型：execute_command（单条命令）+ create_plan（计划模式）。
+	// 遗漏任一个，模型便不知道其存在、永远不会生成对应 tool_call。
+	info, err := sshTool.Info(ctx)
+	if err != nil {
+		return fmt.Errorf("tool info: %w", err)
+	}
+	planInfo, err := planTool.Info(ctx)
+	if err != nil {
+		return fmt.Errorf("plan tool info: %w", err)
+	}
+	withTools, err := wrapped.WithTools([]*schema.ToolInfo{info, planInfo})
+	if err != nil {
+		return fmt.Errorf("绑定工具失败: %w", err)
+	}
+
+	graph, err := graph.BuildAgentGraph(ctx, withTools, toolsNode, s.checkpoints)
+	if err != nil {
+		return fmt.Errorf("构建 Graph 失败: %w", err)
+	}
+	s.graph = graph
+	s.builtAt = version
+	return nil
+}
+
+// onAssistant 返回 assistant 消息落库回调（含 tool_calls 配对记录）。
+func (m *SessionManager) onAssistant(s *agentSession) func(msg *schema.Message) {
+	return func(msg *schema.Message) {
+		_ = m.convs.SaveMessage(convstore.Message{
+			SessionID: s.id, Role: history.RoleAssistant,
+			Content:   msg.Content,
+			ToolCalls: history.ToolCallsToJSON(msg.ToolCalls),
+		})
+		for i := range msg.ToolCalls {
+			s.toolCalls.Add(&msg.ToolCalls[i])
+		}
+	}
+}

@@ -100,9 +100,10 @@ func (h *HostsHandler) ExecuteCommand(hostID, command string) (string, error) {
 	}
 	var output string
 	for line := range ch {
-		if line.Stream == "stdout" {
+		switch line.Stream {
+		case "stdout":
 			output += line.Text + "\n"
-		} else if line.Stream == "stderr" {
+		case "stderr":
 			output += line.Text + "\n"
 		}
 	}
