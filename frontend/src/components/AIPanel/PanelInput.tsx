@@ -1,30 +1,14 @@
 import { Button, Dropdown, Input } from 'antd';
 import { SendOutlined } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
 import type { Ref } from 'react';
 import type { InputRef } from 'antd';
 
-/** 斜杠快捷命令菜单：新增命令只需在此追加。 */
+/** 斜杠快捷命令菜单：新增命令只需在此追加。desc 为 ai 命名空间下的 i18n key。 */
 const SLASH_COMMANDS: { name: string; desc: string }[] = [
-  { name: '/clear', desc: '清空当前会话' },
-  { name: '/new', desc: '新建会话' },
+  { name: '/clear', desc: 'slash.clearDesc' },
+  { name: '/new', desc: 'slash.newDesc' },
 ];
-
-/** 斜杠命令菜单项样式。 */
-const slashMenuItems = SLASH_COMMANDS.map((cmd) => ({
-  key: cmd.name,
-  label: (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span
-        style={{ fontFamily: 'monospace', color: 'var(--antd-color-primary)' }}
-      >
-        {cmd.name}
-      </span>
-      <span style={{ color: 'var(--antd-color-text-secondary)', fontSize: 12 }}>
-        {cmd.desc}
-      </span>
-    </div>
-  ),
-}));
 
 interface PanelInputProps {
   /** 输入框 ref（示例引导填充后聚焦用）。 */
@@ -56,8 +40,31 @@ export default function PanelInput({
   onKeyDown,
   onSlashCommand,
 }: PanelInputProps): React.JSX.Element {
+  const { t } = useTranslation('ai');
   // 输入以 / 开头时弹出斜杠快捷命令菜单
   const showCmdMenu = input.startsWith('/');
+
+  // 斜杠命令菜单项样式（组件内构建以随语言刷新）
+  const slashMenuItems = SLASH_COMMANDS.map((cmd) => ({
+    key: cmd.name,
+    label: (
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <span
+          style={{
+            fontFamily: 'monospace',
+            color: 'var(--antd-color-primary)',
+          }}
+        >
+          {cmd.name}
+        </span>
+        <span
+          style={{ color: 'var(--antd-color-text-secondary)', fontSize: 12 }}
+        >
+          {t(cmd.desc)}
+        </span>
+      </div>
+    ),
+  }));
 
   return (
     <div
@@ -84,10 +91,10 @@ export default function PanelInput({
           onKeyDown={onKeyDown}
           placeholder={
             !configured
-              ? '请先配置 AI 后端'
+              ? t('input.placeholderConfig')
               : inputDisabled
-                ? '等待本轮对话结束...'
-                : '输入问题...'
+                ? t('input.placeholderWait')
+                : t('input.placeholder')
           }
           disabled={inputDisabled}
           style={{ fontSize: 12 }}

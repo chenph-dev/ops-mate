@@ -13,6 +13,7 @@ import {
   ListTasks,
 } from '@wailsjs/go/handler/SftpHandler';
 import { EventsOn } from '@wailsjs/runtime/runtime';
+import i18n from '@/i18n';
 import type { sftp } from '@wailsjs/go/models';
 
 type SftpTask = sftp.TaskInfo;
@@ -56,7 +57,7 @@ export function useSftp(hostId: string | null): {
         setPath(dir);
         setError(null);
       } catch (e) {
-        setError(typeof e === 'string' ? e : '列目录失败');
+        setError(typeof e === 'string' ? e : i18n.t('sftp:listFailed'));
       } finally {
         setLoading(false);
       }
@@ -77,7 +78,7 @@ export function useSftp(hostId: string | null): {
         setError(null);
       } catch (e) {
         if (!alive) return;
-        setError(typeof e === 'string' ? e : '列目录失败');
+        setError(typeof e === 'string' ? e : i18n.t('sftp:listFailed'));
       }
     })();
     return () => {

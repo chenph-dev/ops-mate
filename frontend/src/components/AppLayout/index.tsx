@@ -8,6 +8,8 @@ import {
   SunOutlined,
   MoonOutlined,
 } from '@ant-design/icons';
+import { useTranslation } from 'react-i18next';
+import { changeLanguage } from '@/i18n';
 import { useThemeToggle } from '@/context/ThemeContext';
 import {
   WindowMinimise,
@@ -30,6 +32,8 @@ export default function AppLayout(): React.JSX.Element {
   const { token } = theme.useToken();
   const [isMaximised, setIsMaximised] = useState(false);
   const { isDark, toggleTheme } = useThemeToggle();
+  const { t, i18n } = useTranslation('common');
+  const { t: tMenu } = useTranslation('menu');
   // WebView2 中 CSS 单位（vh / 百分比）和 window.innerHeight 在窗口还原时不更新，
   // 必须通过 Wails 原生 API WindowGetSize 读取真实窗口高度
   const [winHeight, setWinHeight] = useState(() => window.innerHeight);
@@ -108,28 +112,42 @@ export default function AppLayout(): React.JSX.Element {
           </span>
         </div>
 
-        {/* 右侧：主题切换 + 窗口控制 */}
+        {/* 右侧：语言切换 + 主题切换 + 窗口控制 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <WindowButton
+            // 显示当前语言代码：中文界面「中」、英文界面「EN」，一眼可辨
+            icon={
+              <span style={{ fontSize: 11, fontWeight: 600 }}>
+                {i18n.language.startsWith('en') ? 'EN' : '中'}
+              </span>
+            }
+            onClick={() =>
+              changeLanguage(
+                i18n.language.startsWith('en') ? 'zh-CN' : 'en-US',
+              )
+            }
+            title={i18n.language.startsWith('en') ? '简体中文' : 'English'}
+          />
           <WindowButton
             icon={isDark ? <SunOutlined /> : <MoonOutlined />}
             onClick={toggleTheme}
-            title={isDark ? '切换浅色' : '切换深色'}
+            title={isDark ? t('window.toggleLight') : t('window.toggleDark')}
           />
           <WindowButton
             icon={<MinusOutlined />}
             onClick={() => WindowMinimise()}
-            title="最小化"
+            title={t('window.minimize')}
           />
           <WindowButton
             icon={isMaximised ? <SwitcherOutlined /> : <BorderOutlined />}
             onClick={handleToggleMaximize}
-            title={isMaximised ? '还原' : '最大化'}
+            title={isMaximised ? t('window.restore') : t('window.maximize')}
           />
           <WindowButton
             icon={<CloseOutlined />}
             onClick={() => Quit()}
             isDanger
-            title="关闭"
+            title={t('window.close')}
           />
         </div>
       </Header>
@@ -176,13 +194,13 @@ export default function AppLayout(): React.JSX.Element {
                               : 400,
                           }}
                         >
-                          {c.label}
+                          {tMenu(c.label)}
                         </Button>
                       ))}
                     </div>
                   }
                 >
-                  <Tooltip placement="right" title={r.label}>
+                  <Tooltip placement="right" title={tMenu(r.label)}>
                     <Button
                       type="text"
                       size="small"
@@ -203,7 +221,7 @@ export default function AppLayout(): React.JSX.Element {
                   </Tooltip>
                 </Popover>
               ) : (
-                <Tooltip key={r.path} placement="right" title={r.label}>
+                <Tooltip key={r.path} placement="right" title={tMenu(r.label)}>
                   <Button
                     type="text"
                     size="small"

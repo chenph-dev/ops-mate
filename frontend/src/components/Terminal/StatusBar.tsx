@@ -1,4 +1,5 @@
 import { theme } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 interface StatusBarProps {
   statusText: string;
@@ -15,6 +16,7 @@ export default function StatusBar({
   hostAddr,
 }: StatusBarProps): React.JSX.Element {
   const { token } = theme.useToken();
+  const { t } = useTranslation('terminal');
   return (
     <div
       style={{
@@ -33,8 +35,8 @@ export default function StatusBar({
       <span>
         {dims.cols}×{dims.rows}
       </span>
-      <span>字号 {fontSize}</span>
-      <span style={{ marginLeft: 'auto' }}>{hostAddr || '未连接'}</span>
+      <span>{t('statusbar.fontSize', { size: fontSize })}</span>
+      <span style={{ marginLeft: 'auto' }}>{hostAddr || t('status.disconnected')}</span>
     </div>
   );
 }

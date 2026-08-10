@@ -1,11 +1,13 @@
 import { Button, Tag, theme } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { ExperimentOutlined } from '@ant-design/icons';
 import type { PlanInfo } from '@/hooks/useSessions';
 
+// text 存 i18n key（ai 命名空间），渲染处用 t(text) 取当前语言文案
 const STATUS_META: Record<string, { text: string; color: string }> = {
-  pending: { text: '待审批', color: 'processing' },
-  approved: { text: '已批准', color: 'success' },
-  rejected: { text: '已拒绝', color: 'error' },
+  pending: { text: 'plan.statusPending', color: 'processing' },
+  approved: { text: 'plan.statusApproved', color: 'success' },
+  rejected: { text: 'plan.statusRejected', color: 'error' },
 };
 
 interface PlanCardProps {
@@ -30,6 +32,7 @@ export default function PlanCard({
   onReject,
 }: PlanCardProps): React.JSX.Element {
   const { token } = theme.useToken();
+  const { t } = useTranslation('ai');
   const meta = STATUS_META[status ?? ''] ?? STATUS_META.pending;
   const done = status === 'approved' || status === 'rejected';
 
@@ -54,12 +57,12 @@ export default function PlanCard({
         <ExperimentOutlined
           style={{ color: token.colorPrimary, fontSize: 12 }}
         />
-        <span style={{ fontWeight: 600, fontSize: 12 }}>执行计划</span>
+        <span style={{ fontWeight: 600, fontSize: 12 }}>{t('plan.title')}</span>
         <Tag
           color={meta.color}
           style={{ margin: 0, fontSize: 11, lineHeight: '16px' }}
         >
-          {meta.text}
+          {t(meta.text)}
         </Tag>
       </div>
 
@@ -70,7 +73,7 @@ export default function PlanCard({
           marginBottom: 4,
         }}
       >
-        目标: {plan.goal}
+        {t('plan.goal', { goal: plan.goal })}
       </div>
 
       <ol
@@ -97,7 +100,7 @@ export default function PlanCard({
           }}
         >
           <Button size="small" onClick={() => onReject?.()} disabled={busy}>
-            拒绝
+            {t('plan.reject')}
           </Button>
           <Button
             type="primary"
@@ -105,7 +108,7 @@ export default function PlanCard({
             loading={busy}
             onClick={() => onApprove?.()}
           >
-            批准执行
+            {t('plan.approve')}
           </Button>
         </div>
       )}

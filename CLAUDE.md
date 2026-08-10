@@ -64,6 +64,17 @@ pnpm build            # tsc type-check + vite production build
 2. Run `wails dev` to regenerate `frontend/wailsjs/go/main/App.js` and `App.d.ts`.
 3. Import and call from React: `import { MyMethod } from '../wailsjs/go/main/App'` → `const result = await MyMethod('input')`.
 
+## Internationalization (i18n)
+
+- 前端使用 `react-i18next`，**默认简体中文**（`zh-CN`），Header 右上角可切换到 `en-US`，选择持久化到 `localStorage`（key: `ops-mate-lang`）。
+- 语言资源在 `frontend/src/locales/{zh-CN,en-US}/`，按功能模块分命名空间（`common`/`menu`/`hosts`/`terminal`/`sftp`/`ai`/`config`/`audit`/`about`），**两个语言文件的结构必须保持一致**。
+- i18n 实例在 `frontend/src/i18n/index.ts`（`defaultNS: 'common'`）。
+- 新增 UI 文案：不要硬编码中文，组件内用 `useTranslation('<ns>')` 后 `t('key')`，hooks 内用 `i18n.t('ns:key')`，并同步补充两个语言资源。
+- **key 不要带命名空间前缀**：`useTranslation('menu')` 已绑定 ns，`t('hosts')` 即可；写成 `t('menu.hosts')` 会因在 menu 下找不到 `menu.hosts` 而原样返回 key 字符串（`menuConfig` 的 `label` 只存相对 key 如 `'hosts'`）。
+- 插值用 `{{var}}`，如 `t('hosts.tabs.maxWarning', { count: MAX_TABS })`。
+- antd 内置组件文案跟随当前语言（`App.tsx` 中 `ConfigProvider locale` 动态切换）。
+- 后端经 Wails 透传的错误文本一期不做翻译，原样展示；`data/commands.json` 是命令补全数据，不翻译。
+
 ## Conventions
 
 - Package manager is **pnpm** (lockfile and workspace config present). Use `pnpm install`, not `npm install`.

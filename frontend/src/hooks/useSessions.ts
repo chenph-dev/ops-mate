@@ -15,6 +15,7 @@ import {
   RenameConversation,
 } from '@wailsjs/go/handler/SessionsHandler';
 import { EventsOn } from '@wailsjs/runtime/runtime';
+import i18n from '@/i18n';
 import type { convstore } from '@wailsjs/go/models';
 
 type Message = convstore.Message;
@@ -212,7 +213,12 @@ export function useSessions(hostId: string | null): {
   /** 新建对话：创建新 conversation 并切换（旧的留库）。 */
   const newConversation = useCallback(async (): Promise<void> => {
     if (!hostId) return;
-    const sid = await NewSession(hostId, `对话 ${new Date().toLocaleString()}`);
+    const sid = await NewSession(
+      hostId,
+      i18n.t('ai:newConversationTitle', {
+        time: new Date().toLocaleString(),
+      }),
+    );
     setActiveSession(sid);
     setMessages([]);
     setStreamingText('');
@@ -253,7 +259,7 @@ export function useSessions(hostId: string | null): {
       setRunningCommand(null);
       setRunStartAt(null);
     } catch (e) {
-      setLastError(typeof e === 'string' ? e : '清空会话失败');
+      setLastError(typeof e === 'string' ? e : i18n.t('ai:clearFailed'));
     }
   }, [activeSession]);
 
@@ -287,7 +293,7 @@ export function useSessions(hostId: string | null): {
       } catch (e) {
         // 发送失败：移除乐观消息，避免残留一条后端未落库的本地消息
         setMessages((prev) => prev.filter((m) => m.id !== localId));
-        setLastError(typeof e === 'string' ? e : '发送失败，请查看后端日志');
+        setLastError(typeof e === 'string' ? e : i18n.t('ai:sendFailed'));
       }
     },
     [activeSession],
@@ -419,7 +425,7 @@ export function useSessions(hostId: string | null): {
     const offError = EventsOn('ai:error', (raw: AgentEvent) => {
       if (!isMine(raw)) return;
       const d = raw.data as { message?: string };
-      setLastError(d?.message ?? '未知错误');
+      setLastError(d?.message ?? i18n.t('ai:unknownError'));
       setStreamingText('');
     });
 

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Button, Spin } from 'antd';
 import { CopyOutlined, SettingOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ClipboardSetText } from '@wailsjs/runtime/runtime';
 import CommandCard from '@/components/CommandCard';
 import PlanCard from '@/components/PlanCard';
@@ -10,12 +11,12 @@ import type { ApprovalStatus, CommandSuggestion, Message } from './types';
 import type { PlanInfo } from '@/hooks/useSessions';
 import ToolOutputBlock from './ToolOutputBlock';
 
-/** 空态示例 prompt：点击填充输入框（暗示半自动模型：可提议命令需审批）。 */
+/** 空态示例 prompt：点击填充输入框（暗示半自动模型：可提议命令需审批）。值为 ai 命名空间下的 i18n key。 */
 const SUGGESTIONS = [
-  '检查磁盘使用情况并给出清理建议',
-  '查看系统负载和内存占用',
-  '查看最近 10 条系统错误日志',
-  '列出 Docker 容器运行状态',
+  'empty.suggestDisk',
+  'empty.suggestLoad',
+  'empty.suggestLogs',
+  'empty.suggestDocker',
 ];
 
 interface MessageListProps {
@@ -127,6 +128,7 @@ export default function MessageList({
   onRunInTerminal,
 }: MessageListProps): React.JSX.Element {
   const navigate = useNavigate();
+  const { t } = useTranslation('ai');
   const msgRef = useRef<HTMLDivElement>(null);
   const runOutputRef = useRef<HTMLDivElement>(null);
 
@@ -166,7 +168,7 @@ export default function MessageList({
             type="text"
             size="small"
             icon={<CopyOutlined />}
-            title="复制消息"
+            title={t('copyMsg')}
             onClick={() => copyText(msg.content)}
           />
           <div
@@ -239,7 +241,7 @@ export default function MessageList({
             type="text"
             size="small"
             icon={<CopyOutlined />}
-            title="复制消息"
+            title={t('copyMsg')}
             onClick={() => copyText(msg.content)}
           />
         </div>
@@ -281,8 +283,7 @@ export default function MessageList({
               textAlign: 'center',
             }}
           >
-            尚未配置 LLM 模型。请在「LLM模型配置」页设置 LLM 模型供应商、Base
-            URL、API Key 与模型。
+            {t('unconfigured.hint')}
           </div>
           <Button
             type="primary"
@@ -290,7 +291,7 @@ export default function MessageList({
             icon={<SettingOutlined />}
             onClick={() => navigate('/config')}
           >
-            前往配置
+            {t('unconfigured.go')}
           </Button>
         </div>
       ) : cfgLoading ? (
@@ -317,7 +318,7 @@ export default function MessageList({
               fontSize: 12,
             }}
           >
-            尝试让 AI 帮你操作这台主机，例如：
+            {t('empty.hint')}
           </div>
           <div
             style={{
@@ -331,8 +332,8 @@ export default function MessageList({
             {SUGGESTIONS.map((s) => (
               <div
                 key={s}
-                onClick={() => onSelectSuggestion(s)}
-                title="点击填入输入框"
+                onClick={() => onSelectSuggestion(t(s))}
+                title={t('empty.clickHint')}
                 style={{
                   border: '1px solid var(--antd-color-border-secondary)',
                   borderRadius: 6,
@@ -344,7 +345,7 @@ export default function MessageList({
                   background: 'var(--antd-color-bg-elevated)',
                 }}
               >
-                {s}
+                {t(s)}
               </div>
             ))}
           </div>

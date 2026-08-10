@@ -1,4 +1,5 @@
 import { Button, Tag, Tooltip } from 'antd';
+import { useTranslation } from 'react-i18next';
 import {
   RobotOutlined,
   CompressOutlined,
@@ -47,6 +48,7 @@ export default function PanelHeader({
   onNewConversation,
   onToggleCollapse,
 }: PanelHeaderProps): React.JSX.Element {
+  const { t } = useTranslation('ai');
   return (
     <div
       style={{
@@ -60,7 +62,7 @@ export default function PanelHeader({
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <RobotOutlined style={{ color: 'var(--antd-color-primary)' }} />
-        <span style={{ fontSize: 12, fontWeight: 600 }}>智能体</span>
+        <span style={{ fontSize: 12, fontWeight: 600 }}>{t('header.title')}</span>
         <span
           style={{ fontSize: 11, color: 'var(--antd-color-text-secondary)' }}
         >
@@ -76,16 +78,16 @@ export default function PanelHeader({
             · {aiCfg.model}
           </span>
         )}
-        {!sshConnected && <Tag color="warning">SSH 已断开</Tag>}
-        {!configured && !cfgLoading && <Tag color="error">未配置</Tag>}
-        {stateMeta && <Tag color={stateMeta.color}>{stateMeta.text}</Tag>}
+        {!sshConnected && <Tag color="warning">{t('header.sshDisconnected')}</Tag>}
+        {!configured && !cfgLoading && <Tag color="error">{t('header.notConfigured')}</Tag>}
+        {stateMeta && <Tag color={stateMeta.color}>{t(stateMeta.text)}</Tag>}
       </div>
       <div
         style={{ display: 'flex', gap: 4 }}
         onMouseDown={(e) => e.stopPropagation()}
       >
         {(sessionState === 'Running' || sessionState === 'Thinking') && (
-          <Tooltip title="取消本次（执行中/思考中均可中止）">
+          <Tooltip title={t('header.cancel')}>
             <Button
               type="text"
               size="small"
@@ -103,7 +105,7 @@ export default function PanelHeader({
           onRenameConversation={onRenameConversation}
           onRefreshConversations={onRefreshConversations}
         />
-        <Tooltip title="新建对话">
+        <Tooltip title={t('header.newConversation')}>
           <Button
             type="text"
             size="small"
@@ -111,7 +113,7 @@ export default function PanelHeader({
             onClick={() => void onNewConversation()}
           />
         </Tooltip>
-        <Tooltip title="收起">
+        <Tooltip title={t('header.collapse')}>
           <Button
             type="text"
             size="small"

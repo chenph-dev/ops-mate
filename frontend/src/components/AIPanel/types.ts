@@ -10,9 +10,9 @@ export type Message = convstore.Message;
 
 export type { ApprovalStatus, CommandSuggestion, SessionState };
 
-/** 会话状态角标文案（session:state 事件值 → 展示文本与颜色）。 */
+/** 会话状态角标（session:state 事件值 → 展示 key 与颜色）。text 为 ai 命名空间下的 i18n key。 */
 export const STATE_LABEL: Record<string, { text: string; color: string }> = {
-  Thinking: { text: '思考中', color: 'blue' },
-  AwaitingApproval: { text: '等待审批', color: 'orange' },
-  Running: { text: '执行中', color: 'green' },
+  Thinking: { text: 'state.thinking', color: 'blue' },
+  AwaitingApproval: { text: 'state.awaitingApproval', color: 'orange' },
+  Running: { text: 'state.running', color: 'green' },
 };

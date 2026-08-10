@@ -1,4 +1,5 @@
 import { Button, Input, theme, type InputRef } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { UpOutlined, DownOutlined, CloseOutlined } from '@ant-design/icons';
 
 interface SearchBarProps {
@@ -20,6 +21,7 @@ export default function SearchBar({
   onSearchClose,
 }: SearchBarProps): React.JSX.Element {
   const { token } = theme.useToken();
+  const { t } = useTranslation('terminal');
   return (
     <div
       style={{
@@ -35,7 +37,7 @@ export default function SearchBar({
       <Input
         ref={searchInputRef}
         size="small"
-        placeholder="搜索终端内容..."
+        placeholder={t('search.placeholder')}
         value={searchText}
         onChange={(e): void => onSearchChange(e.target.value)}
         onKeyDown={(e): void => {

@@ -9,6 +9,7 @@ import {
   Space,
   Typography,
 } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { GetAIConfig, SaveAIConfig } from '@wailsjs/go/handler/AIConfigHandler';
 import type { configstore } from '@wailsjs/go/models';
 
@@ -18,14 +19,18 @@ const { Title, Paragraph } = Typography;
 
 // LLM 模型供应商（provider 值直接对应后端 provider.go 的 NewChatModel 分支）。
 // 具体服务商（OpenAI/DeepSeek/通义/智谱/Ollama 等）通过 BaseURL + Model 区分。
-const protocols = [
-  { label: 'OpenAI 兼容', value: 'openai' },
-  { label: 'Anthropic', value: 'claude' },
+// label 存 i18n key（config 命名空间），渲染处用 t(label) 取当前语言文案。
+const protocolKeys = [
+  { label: 'providerOpenAI', value: 'openai' },
+  { label: 'providerClaude', value: 'claude' },
 ];
 
 export default function ConfigPage(): React.JSX.Element {
   const [form] = Form.useForm<AIConfig>();
   const [saving, setSaving] = useState(false);
+  const { t } = useTranslation('config');
+
+  const protocols = protocolKeys.map((p) => ({ ...p, label: t(p.label) }));
 
   useEffect(() => {
     GetAIConfig()
@@ -40,9 +45,9 @@ export default function ConfigPage(): React.JSX.Element {
     setSaving(true);
     try {
       await SaveAIConfig(values);
-      message.success('配置已保存');
+      message.success(t('saveSuccess'));
     } catch (e) {
-      message.error(`保存失败: ${e}`);
+      message.error(t('saveFailed', { err: String(e) }));
     } finally {
       setSaving(false);
     }
@@ -50,48 +55,48 @@ export default function ConfigPage(): React.JSX.Element {
 
   return (
     <div style={{ maxWidth: 560, margin: '0 auto' }}>
-      <Title level={4}>LLM模型配置</Title>
+      <Title level={4}>{t('title')}</Title>
       <Paragraph type="secondary" style={{ fontSize: 12 }}>
-        配置 AI 提供商。更改后立即生效。
+        {t('subtitle')}
       </Paragraph>
 
       <Card size="small">
         <Form form={form} layout="vertical" size="small">
           <Form.Item
             name="provider"
-            label="LLM模型供应商"
-            rules={[{ required: true, message: '请选择 LLM 模型供应商' }]}
+            label={t('provider')}
+            rules={[{ required: true, message: t('providerRequired') }]}
           >
-            <Select options={protocols} placeholder="选择 LLM 模型供应商" />
+            <Select options={protocols} placeholder={t('providerPlaceholder')} />
           </Form.Item>
 
           <Form.Item name="baseURL" label="Base URL">
-            <Input placeholder="完整地址（含 /v1），如 https://api.deepseek.com/v1；留空用默认" />
+            <Input placeholder={t('baseURLPlaceholder')} />
           </Form.Item>
 
           <Form.Item name="apiKey" label="API Key">
-            <Input.Password placeholder="输入 API Key（本地服务可留空）" />
+            <Input.Password placeholder={t('apiKeyPlaceholder')} />
           </Form.Item>
 
           <Form.Item
             name="model"
-            label="模型"
-            rules={[{ required: true, message: '请输入模型名称' }]}
+            label={t('model')}
+            rules={[{ required: true, message: t('modelRequired') }]}
           >
-            <Input placeholder="如 claude-sonnet-5 / gpt-4o / deepseek-chat" />
+            <Input placeholder={t('modelPlaceholder')} />
           </Form.Item>
 
           <Form.Item>
             <Space>
               <Button type="primary" onClick={handleSave} loading={saving}>
-                保存配置
+                {t('save')}
               </Button>
               <Button
                 onClick={() =>
                   GetAIConfig().then((cfg) => form.setFieldsValue(cfg))
                 }
               >
-                重置
+                {t('reset')}
               </Button>
             </Space>
           </Form.Item>

@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useTranslation } from 'react-i18next';
 import { ClipboardSetText } from '@wailsjs/runtime/runtime';
 
 const MONO = '"Cascadia Code", "Fira Code", "Consolas", monospace';
@@ -18,6 +19,7 @@ function getText(node: ReactNode): string {
 
 /** 代码块：等宽深色背景 + 右上角复制按钮。 */
 function CodeBlock({ children }: { children: ReactNode }): React.JSX.Element {
+  const { t } = useTranslation('ai');
   const [copied, setCopied] = useState(false);
   const handleCopy = (): void => {
     const text = getText(children).replace(/\n$/, '');
@@ -60,7 +62,7 @@ function CodeBlock({ children }: { children: ReactNode }): React.JSX.Element {
           opacity: 0.8,
         }}
       >
-        {copied ? '已复制' : '复制'}
+        {copied ? t('code.copied') : t('code.copy')}
       </button>
     </div>
   );

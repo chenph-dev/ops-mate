@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { InputRef } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { GetAIConfig } from '@wailsjs/go/handler/AIConfigHandler';
 import type { configstore, convstore } from '@wailsjs/go/models';
 import type {
@@ -79,6 +80,8 @@ export default function AIPanel({
   onCancel,
   onNewConversation,
 }: AIPanelProps): React.JSX.Element | null {
+  const { t } = useTranslation('ai');
+  const { t: tc } = useTranslation('common');
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [aiCfg, setAiCfg] = useState<configstore.AIConfig | null>(null);
@@ -207,7 +210,7 @@ export default function AIPanel({
         onMouseDown={onResizeStart}
         onMouseEnter={() => setResizeHover(true)}
         onMouseLeave={() => setResizeHover(false)}
-        title="拖动调整宽度"
+        title={tc('dragResize')}
         style={{
           position: 'absolute',
           left: 0,
@@ -250,7 +253,7 @@ export default function AIPanel({
             color: 'var(--antd-color-warning-text)',
           }}
         >
-          ⚠ SSH 连接已断开，AI 命令无法在主机执行。请先在终端建立连接。
+          {t('ssh.disconnected')}
         </div>
       )}
       <MessageList

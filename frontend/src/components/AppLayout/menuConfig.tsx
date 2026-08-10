@@ -9,10 +9,12 @@ import {
 
 /** 路由项定义 — 同时驱动菜单和路由。
  * 叶子：需 path + component；分组（聚合菜单）：需 path + children（无 component）。
+ * label 存 menu 命名空间下的相对 i18n key（如 'hosts'），
+ * 渲染处用 useTranslation('menu') 的 t(label) 取当前语言文案。
  */
 export interface RouteItem {
   path: string;
-  label: string;
+  label: string; // menu 命名空间下的相对 key（如 'hosts'），不带命名空间前缀
   icon?: React.ReactNode;
   component?: ComponentType; // 叶子才有；分组为空
   hideInMenu?: boolean;
@@ -26,23 +28,23 @@ const lazyPage = (
 export const routes: RouteItem[] = [
   {
     path: '/hosts',
-    label: '主机',
+    label: 'hosts',
     icon: <DesktopOutlined />,
     component: lazyPage(() => import('@/pages/Hosts')),
   },
   {
     path: '/system',
-    label: '系统',
+    label: 'system',
     icon: <SettingOutlined />,
     children: [
       {
         path: '/config',
-        label: 'LLM模型配置',
+        label: 'config',
         component: lazyPage(() => import('@/pages/Config')),
       },
       {
         path: '/audit',
-        label: '审计日志',
+        label: 'audit',
         icon: <FileSearchOutlined />,
         component: lazyPage(() => import('@/pages/Audit')),
       },
@@ -50,7 +52,7 @@ export const routes: RouteItem[] = [
   },
   {
     path: '/about',
-    label: '关于',
+    label: 'about',
     icon: <InfoCircleOutlined />,
     component: lazyPage(() => import('@/pages/About')),
   },
@@ -79,8 +81,11 @@ export function leafRoutes(items: RouteItem[]): LeafRouteItem[] {
   return out;
 }
 
-/** RouteItem[] → antd Menu items（含子菜单，供需要时使用）。 */
-export function toMenuItems(items: RouteItem[]): ItemType<MenuItemType>[] {
+/** RouteItem[] → antd Menu items（含子菜单，供需要时使用）。label 为 menu 命名空间相对 key，t 需传入绑定 menu 的翻译函数。 */
+export function toMenuItems(
+  items: RouteItem[],
+  t: (key: string) => string,
+): ItemType<MenuItemType>[] {
   return items
     .filter((r) => !r.hideInMenu)
     .map((r) =>
@@ -88,9 +93,9 @@ export function toMenuItems(items: RouteItem[]): ItemType<MenuItemType>[] {
         ? {
             key: r.path,
             icon: r.icon,
-            label: r.label,
-            children: toMenuItems(r.children),
+            label: t(r.label),
+            children: toMenuItems(r.children, t),
           }
-        : { key: r.path, icon: r.icon, label: r.label },
+        : { key: r.path, icon: r.icon, label: t(r.label) },
     );
 }

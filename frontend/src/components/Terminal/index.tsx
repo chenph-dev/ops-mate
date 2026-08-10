@@ -12,6 +12,7 @@ import '@xterm/xterm/css/xterm.css';
 import { ClipboardGetText, ClipboardSetText } from '@wailsjs/runtime/runtime';
 import { ListHostCommands } from '@wailsjs/go/handler/TerminalHandler';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { terminalTheme } from '@/theme';
 import { useCommandCompletion } from '@/hooks/useCommandCompletion';
 import CompletionPopup from './CompletionPopup';
@@ -83,6 +84,7 @@ export default function Terminal({
     x: number;
     y: number;
   } | null>(null);
+  const { t } = useTranslation('terminal');
 
   const {
     completion,
@@ -302,11 +304,11 @@ export default function Terminal({
   useEffect(() => {
     if (prevConnectedRef.current && !connected && !reconnecting) {
       xtermRef.current?.write(
-        '\x1b[90m\r\n[会话已断开] 双击主机重新连接\x1b[0m\r\n',
+        `\x1b[90m\r\n${t('disconnectNotice')}\x1b[0m\r\n`,
       );
     }
     prevConnectedRef.current = connected;
-  }, [connected, reconnecting]);
+  }, [connected, reconnecting, t]);
 
   // 右键菜单事件监听
   useEffect(() => {
@@ -392,20 +394,23 @@ export default function Terminal({
   }, []);
 
   const contextMenuItems: ContextMenuItem[] = [
-    { key: 'copy', label: '复制', onClick: handleCopy },
-    { key: 'paste', label: '粘贴', onClick: handlePaste },
-    { key: 'select-all', label: '全选', onClick: handleSelectAll },
-    { key: 'clear', label: '清空', onClick: handleClear },
+    { key: 'copy', label: t('menu.copy'), onClick: handleCopy },
+    { key: 'paste', label: t('menu.paste'), onClick: handlePaste },
+    { key: 'select-all', label: t('menu.selectAll'), onClick: handleSelectAll },
+    { key: 'clear', label: t('menu.clear'), onClick: handleClear },
   ];
 
   const statusDot = connecting ? '⏳' : connected ? '🟢' : '⚪';
   const statusText = connecting
-    ? '连接中'
+    ? t('status.connecting')
     : reconnecting
-      ? `重连中 (${reconnectCount}/${MAX_RECONNECT_RETRIES})`
+      ? t('status.reconnecting', {
+          count: reconnectCount,
+          max: MAX_RECONNECT_RETRIES,
+        })
       : connected
-        ? '已连接'
-        : '未连接';
+        ? t('status.connected')
+        : t('status.disconnected');
 
   return (
     <div
@@ -483,7 +488,11 @@ export default function Terminal({
             }}
           >
             <Spin
-              description={reconnecting ? '连接断开，正在重连...' : '连接中...'}
+              description={
+                reconnecting
+                  ? t('spinner.reconnecting')
+                  : t('spinner.connecting')
+              }
             />
           </div>
         )}

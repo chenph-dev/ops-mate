@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button, Tag, Input, Tooltip, theme } from 'antd';
+import { useTranslation } from 'react-i18next';
 import { CodeOutlined, EditOutlined } from '@ant-design/icons';
 import type { ApprovalStatus, CommandSuggestion } from '@/hooks/useSessions';
 import { isHighRiskCommand } from './risk';
@@ -18,10 +19,11 @@ interface CommandCardProps {
   onRunInTerminal?: (command: string) => void;
 }
 
+// text 存 i18n key（ai 命名空间），渲染处用 t(text) 取当前语言文案
 const STATUS_META: Record<ApprovalStatus, { text: string; color: string }> = {
-  pending: { text: '待审批', color: 'processing' },
-  approved: { text: '已批准', color: 'success' },
-  rejected: { text: '已拒绝', color: 'error' },
+  pending: { text: 'cmd.statusPending', color: 'processing' },
+  approved: { text: 'cmd.statusApproved', color: 'success' },
+  rejected: { text: 'cmd.statusRejected', color: 'error' },
 };
 
 /** 命令审批卡：状态+原因一行、命令、操作按钮（紧凑布局）。 */
@@ -35,6 +37,7 @@ export default function CommandCard({
   onRunInTerminal,
 }: CommandCardProps): React.JSX.Element {
   const { token } = theme.useToken();
+  const { t } = useTranslation('ai');
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(command.command);
   const [confirming, setConfirming] = useState(false);
@@ -79,7 +82,7 @@ export default function CommandCard({
             color={STATUS_META[status].color}
             style={{ margin: 0, fontSize: 11, lineHeight: '16px' }}
           >
-            {STATUS_META[status].text}
+            {t(STATUS_META[status].text)}
           </Tag>
         )}
         <span
@@ -94,14 +97,14 @@ export default function CommandCard({
             color: token.colorTextSecondary,
           }}
         >
-          原因: {command.why || '—'}
+          {t('cmd.reason', { reason: command.why || '—' })}
         </span>
         {isHighRisk && (
           <Tag
             color="error"
             style={{ margin: 0, fontSize: 11, lineHeight: '16px' }}
           >
-            高风险
+            {t('cmd.highRisk')}
           </Tag>
         )}
       </div>
@@ -142,7 +145,7 @@ export default function CommandCard({
           }}
         >
           {onRunInTerminal && (
-            <Tooltip title="在右侧终端执行">
+            <Tooltip title={t('cmd.runInTerminal')}>
               <Button
                 size="small"
                 icon={<CodeOutlined />}
@@ -151,7 +154,7 @@ export default function CommandCard({
               />
             </Tooltip>
           )}
-          <Tooltip title={editing ? '完成编辑' : '修改命令'}>
+          <Tooltip title={editing ? t('cmd.editDone') : t('cmd.editModify')}>
             <Button
               size="small"
               icon={<EditOutlined />}
@@ -162,11 +165,11 @@ export default function CommandCard({
               }}
               disabled={busy}
             >
-              {editing ? '完成' : '编辑'}
+              {editing ? t('cmd.done') : t('cmd.edit')}
             </Button>
           </Tooltip>
           <Button size="small" onClick={() => onReject?.()} disabled={busy}>
-            拒绝
+            {t('cmd.reject')}
           </Button>
           <Button
             type="primary"
@@ -175,7 +178,7 @@ export default function CommandCard({
             loading={busy}
             onClick={handleApprove}
           >
-            {isHighRisk && confirming ? '再次确认' : '批准'}
+            {isHighRisk && confirming ? t('cmd.confirmAgain') : t('cmd.approve')}
           </Button>
         </div>
       )}

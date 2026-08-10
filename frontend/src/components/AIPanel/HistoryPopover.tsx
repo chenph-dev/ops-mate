@@ -7,6 +7,7 @@ import {
   Popover,
   Tooltip,
 } from 'antd';
+import { useTranslation } from 'react-i18next';
 import {
   DeleteOutlined,
   EditOutlined,
@@ -33,6 +34,7 @@ export default function HistoryPopover({
   onRefreshConversations,
 }: HistoryPopoverProps): React.JSX.Element {
   const { modal } = AntdApp.useApp();
+  const { t } = useTranslation('ai');
   const [open, setOpen] = useState(false);
 
   const handleOpenChange = (next: boolean): void => {
@@ -44,7 +46,7 @@ export default function HistoryPopover({
   const handleRename = (conv: convstore.Conversation): void => {
     let title = conv.title;
     modal.confirm({
-      title: '重命名会话',
+      title: t('history.renameTitle'),
       content: (
         <Input
           autoFocus
@@ -66,7 +68,7 @@ export default function HistoryPopover({
       onOpenChange={handleOpenChange}
       trigger="click"
       placement="bottomRight"
-      title="历史对话"
+      title={t('history.title')}
       styles={{ content: { padding: 4, width: 240 } }}
       content={
         <div style={{ maxHeight: 300, overflow: 'auto' }}>
@@ -79,7 +81,7 @@ export default function HistoryPopover({
                 color: 'var(--antd-color-text-secondary)',
               }}
             >
-              暂无历史对话
+              {t('history.empty')}
             </div>
           ) : (
             conversations.map((conv) => (
@@ -109,7 +111,7 @@ export default function HistoryPopover({
                       textOverflow: 'ellipsis',
                     }}
                   >
-                    {activeSession === conv.id ? '当前 · ' : ''}
+                    {activeSession === conv.id ? t('history.current') : ''}
                     {conv.title}
                   </div>
                   <div
@@ -126,14 +128,14 @@ export default function HistoryPopover({
                   type="text"
                   size="small"
                   icon={<EditOutlined />}
-                  title="重命名"
+                  title={t('history.renameBtn')}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleRename(conv);
                   }}
                 />
                 <Popconfirm
-                  title="删除该对话？此操作不可恢复。"
+                  title={t('history.deleteConfirm')}
                   onConfirm={(e) => {
                     e?.stopPropagation();
                     void onDeleteConversation(conv.id);
@@ -153,7 +155,7 @@ export default function HistoryPopover({
         </div>
       }
     >
-      <Tooltip title="历史对话">
+      <Tooltip title={t('history.title')}>
         <Button type="text" size="small" icon={<HistoryOutlined />} />
       </Tooltip>
     </Popover>

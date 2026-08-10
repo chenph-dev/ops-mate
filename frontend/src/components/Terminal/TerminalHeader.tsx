@@ -1,4 +1,5 @@
 import { Button, Tooltip, theme } from 'antd';
+import { useTranslation } from 'react-i18next';
 import {
   ClearOutlined,
   CopyOutlined,
@@ -54,6 +55,7 @@ export default function TerminalHeader({
   onDisconnect,
 }: TerminalHeaderProps): React.JSX.Element {
   const { token } = theme.useToken();
+  const { t } = useTranslation('terminal');
   return (
     <div
       style={{
@@ -76,10 +78,10 @@ export default function TerminalHeader({
             whiteSpace: 'nowrap',
           }}
         >
-          终端
+          {t('header.title')}
         </span>
         <span style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
-          {hostName || '未选择主机'}
+          {hostName || t('header.noHost')}
         </span>
         <span
           style={{
@@ -108,7 +110,7 @@ export default function TerminalHeader({
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Tooltip title="打开 SFTP 文件浏览">
+        <Tooltip title={t('header.sftp')}>
           <Button
             type="text"
             size="small"
@@ -116,7 +118,7 @@ export default function TerminalHeader({
             onClick={onOpenSftp}
           />
         </Tooltip>
-        <Tooltip title={aiOpen ? '收起智能体面板' : '打开智能体面板'}>
+        <Tooltip title={aiOpen ? t('header.aiOpen') : t('header.aiClose')}>
           <Button
             type={aiOpen ? 'primary' : 'text'}
             size="small"
@@ -124,7 +126,7 @@ export default function TerminalHeader({
             onClick={onToggleAI}
           />
         </Tooltip>
-        <Tooltip title="刷新连接">
+        <Tooltip title={t('header.refresh')}>
           <Button
             type="text"
             size="small"
@@ -132,7 +134,7 @@ export default function TerminalHeader({
             onClick={onRefresh}
           />
         </Tooltip>
-        <Tooltip title="放大 (Ctrl++)">
+        <Tooltip title={t('header.zoomIn')}>
           <Button
             type="text"
             size="small"
@@ -141,7 +143,7 @@ export default function TerminalHeader({
             disabled={fontSize >= maxFontSize}
           />
         </Tooltip>
-        <Tooltip title="缩小 (Ctrl+-)">
+        <Tooltip title={t('header.zoomOut')}>
           <Button
             type="text"
             size="small"
@@ -150,7 +152,7 @@ export default function TerminalHeader({
             disabled={fontSize <= minFontSize}
           />
         </Tooltip>
-        <Tooltip title="搜索 (Ctrl+F)">
+        <Tooltip title={t('header.search')}>
           <Button
             type="text"
             size="small"
@@ -158,7 +160,7 @@ export default function TerminalHeader({
             onClick={onSearch}
           />
         </Tooltip>
-        <Tooltip title="清空">
+        <Tooltip title={t('header.clear')}>
           <Button
             type="text"
             size="small"
@@ -166,7 +168,7 @@ export default function TerminalHeader({
             onClick={onClear}
           />
         </Tooltip>
-        <Tooltip title="复制选中内容">
+        <Tooltip title={t('header.copy')}>
           <Button
             type="text"
             size="small"
@@ -175,7 +177,7 @@ export default function TerminalHeader({
           />
         </Tooltip>
         {connected && (
-          <Tooltip title="断开连接">
+          <Tooltip title={t('header.disconnect')}>
             <Button
               type="text"
               size="small"

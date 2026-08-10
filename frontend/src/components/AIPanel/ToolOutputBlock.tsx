@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /** 后端落库的 tool 执行元数据（Message.toolResult，见 internal/einoagent/tools/toolMeta）。 */
 interface ToolMeta {
@@ -17,6 +18,7 @@ export default function ToolOutputBlock({
   content: string;
   toolResult?: string;
 }): React.JSX.Element {
+  const { t } = useTranslation('ai');
   const [open, setOpen] = useState(false);
   const lineCount = content.split('\n').filter((l) => l.trim() !== '').length;
   const meta = useMemo(() => {
@@ -28,14 +30,14 @@ export default function ToolOutputBlock({
     }
   }, [toolResult]);
 
-  const cmdText = meta?.command ? `$ ${meta.command}` : '命令输出';
+  const cmdText = meta?.command ? `$ ${meta.command}` : t('output.title');
   const durText =
     meta?.durationMs != null ? `${(meta.durationMs / 1000).toFixed(1)}s` : '';
   const statusEl =
     meta?.status === 'rejected' ? (
-      <span style={{ color: 'var(--antd-color-error)' }}>已拒绝</span>
+      <span style={{ color: 'var(--antd-color-error)' }}>{t('output.rejected')}</span>
     ) : meta?.cancelled ? (
-      <span style={{ color: 'var(--antd-color-warning)' }}>已取消</span>
+      <span style={{ color: 'var(--antd-color-warning)' }}>{t('output.cancelled')}</span>
     ) : meta?.exitCode !== undefined ? (
       <span
         style={{
@@ -53,7 +55,7 @@ export default function ToolOutputBlock({
     <div style={{ marginBottom: 6 }}>
       <div
         onClick={() => setOpen(!open)}
-        title={open ? '收起输出' : '展开输出'}
+        title={open ? t('output.collapse') : t('output.expand')}
         style={{
           fontFamily: '"Cascadia Code", "Fira Code", "Consolas", monospace',
           fontSize: 11,
@@ -99,7 +101,7 @@ export default function ToolOutputBlock({
         <span
           style={{ flexShrink: 0, color: 'var(--antd-color-text-secondary)' }}
         >
-          （{lineCount} 行）
+          {t('output.lines', { count: lineCount })}
         </span>
       </div>
       {open && (

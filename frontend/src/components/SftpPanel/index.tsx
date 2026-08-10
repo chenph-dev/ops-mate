@@ -30,15 +30,17 @@ import {
   StopOutlined,
 } from '@ant-design/icons';
 import { useSftp } from '@/hooks/useSftp';
+import { useTranslation } from 'react-i18next';
 import type { sftp } from '@wailsjs/go/models';
 
+// text 存 i18n key（sftp 命名空间），渲染处用 t(text) 取当前语言文案
 const TASK_STATUS_META: Record<string, { text: string; color: string }> = {
-  queued: { text: '队列中', color: 'default' },
-  running: { text: '传输中', color: 'processing' },
-  paused: { text: '已暂停', color: 'warning' },
-  done: { text: '完成', color: 'success' },
-  error: { text: '失败', color: 'error' },
-  cancelled: { text: '已删除', color: 'default' },
+  queued: { text: 'taskStatus.queued', color: 'default' },
+  running: { text: 'taskStatus.running', color: 'processing' },
+  paused: { text: 'taskStatus.paused', color: 'warning' },
+  done: { text: 'taskStatus.done', color: 'success' },
+  error: { text: 'taskStatus.error', color: 'error' },
+  cancelled: { text: 'taskStatus.cancelled', color: 'default' },
 };
 
 type TaskTab = 'running' | 'queued' | 'paused' | 'cancelled' | 'done';
@@ -61,6 +63,7 @@ export default function SftpPanel({
   hostName: string;
 }): React.JSX.Element {
   const { modal, message } = AntdApp.useApp();
+  const { t } = useTranslation('sftp');
   const sf = useSftp(hostId);
   const { loadTasks } = sf;
   // 选中的条目完整路径（单击选中，再次点击取消）
@@ -152,34 +155,34 @@ export default function SftpPanel({
   };
 
   const handleMkdir = (): void => {
-    askName('新建目录', '输入目录名', (name) => {
+    askName(t('dir.title'), t('dir.placeholder'), (name) => {
       void sf
         .mkdir(joinPath(sf.path, name))
-        .catch((e) => message.error(`新建失败: ${e}`));
+        .catch((e) => message.error(t('dir.fail', { err: String(e) })));
     });
   };
 
   const handleRename = (): void => {
     if (!selected) {
-      message.info('请先选择文件/目录');
+      message.info(t('selectFirst'));
       return;
     }
     const base = selected.split('/').pop() ?? '';
-    askName('重命名', '输入新名称', (name) => {
+    askName(t('rename.title'), t('rename.placeholder'), (name) => {
       const parent = selected.slice(0, selected.length - base.length);
       void sf
         .rename(selected, parent + name)
-        .catch((e) => message.error(`重命名失败: ${e}`));
+        .catch((e) => message.error(t('rename.fail', { err: String(e) })));
     });
   };
 
   const handleDelete = (): void => {
     if (!selected) {
-      message.info('请先选择文件/目录');
+      message.info(t('selectFirst'));
       return;
     }
     modal.confirm({
-      title: '删除该条目？',
+      title: t('delete.title'),
       content: selected,
       okButtonProps: { danger: true },
       onOk: () => sf.remove(selected),
@@ -189,15 +192,15 @@ export default function SftpPanel({
   // 传输任务表格列定义
   const columns: ColumnsType<sftp.TaskInfo> = [
     {
-      title: '名称',
+      title: t('col.name'),
       key: 'name',
       ellipsis: true,
-      render: (_, t) => {
+      render: (_, task) => {
         // 显示远端文件名（传输的目标/源文件）
-        const name = t.remotePath.split(/[\\/]/).pop();
+        const name = task.remotePath.split(/[\\/]/).pop();
         return (
           <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            {t.direction === 'upload' ? (
+            {task.direction === 'upload' ? (
               <UploadOutlined style={{ color: 'var(--antd-color-primary)' }} />
             ) : (
               <DownloadOutlined
@@ -205,7 +208,7 @@ export default function SftpPanel({
               />
             )}
             <span
-              title={`${t.direction === 'upload' ? '上传' : '下载'} ${t.remotePath}`}
+              title={`${task.direction === 'upload' ? t('direction.upload') : t('direction.download')} ${task.remotePath}`}
               style={{
                 fontSize: 12,
                 overflow: 'hidden',
@@ -220,37 +223,37 @@ export default function SftpPanel({
       },
     },
     {
-      title: '进度',
+      title: t('col.progress'),
       key: 'progress',
       width: 120,
-      render: (_, t) => (
+      render: (_, task) => (
         <Progress
-          percent={t.total > 0 ? Math.round((t.done / t.total) * 100) : 0}
+          percent={task.total > 0 ? Math.round((task.done / task.total) * 100) : 0}
           size="small"
         />
       ),
     },
     {
-      title: '状态',
+      title: t('col.status'),
       key: 'status',
       width: 70,
-      render: (_, t) => {
-        const meta = TASK_STATUS_META[t.status] ?? {
-          text: t.status,
+      render: (_, task) => {
+        const meta = TASK_STATUS_META[task.status] ?? {
+          text: task.status,
           color: 'default',
         };
         return (
           <Tag color={meta.color} style={{ margin: 0 }}>
-            {meta.text}
+            {t(meta.text)}
           </Tag>
         );
       },
     },
     {
-      title: '大小',
+      title: t('col.size'),
       key: 'size',
       width: 110,
-      render: (_, t) => (
+      render: (_, task) => (
         <span
           style={{
             fontSize: 11,
@@ -258,59 +261,59 @@ export default function SftpPanel({
             whiteSpace: 'nowrap',
           }}
         >
-          {formatSize(t.done)} / {formatSize(t.total)}
+          {formatSize(task.done)} / {formatSize(task.total)}
         </span>
       ),
     },
     {
-      title: '操作',
+      title: t('col.action'),
       key: 'action',
       width: 90,
-      render: (_, t) => (
+      render: (_, task) => (
         <div style={{ display: 'flex', gap: 2 }}>
-          {t.status === 'running' && (
-            <Tooltip title="暂停">
+          {task.status === 'running' && (
+            <Tooltip title={t('op.pause')}>
               <Button
                 size="small"
                 type="text"
                 icon={<PauseOutlined />}
-                onClick={() => void sf.pauseTask(t.id)}
+                onClick={() => void sf.pauseTask(task.id)}
               />
             </Tooltip>
           )}
-          {t.status === 'paused' && (
-            <Tooltip title="继续">
+          {task.status === 'paused' && (
+            <Tooltip title={t('op.resume')}>
               <Button
                 size="small"
                 type="text"
                 icon={<CaretRightOutlined />}
-                onClick={() => void sf.resumeTask(t.id)}
+                onClick={() => void sf.resumeTask(task.id)}
               />
             </Tooltip>
           )}
-          {(t.status === 'running' ||
-            t.status === 'paused' ||
-            t.status === 'queued') && (
-            <Tooltip title="取消">
+          {(task.status === 'running' ||
+            task.status === 'paused' ||
+            task.status === 'queued') && (
+            <Tooltip title={t('op.cancel')}>
               <Button
                 size="small"
                 type="text"
                 danger
                 icon={<StopOutlined />}
-                onClick={() => void sf.cancelTask(t.id)}
+                onClick={() => void sf.cancelTask(task.id)}
               />
             </Tooltip>
           )}
-          {(t.status === 'done' ||
-            t.status === 'error' ||
-            t.status === 'cancelled') && (
-            <Tooltip title="删除">
+          {(task.status === 'done' ||
+            task.status === 'error' ||
+            task.status === 'cancelled') && (
+            <Tooltip title={t('op.delete')}>
               <Button
                 size="small"
                 type="text"
                 danger
                 icon={<DeleteOutlined />}
-                onClick={() => void sf.removeTask(t.id)}
+                onClick={() => void sf.removeTask(task.id)}
               />
             </Tooltip>
           )}
@@ -359,24 +362,24 @@ export default function SftpPanel({
         <Button
           size="small"
           icon={<ArrowUpOutlined />}
-          title="上级目录"
+          title={t('btn.up')}
           onClick={sf.goParent}
         />
         <Button
           size="small"
           icon={<ReloadOutlined />}
-          title="刷新"
+          title={t('btn.refresh')}
           onClick={() => void sf.refresh(sf.path)}
         />
         <Button size="small" icon={<FolderAddOutlined />} onClick={handleMkdir}>
-          新建目录
+          {t('btn.newFolder')}
         </Button>
         <Button
           size="small"
           icon={<UploadOutlined />}
           onClick={() => void sf.startUpload(sf.path)}
         >
-          上传
+          {t('btn.upload')}
         </Button>
         <Button
           size="small"
@@ -384,7 +387,7 @@ export default function SftpPanel({
           disabled={!selected}
           onClick={() => selected && void sf.startDownload(selected)}
         >
-          下载
+          {t('btn.download')}
         </Button>
         <Button
           size="small"
@@ -392,7 +395,7 @@ export default function SftpPanel({
           disabled={!selected}
           onClick={handleRename}
         >
-          重命名
+          {t('btn.rename')}
         </Button>
         <Button
           size="small"
@@ -401,7 +404,7 @@ export default function SftpPanel({
           disabled={!selected}
           onClick={handleDelete}
         >
-          删除
+          {t('btn.delete')}
         </Button>
         <Popover
           trigger="click"
@@ -423,21 +426,23 @@ export default function SftpPanel({
                 items={[
                   {
                     key: 'running',
-                    label: `进行中(${countByStatus('running')})`,
+                    label: t('tab.running', { count: countByStatus('running') }),
                   },
                   {
                     key: 'queued',
-                    label: `队列中(${countByStatus('queued')})`,
+                    label: t('tab.queued', { count: countByStatus('queued') }),
                   },
                   {
                     key: 'paused',
-                    label: `已暂停(${countByStatus('paused')})`,
+                    label: t('tab.paused', { count: countByStatus('paused') }),
                   },
                   {
                     key: 'cancelled',
-                    label: `已删除(${countByStatus('cancelled')})`,
+                    label: t('tab.cancelled', {
+                      count: countByStatus('cancelled'),
+                    }),
                   },
-                  { key: 'done', label: `已完成(${countByDone()})` },
+                  { key: 'done', label: t('tab.done', { count: countByDone() }) },
                 ]}
               />
               <Table
@@ -448,13 +453,13 @@ export default function SftpPanel({
                 dataSource={visibleTasks}
                 pagination={false}
                 scroll={{ y: 360 }}
-                locale={{ emptyText: '无任务' }}
+                locale={{ emptyText: t('table.empty') }}
               />
             </div>
           }
         >
           <Button size="small" icon={<BarsOutlined />}>
-            传输任务
+            {t('btn.tasks')}
           </Button>
         </Popover>
       </div>
@@ -477,26 +482,26 @@ export default function SftpPanel({
           style={{ flex: 1, cursor: 'pointer' }}
           onClick={() => handleSort('name')}
         >
-          名称 {sort.key === 'name' && (sort.order === 'asc' ? '↑' : '↓')}
+          {t('head.name')} {sort.key === 'name' && (sort.order === 'asc' ? '↑' : '↓')}
         </span>
         <span
           style={{ width: 126, textAlign: 'right', cursor: 'pointer' }}
           onClick={() => handleSort('modTime')}
         >
-          修改时间{' '}
+          {t('head.modTime')}{' '}
           {sort.key === 'modTime' && (sort.order === 'asc' ? '↑' : '↓')}
         </span>
         <span
           style={{ width: 64, textAlign: 'center', cursor: 'pointer' }}
           onClick={() => handleSort('type')}
         >
-          类型 {sort.key === 'type' && (sort.order === 'asc' ? '↑' : '↓')}
+          {t('head.type')} {sort.key === 'type' && (sort.order === 'asc' ? '↑' : '↓')}
         </span>
         <span
           style={{ width: 72, textAlign: 'right', cursor: 'pointer' }}
           onClick={() => handleSort('size')}
         >
-          大小 {sort.key === 'size' && (sort.order === 'asc' ? '↑' : '↓')}
+          {t('head.size')} {sort.key === 'size' && (sort.order === 'asc' ? '↑' : '↓')}
         </span>
       </div>
 
@@ -511,7 +516,7 @@ export default function SftpPanel({
         ) : sf.error ? (
           <Empty description={sf.error} />
         ) : sf.entries.length === 0 ? (
-          <Empty description="空目录" />
+          <Empty description={t('entry.emptyDir')} />
         ) : (
           sorted.map((e: sftp.Entry) => {
             const full = joinPath(sf.path, e.name);
@@ -573,7 +578,7 @@ export default function SftpPanel({
                     textAlign: 'center',
                   }}
                 >
-                  {e.isDir ? '目录' : '文件'}
+                  {e.isDir ? t('entry.dir') : t('entry.file')}
                 </span>
                 <span
                   style={{

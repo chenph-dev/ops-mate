@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { theme } from 'antd';
+import { useTranslation } from 'react-i18next';
 
 interface CommandMatch {
   name: string;
@@ -26,6 +27,7 @@ export default function CompletionPopup({
   onSelect,
 }: CompletionPopupProps): React.JSX.Element {
   const { token } = theme.useToken();
+  const { t } = useTranslation('terminal');
   const selectedRef = useRef<HTMLDivElement | null>(null);
 
   // 选中项变化时滚动到可视区，避免方向键选择超出弹窗可视范围
@@ -109,7 +111,7 @@ export default function CompletionPopup({
             borderTop: `1px solid ${token.colorBorderSecondary}`,
           }}
         >
-          共 {matches.length} 项 · Tab/Enter 接受 · ↑/↓ 选择 · Esc 关闭
+          {t('completion.hint', { count: matches.length })}
         </div>
       )}
     </div>

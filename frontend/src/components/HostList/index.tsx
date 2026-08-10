@@ -10,6 +10,7 @@ import {
   LinkOutlined,
 } from '@ant-design/icons';
 import { useState, useCallback, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { hoststore } from '@wailsjs/go/models';
 
 type TreeNode = hoststore.TreeNode;
@@ -53,25 +54,26 @@ function ContextMenu({
   onSftp,
 }: ContextMenuProps): React.JSX.Element {
   const { token } = theme.useToken();
+  const { t } = useTranslation('hosts');
   const items =
     node.nodeType === 'folder'
       ? [
           {
             key: 'add-folder',
             icon: <PlusOutlined />,
-            label: '新建子目录',
+            label: t('ctx.newSubfolder'),
             onClick: onAddFolder,
           },
           {
             key: 'add-host',
             icon: <PlusOutlined />,
-            label: '新建主机',
+            label: t('ctx.newHost'),
             onClick: onAddHost,
           },
           {
             key: 'delete',
             icon: <DeleteOutlined />,
-            label: '删除',
+            label: t('ctx.delete'),
             danger: true,
             onClick: onDelete,
           },
@@ -80,25 +82,25 @@ function ContextMenu({
           {
             key: 'connect',
             icon: <LinkOutlined />,
-            label: '连接',
+            label: t('ctx.connect'),
             onClick: onTest,
           },
           {
             key: 'sftp',
             icon: <FolderOpenOutlined />,
-            label: 'SFTP 文件',
+            label: t('ctx.sftp'),
             onClick: onSftp,
           },
           {
             key: 'edit',
             icon: <EditOutlined />,
-            label: '编辑',
+            label: t('ctx.edit'),
             onClick: onEdit,
           },
           {
             key: 'delete',
             icon: <DeleteOutlined />,
-            label: '删除',
+            label: t('ctx.delete'),
             danger: true,
             onClick: onDelete,
           },
@@ -150,6 +152,7 @@ export default function HostList({
   onSftp,
 }: HostListProps): React.JSX.Element {
   const { token } = theme.useToken();
+  const { t } = useTranslation('hosts');
   const [contextMenu, setContextMenu] = useState<{
     node: TreeNode;
     x: number;
@@ -231,7 +234,7 @@ export default function HostList({
             color: token.colorTextSecondary,
           }}
         >
-          主机
+          {t('list.title')}
         </span>
         <div style={{ display: 'flex', gap: 4 }}>
           <span
@@ -240,7 +243,7 @@ export default function HostList({
               fontSize: 14,
               color: token.colorTextSecondary,
             }}
-            title="新建目录"
+            title={t('modal.newFolder')}
             onClick={() => onAddFolder('')}
           >
             <PlusOutlined />
@@ -259,7 +262,7 @@ export default function HostList({
               fontSize: 12,
             }}
           >
-            右键点击此处添加目录或主机
+            {t('list.empty')}
           </div>
         ) : (
           <Tree

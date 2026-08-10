@@ -1,0 +1,25 @@
+export default {
+  title: '审计日志',
+  col: {
+    time: '时间',
+    type: '类型',
+    model: '模型',
+    tool: '工具',
+    node: '节点',
+    provider: '实现',
+    duration: '耗时',
+    status: '状态',
+    success: '成功',
+    fail: '失败',
+    error: '错误',
+  },
+  stat: {
+    totalCalls: '总调用',
+    modelCalls: '模型调用',
+    toolCalls: '工具调用',
+    tokensIn: 'Token 入口',
+    tokensOut: 'Token 出口',
+    tokensTotal: 'Token 总计',
+  },
+  empty: '暂无审计记录（AI 调用后才会产生）',
+};

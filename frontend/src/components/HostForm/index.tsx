@@ -1,5 +1,6 @@
 import { Modal, Form, Input, InputNumber, Select, message } from 'antd';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { hoststore } from '@wailsjs/go/models';
 
 type HostInput = hoststore.HostInput;
@@ -33,16 +34,17 @@ export default function HostForm({
   const [submitting, setSubmitting] = useState(false);
   const [testing, setTesting] = useState(false);
   const authType = Form.useWatch('authType', form);
+  const { t } = useTranslation('hosts');
 
   const handleSubmit = async (): Promise<void> => {
     const values = await form.validateFields();
     setSubmitting(true);
     try {
       await onSubmit(values);
-      message.success('保存成功');
+      message.success(t('form.saveSuccess'));
       onCancel();
     } catch (e) {
-      message.error(`保存失败: ${e}`);
+      message.error(t('form.saveFailed', { err: String(e) }));
     } finally {
       setSubmitting(false);
     }
@@ -52,19 +54,19 @@ export default function HostForm({
     const values = await form.validateFields();
     // 编辑模式：secret 留空表示不修改，测试连接需要真实凭据，提示先输入
     if (initialValues && !values.secret) {
-      message.warning('请输入新密码/私钥后再测试');
+      message.warning(t('form.testNeedSecret'));
       return;
     }
     setTesting(true);
     try {
       const ok = await onTest(values);
       if (ok) {
-        message.success('连接成功');
+        message.success(t('form.testSuccess'));
       } else {
-        message.warning('连接失败');
+        message.warning(t('form.testFailed'));
       }
     } catch (e) {
-      message.error(`测试失败: ${e}`);
+      message.error(t('form.testError', { err: String(e) }));
     } finally {
       setTesting(false);
     }
@@ -72,7 +74,7 @@ export default function HostForm({
 
   return (
     <Modal
-      title={initialValues ? '编辑主机' : '添加主机'}
+      title={initialValues ? t('form.titleEdit') : t('form.titleAdd')}
       open={open}
       onCancel={onCancel}
       onOk={handleSubmit}
@@ -87,69 +89,73 @@ export default function HostForm({
       <Form form={form} layout="vertical" size="small">
         <Form.Item
           name="name"
-          label="名称"
-          rules={[{ required: true, message: '请输入主机名称' }]}
+          label={t('form.name')}
+          rules={[{ required: true, message: t('form.nameRequired') }]}
         >
           <Input placeholder="web-01" />
         </Form.Item>
         <Form.Item
           name="addr"
-          label="地址"
-          rules={[{ required: true, message: '请输入 IP 或域名' }]}
+          label={t('form.addr')}
+          rules={[{ required: true, message: t('form.addrRequired') }]}
         >
           <Input placeholder="10.0.0.1 或 example.com" />
         </Form.Item>
         <Form.Item
           name="port"
-          label="端口"
-          rules={[{ required: true, message: '请输入端口' }]}
+          label={t('form.port')}
+          rules={[{ required: true, message: t('form.portRequired') }]}
         >
           <InputNumber min={1} max={65535} style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item
           name="user"
-          label="用户名"
-          rules={[{ required: true, message: '请输入用户名' }]}
+          label={t('form.user')}
+          rules={[{ required: true, message: t('form.userRequired') }]}
         >
           <Input placeholder="root" />
         </Form.Item>
         <Form.Item
           name="authType"
-          label="认证方式"
+          label={t('form.authType')}
           rules={[{ required: true }]}
         >
           <Select
             options={[
-              { label: '密码', value: 'password' },
-              { label: '私钥', value: 'privatekey' },
+              { label: t('form.password'), value: 'password' },
+              { label: t('form.privateKey'), value: 'privatekey' },
             ]}
           />
         </Form.Item>
         <Form.Item
           name="secret"
-          label={authType === 'privatekey' ? '私钥 (PEM)' : '密码'}
+          label={authType === 'privatekey' ? t('form.privateKey') : t('form.password')}
           // 编辑模式 secret 非必填（留空保留原密码），新增必填
-          rules={[{ required: !initialValues, message: '请输入' }]}
+          rules={[{ required: !initialValues, message: t('form.secretRequired') }]}
         >
           {authType === 'privatekey' ? (
             <Input.TextArea
               rows={3}
               placeholder={
                 initialValues
-                  ? '留空则不修改私钥'
+                  ? t('form.keepSecretPlaceholder')
                   : '-----BEGIN RSA PRIVATE KEY-----...'
               }
             />
           ) : (
             <Input.Password
-              placeholder={initialValues ? '留空则不修改密码' : '输入密码'}
+              placeholder={
+                initialValues
+                  ? t('form.keepPasswordPlaceholder')
+                  : t('form.passwordPlaceholder')
+              }
             />
           )}
         </Form.Item>
       </Form>
       <div style={{ textAlign: 'right', marginTop: 8 }}>
         <a onClick={handleTest} style={{ fontSize: 12 }}>
-          {testing ? '测试中...' : '测试连接'}
+          {testing ? t('form.testing') : t('form.testConnection')}
         </a>
       </div>
     </Modal>

@@ -1,0 +1,25 @@
+export default {
+  title: 'Audit Logs',
+  col: {
+    time: 'Time',
+    type: 'Type',
+    model: 'Model',
+    tool: 'Tool',
+    node: 'Node',
+    provider: 'Provider',
+    duration: 'Duration',
+    status: 'Status',
+    success: 'Success',
+    fail: 'Failed',
+    error: 'Error',
+  },
+  stat: {
+    totalCalls: 'Total calls',
+    modelCalls: 'Model calls',
+    toolCalls: 'Tool calls',
+    tokensIn: 'Token in',
+    tokensOut: 'Token out',
+    tokensTotal: 'Token total',
+  },
+  empty: 'No audit records yet (generated after AI calls)',
+};

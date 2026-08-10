@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { App as AntdApp, Button, Input } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { hoststore } from '@wailsjs/go/models';
 
 type TreeNode = hoststore.TreeNode;
@@ -36,6 +37,8 @@ function hostAddrOf(node: TreeNode): string {
 export default function HostsPage(): React.JSX.Element {
   const { message, modal } = AntdApp.useApp();
   const { isDark } = useThemeToggle();
+  const { t } = useTranslation('hosts');
+  const { t: tc } = useTranslation('common');
   const {
     tree,
     addHost,
@@ -103,7 +106,7 @@ export default function HostsPage(): React.JSX.Element {
   // 普通函数（非 useCallback）：需读取每轮 render 最新的 terminal/activeTab，无 memo 价值。
   const runInTerminal = (cmd: string): void => {
     if (!activeTab?.connected) {
-      message.info('终端未连接，请先双击主机打开终端');
+      message.info(t('terminal.notConnected'));
       return;
     }
     terminal.sendData(activeTab.key, cmd + '\r');
@@ -136,7 +139,7 @@ export default function HostsPage(): React.JSX.Element {
   // 普通函数（非 useCallback）：需读取每轮 render 最新的 terminal 状态，无 memo 价值。
   const openTerminal = (node: TreeNode): void => {
     if (terminal.tabs.length >= MAX_TABS) {
-      message.warning(`标签数量已达上限（${MAX_TABS}）`);
+      message.warning(t('tabs.maxWarning', { count: MAX_TABS }));
       return;
     }
     terminal.open(node.id, node.name, hostAddrOf(node));
@@ -146,11 +149,11 @@ export default function HostsPage(): React.JSX.Element {
     (parentId: string) => {
       let name = '';
       modal.confirm({
-        title: '新建目录',
+        title: t('modal.newFolder'),
         content: (
           <Input
             autoFocus
-            placeholder="输入目录名称"
+            placeholder={t('modal.folderNamePlaceholder')}
             onChange={(e) => (name = e.target.value)}
           />
         ),
@@ -161,7 +164,7 @@ export default function HostsPage(): React.JSX.Element {
         },
       });
     },
-    [createFolder, modal],
+    [createFolder, modal, t],
   );
 
   const handleAddHost = useCallback((parentId: string) => {
@@ -191,13 +194,13 @@ export default function HostsPage(): React.JSX.Element {
   const handleDelete = useCallback(
     async (node: TreeNode) => {
       modal.confirm({
-        title: `确定删除"${node.name}"？`,
+        title: t('modal.deleteTitle', { name: node.name }),
         content:
-          node.nodeType === 'folder' ? '目录内的所有主机将被一并删除。' : '',
+          node.nodeType === 'folder' ? t('modal.deleteFolderContent') : '',
         onOk: () => deleteNode(node.id),
       });
     },
-    [deleteNode, modal],
+    [deleteNode, modal, t],
   );
 
   // 右键「连接」菜单：与双击一致，新建终端标签（普通函数，依赖最新 openTerminal）
@@ -254,7 +257,7 @@ export default function HostsPage(): React.JSX.Element {
         onMouseDown={onSidebarResize}
         onMouseEnter={() => setSidebarResizeHover(true)}
         onMouseLeave={() => setSidebarResizeHover(false)}
-        title="拖动调整宽度"
+        title={tc('dragResize')}
         style={{
           cursor: 'col-resize',
           background: sidebarResizeHover
@@ -289,7 +292,7 @@ export default function HostsPage(): React.JSX.Element {
         >
           {terminal.tabs.length === 0 && (
             <span style={{ fontSize: 12, color: '#999' }}>
-              双击左侧主机打开终端
+              {t('tabs.hint')}
             </span>
           )}
           {terminal.tabs.map((t) => {
@@ -431,10 +434,10 @@ export default function HostsPage(): React.JSX.Element {
               }}
             >
               <Button size="small" onClick={() => setView('terminal')}>
-                返回终端
+                {t('view.backToTerminal')}
               </Button>
               <span style={{ fontSize: 12 }}>
-                SFTP · {activeTab?.hostName ?? '未选择主机'}
+                SFTP · {activeTab?.hostName ?? t('sftp.noHost')}
               </span>
             </div>
             <div style={{ flex: 1, minHeight: 0, padding: '4px 5px' }}>
