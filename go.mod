@@ -9,7 +9,7 @@ require (
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/pkg/sftp v1.13.11
-	github.com/wailsapp/wails/v2 v2.13.0
+	github.com/wailsapp/wails/v2 v2.12.0
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.54.0
 	gopkg.in/yaml.v3 v3.0.1
