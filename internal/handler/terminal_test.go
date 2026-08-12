@@ -21,8 +21,8 @@ func TestTerminalHandler_TerminalContext(t *testing.T) {
 	if !strings.Contains(got, "/dev/sda1") {
 		t.Errorf("清洗后应含命令输出: %q", got)
 	}
-	if strings.Contains(got, "df -h") {
-		t.Errorf("回显应被去掉: %q", got)
+	if !strings.Contains(got, "> df -h") {
+		t.Errorf("输入的命令应以 > 前缀保留: %q", got)
 	}
 	if strings.Contains(got, "\x1b") {
 		t.Errorf("ANSI 应被去掉: %q", got)

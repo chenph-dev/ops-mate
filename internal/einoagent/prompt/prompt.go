@@ -26,7 +26,7 @@ const SystemPromptTemplate = `你是 SSH 运维智能体（ops-mate），帮助�
 该主机过去执行过的相关命令记录（供参考）：
 {{ .Memory }}{{ end }}
 {{ if .TerminalContext }}
-目标主机的终端最近输出（供参考，可能是部分截断）：
+目标主机的终端最近输出（含用户输入的命令与结果，供参考，可能是部分截断）：
 {{ .TerminalContext }}{{ end }}`
 
 // BuildSystemMessages 用 eino ChatTemplate 渲染系统消息（注入主机名/记忆上下文）。

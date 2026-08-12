@@ -16,19 +16,19 @@ const (
 // ansiRe 匹配常见 ANSI 转义：CSI（颜色/光标）、OSC（标题等）、其它控制。
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]|\x1b\].*?(?:\x07|\x1b\\)|\x1b[>=]|\x1b[()][0-9A-B]`)
 
-// promptRe 匹配 shell 提示符开头的行（命令回显）。形如：
+// promptRe 匹配 shell 提示符开头的行（命令回显），并捕获其后输入的命令。形如：
 //
-//	root@web01:~$ df -h
-//	$ uptime
-//	# whoami
-//	> next
+//	root@web01:~$ df -h   →  df -h
+//	$ uptime              →  uptime
+//	# whoami              →  whoami
+//	> next                →  next
 //
-// 仅匹配强模式（含提示符特征且后跟空格），避免误删普通输出。
-var promptRe = regexp.MustCompile(`^(?:[a-zA-Z0-9_.-]+@[a-zA-Z0-9_.-]+:[^$#>\n]*)?[$#>]\s`)
+// 仅匹配强模式（含提示符特征且后跟空白），避免误删普通输出。
+var promptRe = regexp.MustCompile(`^(?:[a-zA-Z0-9_.-]+@[a-zA-Z0-9_.-]+:[^$#>\n]*)?[$#>][ \t]+(.*)$`)
 
 // Clean 把终端原始输出清洗为可注入模型的文本：
 //  1. 去 ANSI 转义序列；
-//  2. 去命令行回显（以 shell 提示符开头的行）；
+//  2. 从命令行回显中提取输入的命令（root@host:~$ ls → "> ls"），空提示符行跳过；
 //  3. 合并相邻重复行；
 //  4. 截断超长行（MaxLineBytes）与总长（MaxTotalBytes）；
 //  5. 空输入或清洗后为空返回空串。
@@ -47,9 +47,14 @@ func Clean(raw []byte) string {
 		if line == "" {
 			continue
 		}
-		if promptRe.MatchString(line) {
-			// 命令行回显：跳过，不更新 prev（其后的输出与命令无关联限制）
-			continue
+		if m := promptRe.FindStringSubmatch(line); m != nil {
+			// 命令回显行：保留输入的命令（"root@host:~$ ls" → "> ls"）；
+			// 空提示符（无命令）跳过，不更新 prev。
+			cmd := strings.TrimSpace(m[1])
+			if cmd == "" {
+				continue
+			}
+			line = "> " + cmd
 		}
 		if line == prev {
 			// 连续重复行：合并

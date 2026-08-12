@@ -50,25 +50,32 @@ func TestClean_StripsANSI(t *testing.T) {
 	}
 }
 
-func TestClean_StripsCommandEcho(t *testing.T) {
+func TestClean_KeepsCommandAndOutput(t *testing.T) {
 	raw := []byte("root@web01:~$ df -h\r\n/dev/sda1  40G  20G  18G  52% /\r\n")
 	got := Clean(raw)
-	if strings.Contains(got, "df -h") {
-		t.Errorf("命令行回显应被去掉: %q", got)
+	if !strings.Contains(got, "> df -h") {
+		t.Errorf("输入的命令应以 > 前缀保留: %q", got)
 	}
 	if !strings.Contains(got, "/dev/sda1") {
 		t.Errorf("命令输出应保留: %q", got)
 	}
 }
 
-func TestClean_StripsShellPromptPrefix(t *testing.T) {
+func TestClean_KeepsShellPromptCommands(t *testing.T) {
 	raw := []byte("$ uptime\r\n 10:00 up 3 days\r\n# whoami\r\nroot\r\n")
 	got := Clean(raw)
-	if strings.Contains(got, "uptime") || strings.Contains(got, "whoami") {
-		t.Errorf("提示符行应去掉: %q", got)
+	if !strings.Contains(got, "> uptime") || !strings.Contains(got, "> whoami") {
+		t.Errorf("提示符命令应以 > 前缀保留: %q", got)
 	}
 	if !strings.Contains(got, "up 3 days") || !strings.Contains(got, "root") {
 		t.Errorf("输出应保留: %q", got)
+	}
+}
+
+func TestClean_SkipsBarePrompt(t *testing.T) {
+	raw := []byte("root@h:~$ \r\n") // 空提示符，无命令
+	if got := Clean(raw); got != "" {
+		t.Errorf("空提示符应跳过: %q", got)
 	}
 }
 
