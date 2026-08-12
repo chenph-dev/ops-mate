@@ -31,7 +31,7 @@ type DB struct {
 // Open 打开（必要时创建）ops-mate.db 并执行建表迁移。
 // 数据库文件位于用户数据目录（Windows: %APPDATA%/ops-mate）。
 func Open() (*DB, error) {
-	dir, err := dataDir()
+	dir, err := DataDir()
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +83,8 @@ func runMigrations(gormDB *gorm.DB) error {
 	return nil
 }
 
-func dataDir() (string, error) {
+// DataDir 返回应用数据目录（Windows: %APPDATA%/ops-mate），技能文件等落盘于此。
+func DataDir() (string, error) {
 	base, err := os.UserConfigDir()
 	if err != nil {
 		return "", err

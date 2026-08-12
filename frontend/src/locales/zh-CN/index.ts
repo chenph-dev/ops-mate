@@ -6,6 +6,7 @@ import sftp from './sftp';
 import ai from './ai';
 import config from './config';
 import audit from './audit';
+import skills from './skills';
 import about from './about';
 
 export default {
@@ -17,5 +18,6 @@ export default {
   ai,
   config,
   audit,
+  skills,
   about,
 };

@@ -11,7 +11,7 @@ import (
 func TestBuildSystemMessages_TerminalContext(t *testing.T) {
 	// 有终端上下文 → 段落输出且包含内容
 	msgs, err := BuildSystemMessages(context.Background(), map[string]any{
-		"HostName": "web01", "Memory": "", "TerminalContext": "/dev/sda1 52% /\n",
+		"HostName": "web01", "Memory": "", "TerminalContext": "/dev/sda1 52% /\n", "SkillsCatalog": "",
 	})
 	if err != nil {
 		t.Fatalf("BuildSystemMessages: %v", err)
@@ -30,7 +30,7 @@ func TestBuildSystemMessages_TerminalContext(t *testing.T) {
 
 func TestBuildSystemMessages_NoTerminalContext(t *testing.T) {
 	msgs, err := BuildSystemMessages(context.Background(), map[string]any{
-		"HostName": "", "Memory": "", "TerminalContext": "",
+		"HostName": "", "Memory": "", "TerminalContext": "", "SkillsCatalog": "",
 	})
 	if err != nil {
 		t.Fatalf("BuildSystemMessages: %v", err)

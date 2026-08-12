@@ -21,6 +21,7 @@ import (
 	"ops-mate/internal/einoagent/checkpoint"
 	agentmodel "ops-mate/internal/einoagent/model"
 	agenttools "ops-mate/internal/einoagent/tools"
+	"ops-mate/internal/skill"
 	"ops-mate/internal/sshexec"
 	"ops-mate/internal/store"
 	configstore "ops-mate/internal/store/config"
@@ -127,6 +128,10 @@ type SessionManager struct {
 	// terminalContextFor 按主机解析终端最近输出清洗文本（AI 上下文）；nil 表示不注入。
 	terminalContextFor func(hostID string) string
 
+	// skillCatalogFor 返回已启用技能的目录文本（无则空串）；skillFor 按名解析技能（供工具用）。nil 表示不启用技能。
+	skillCatalogFor func() string
+	skillFor        func(name string) (*skill.Skill, error)
+
 	mu            sync.Mutex
 	sessions      map[string]*agentSession
 	configVersion int
@@ -179,4 +184,14 @@ func (m *SessionManager) SetTerminalContextResolver(fn func(hostID string) strin
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.terminalContextFor = fn
+}
+
+// SetSkillResolver 注入技能解析器（目录文本 + 按名解析）。不注入则系统提示词不含
+// 技能目录、不注册技能工具。注入同时使已构建 Graph 失效（技能工具列表随技能增删变化）。
+func (m *SessionManager) SetSkillResolver(catalog func() string, lookup func(name string) (*skill.Skill, error)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.skillCatalogFor = catalog
+	m.skillFor = lookup
+	m.configVersion++
 }

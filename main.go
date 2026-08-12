@@ -4,6 +4,8 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"os"
+	"path/filepath"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -13,12 +15,14 @@ import (
 	"ops-mate/internal/einoagent/session"
 	"ops-mate/internal/handler"
 	sftppkg "ops-mate/internal/sftp"
+	"ops-mate/internal/skill"
 	"ops-mate/internal/sshexec"
 	"ops-mate/internal/store"
 	cfgstore "ops-mate/internal/store/config"
 	convstore "ops-mate/internal/store/conversations"
 	hoststore "ops-mate/internal/store/hosts"
 	logsstore "ops-mate/internal/store/logs"
+	skillsstore "ops-mate/internal/store/skills"
 )
 
 //go:embed all:frontend/dist
@@ -36,6 +40,19 @@ func main() {
 	hostsStore := hoststore.NewHostsStore(app)
 	convStore := convstore.NewConvStore(app)
 	logsStore := logsstore.NewLogsStore(app)
+	// 运维技能：DB 元数据 + 磁盘文件（<DataDir>/skills/）。技能增删/启停后使 Graph 失效。
+	dataDir, err := store.DataDir()
+	if err != nil {
+		fmt.Println("data dir error:", err)
+		return
+	}
+	skillRoot := filepath.Join(dataDir, "skills")
+	if err := os.MkdirAll(skillRoot, 0o700); err != nil {
+		fmt.Println("mkdir skills dir error:", err)
+		return
+	}
+	skillStore := skillsstore.NewSkillStore(app)
+	skillManager := skill.NewManager(skillStore, skillRoot)
 	// 终端会话管理：按 hostID 记录最近输出，供 AI 上下文注入。
 	terminalHandler := handler.NewTerminalHandler(hostsStore)
 
@@ -71,6 +88,8 @@ func main() {
 	})
 	// 终端上下文注入：每次发消息时把当前主机终端最近输出清洗后给模型。
 	sessionManager.SetTerminalContextResolver(terminalHandler.TerminalContext)
+	// 运维技能：技能目录注入系统提示词 + 技能工具解析（load_skill / run_skill_script）。
+	sessionManager.SetSkillResolver(skillManager.Catalog, skillManager.Lookup)
 
 	// SFTP 管理器：按 hostID 懒建立/复用连接，应用退出时关闭。
 	sftpManager := sftppkg.NewManager(
@@ -130,6 +149,7 @@ func main() {
 			handler.NewApprovalPolicyHandler(policyStore, sessionManager.InvalidateConfig),
 			handler.NewSessionsHandler(convStore, sessionManager),
 			terminalHandler,
+			handler.NewSkillsHandler(skillManager, sessionManager.InvalidateConfig),
 			handler.NewSftpHandler(sftpManager),
 			handler.NewLogsHandler(logsStore),
 		},

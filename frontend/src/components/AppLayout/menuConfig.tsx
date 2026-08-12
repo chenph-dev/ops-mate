@@ -43,6 +43,11 @@ export const routes: RouteItem[] = [
         component: lazyPage(() => import('@/pages/Config')),
       },
       {
+        path: '/system/skills',
+        label: 'skills',
+        component: lazyPage(() => import('@/pages/Skills')),
+      },
+      {
         path: '/audit',
         label: 'audit',
         icon: <FileSearchOutlined />,

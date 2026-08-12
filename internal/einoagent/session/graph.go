@@ -76,6 +76,7 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 	m.mu.Lock()
 	version := m.configVersion
 	policyFor := m.policyFor
+	skillFor := m.skillFor
 	m.mu.Unlock()
 
 	s.mu.Lock()
@@ -103,16 +104,10 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 		sshTool.SetApprovalPolicy(auto, wl)
 	}
 	planTool := agenttools.NewPlanTool(s.id, m.emit, m.convs, s.toolCalls)
-	toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
-		Tools: []einotool.BaseTool{sshTool, planTool}, ExecuteSequentially: true,
-	})
-	if err != nil {
-		return fmt.Errorf("构建工具节点失败: %w", err)
-	}
 
-	wrapped := agentmodel.NewStreamingChatModel(base, s.id, m.emit, m.onAssistant(s))
-	// 两个工具都暴露给模型：execute_command（单条命令）+ create_plan（计划模式）。
-	// 遗漏任一个，模型便不知道其存在、永远不会生成对应 tool_call。
+	// 工具集合：execute_command + create_plan，注入技能解析器时追加 load_skill / run_skill_script。
+	baseTools := []einotool.BaseTool{sshTool, planTool}
+	baseInfos := []*schema.ToolInfo{}
 	info, err := sshTool.Info(ctx)
 	if err != nil {
 		return fmt.Errorf("tool info: %w", err)
@@ -121,7 +116,30 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 	if err != nil {
 		return fmt.Errorf("plan tool info: %w", err)
 	}
-	withTools, err := wrapped.WithTools([]*schema.ToolInfo{info, planInfo})
+	baseInfos = append(baseInfos, info, planInfo)
+	if skillFor != nil {
+		skillTools := agenttools.NewSkillTools(s.id, s.holder, m.emit, m.convs, s.toolCalls, skillFor)
+		for _, t := range skillTools.Tools() {
+			baseTools = append(baseTools, t)
+			ti, err := t.Info(ctx)
+			if err != nil {
+				return fmt.Errorf("skill tool info: %w", err)
+			}
+			baseInfos = append(baseInfos, ti)
+		}
+	}
+
+	toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
+		Tools: baseTools, ExecuteSequentially: true,
+	})
+	if err != nil {
+		return fmt.Errorf("构建工具节点失败: %w", err)
+	}
+
+	wrapped := agentmodel.NewStreamingChatModel(base, s.id, m.emit, m.onAssistant(s))
+	// 全部工具都暴露给模型：execute_command + create_plan +（可选）load_skill / run_skill_script。
+	// 遗漏任一个，模型便不知道其存在、永远不会生成对应 tool_call。
+	withTools, err := wrapped.WithTools(baseInfos)
 	if err != nil {
 		return fmt.Errorf("绑定工具失败: %w", err)
 	}

@@ -11,6 +11,7 @@ import (
 
 	"ops-mate/internal/einoagent/history"
 	"ops-mate/internal/einoagent/testutil"
+	"ops-mate/internal/skill"
 	"ops-mate/internal/sshexec"
 	"ops-mate/internal/store"
 	configstore "ops-mate/internal/store/config"
@@ -278,6 +279,45 @@ func TestBuildInput_NoResolverNoContext(t *testing.T) {
 	for _, msg := range input {
 		if msg.Role == schema.System && strings.Contains(msg.Content, "终端最近输出") {
 			t.Error("未注入 resolver 时不应输出终端上下文段落")
+		}
+	}
+}
+
+func TestBuildInput_SkillsCatalogInjected(t *testing.T) {
+	f := newSessionFixture(t, []*schema.Message{schema.AssistantMessage("hi", nil)})
+	f.mgr.SetSkillResolver(
+		func() string { return "- nginx-check: 检查 Nginx" },
+		func(name string) (*skill.Skill, error) { return nil, nil },
+	)
+	sid, _ := f.mgr.EnsureSession(f.hostID)
+	s, _ := f.mgr.sessionFor(sid)
+	input, err := f.mgr.buildInput(s, "继续")
+	if err != nil {
+		t.Fatalf("buildInput: %v", err)
+	}
+	found := false
+	for _, msg := range input {
+		if msg.Role == schema.System && strings.Contains(msg.Content, "nginx-check") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("system 消息应含技能目录")
+	}
+}
+
+func TestBuildInput_NoSkillsCatalog(t *testing.T) {
+	f := newSessionFixture(t, []*schema.Message{schema.AssistantMessage("hi", nil)})
+	// 不注入技能解析器
+	sid, _ := f.mgr.EnsureSession(f.hostID)
+	s, _ := f.mgr.sessionFor(sid)
+	input, err := f.mgr.buildInput(s, "继续")
+	if err != nil {
+		t.Fatalf("buildInput: %v", err)
+	}
+	for _, msg := range input {
+		if msg.Role == schema.System && strings.Contains(msg.Content, "已安装运维技能") {
+			t.Error("未注入技能解析器时不应输出技能目录段落")
 		}
 	}
 }
