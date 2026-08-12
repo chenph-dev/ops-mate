@@ -124,6 +124,9 @@ type SessionManager struct {
 	// policyFor 按主机解析审批策略（enableAuto + 只读白名单）；nil 表示全量审批。
 	policyFor func(hostID string) (enableAuto bool, readOnlyWhitelist []string)
 
+	// terminalContextFor 按主机解析终端最近输出清洗文本（AI 上下文）；nil 表示不注入。
+	terminalContextFor func(hostID string) string
+
 	mu            sync.Mutex
 	sessions      map[string]*agentSession
 	configVersion int
@@ -168,4 +171,12 @@ func (m *SessionManager) SetApprovalPolicyResolver(fn func(hostID string) (bool,
 	defer m.mu.Unlock()
 	m.policyFor = fn
 	m.configVersion++
+}
+
+// SetTerminalContextResolver 注入终端上下文解析器（hostID → 清洗后的终端输出文本）。
+// 不注入则 AI 上下文不含终端内容。
+func (m *SessionManager) SetTerminalContextResolver(fn func(hostID string) string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.terminalContextFor = fn
 }

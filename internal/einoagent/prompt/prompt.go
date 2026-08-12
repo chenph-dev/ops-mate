@@ -24,7 +24,10 @@ const SystemPromptTemplate = `你是 SSH 运维智能体（ops-mate），帮助�
 7. 计划模式：面对复杂/多步运维任务（需要多条命令诊断/修复），先调用 create_plan 提交执行计划（目标 + 步骤列表）供用户审批，批准后再按计划逐步执行（每步仍通过 execute_command 提议命令等待审批）。简单单条命令任务直接使用 execute_command，不要使用 create_plan。
 {{ if .Memory }}
 该主机过去执行过的相关命令记录（供参考）：
-{{ .Memory }}{{ end }}`
+{{ .Memory }}{{ end }}
+{{ if .TerminalContext }}
+目标主机的终端最近输出（供参考，可能是部分截断）：
+{{ .TerminalContext }}{{ end }}`
 
 // BuildSystemMessages 用 eino ChatTemplate 渲染系统消息（注入主机名/记忆上下文）。
 // params 支持键：HostName（主机名）、Memory（记忆文本）。

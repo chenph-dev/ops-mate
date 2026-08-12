@@ -239,6 +239,49 @@ func TestSessionManager_CancelRun(t *testing.T) {
 	f.waitState(sid, StateIdle)
 }
 
+func TestBuildInput_TerminalContextInjected(t *testing.T) {
+	f := newSessionFixture(t, []*schema.Message{schema.AssistantMessage("hi", nil)})
+	f.mgr.SetTerminalContextResolver(func(hostID string) string {
+		return "TERMINAL_CTX_" + hostID
+	})
+	sid, _ := f.mgr.EnsureSession(f.hostID)
+
+	s, err := f.mgr.sessionFor(sid)
+	if err != nil {
+		t.Fatalf("sessionFor: %v", err)
+	}
+	input, err := f.mgr.buildInput(s, "继续")
+	if err != nil {
+		t.Fatalf("buildInput: %v", err)
+	}
+	// system 消息应包含终端上下文
+	found := false
+	for _, msg := range input {
+		if msg.Role == schema.System && strings.Contains(msg.Content, "TERMINAL_CTX_"+f.hostID) {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("system 消息应包含终端上下文")
+	}
+}
+
+func TestBuildInput_NoResolverNoContext(t *testing.T) {
+	f := newSessionFixture(t, []*schema.Message{schema.AssistantMessage("hi", nil)})
+	// 不注入 resolver
+	sid, _ := f.mgr.EnsureSession(f.hostID)
+	s, _ := f.mgr.sessionFor(sid)
+	input, err := f.mgr.buildInput(s, "继续")
+	if err != nil {
+		t.Fatalf("buildInput: %v", err)
+	}
+	for _, msg := range input {
+		if msg.Role == schema.System && strings.Contains(msg.Content, "终端最近输出") {
+			t.Error("未注入 resolver 时不应输出终端上下文段落")
+		}
+	}
+}
+
 func TestSessionManager_PolicyResolverInjected(t *testing.T) {
 	f := newSessionFixture(t, []*schema.Message{schema.AssistantMessage("hi", nil)})
 	resolved := false

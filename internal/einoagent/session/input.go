@@ -47,8 +47,8 @@ func (m *SessionManager) buildInput(s *agentSession, userText string) ([]*schema
 		return nil, err
 	}
 
-	// 模板参数：主机名 + 记忆（失败不阻断主流程）
-	params := map[string]any{"HostName": "", "Memory": ""}
+	// 模板参数：主机名 + 记忆 + 终端上下文（失败不阻断主流程）
+	params := map[string]any{"HostName": "", "Memory": "", "TerminalContext": ""}
 	if m.hostNameFor != nil {
 		if name, err := m.hostNameFor(s.hostID); err == nil {
 			params["HostName"] = name
@@ -62,6 +62,11 @@ func (m *SessionManager) buildInput(s *agentSession, userText string) ([]*schema
 			note.WriteString("\n")
 		}
 		params["Memory"] = strings.TrimSuffix(note.String(), "\n")
+	}
+	if m.terminalContextFor != nil {
+		if ctx := m.terminalContextFor(s.hostID); ctx != "" {
+			params["TerminalContext"] = ctx
+		}
 	}
 	sysMsgs, err := prompt.BuildSystemMessages(context.Background(), params)
 	if err != nil {

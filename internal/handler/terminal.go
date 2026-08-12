@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"ops-mate/internal/sshexec"
 	"ops-mate/internal/store/crypto"
 	hoststore "ops-mate/internal/store/hosts"
+	"ops-mate/internal/termctx"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -21,11 +23,19 @@ type TerminalHandler struct {
 	hosts    *hoststore.HostsStore
 	sessions map[string]*sshexec.Session
 	mu       sync.Mutex
+
+	// 按 hostID 缓存最近终端输出（供 AI 上下文注入）。termMu 保护。
+	termBufs map[string]*termctx.RingBuffer
+	termMu   sync.Mutex
 }
 
 // NewTerminalHandler 构造 TerminalHandler。
 func NewTerminalHandler(hosts *hoststore.HostsStore) *TerminalHandler {
-	return &TerminalHandler{hosts: hosts, sessions: map[string]*sshexec.Session{}}
+	return &TerminalHandler{
+		hosts:    hosts,
+		sessions: map[string]*sshexec.Session{},
+		termBufs: map[string]*termctx.RingBuffer{},
+	}
 }
 
 // getHost 按 hostID 取凭据与元信息，构造 SSH 目标。
@@ -63,6 +73,7 @@ func (h *TerminalHandler) OpenTerminal(hostID string, cols, rows int) (string, e
 	out := sess.Output()
 	go func() {
 		for chunk := range out {
+			h.appendTermOutput(hostID, chunk)
 			wailsruntime.EventsEmit(Ctx(), "terminal:output", map[string]any{
 				"sessionId": id,
 				"data":      base64.StdEncoding.EncodeToString(chunk),
@@ -108,6 +119,42 @@ func (h *TerminalHandler) CloseTerminal(sessionID string) {
 	if ok {
 		sess.Close()
 	}
+}
+
+// appendTermOutput 把终端输出 chunk 写入该主机的环形缓冲。
+// 检测到清屏转义（\x1b[2J）时清空缓冲，尊重用户清屏意图。
+func (h *TerminalHandler) appendTermOutput(hostID string, chunk []byte) {
+	h.termMu.Lock()
+	buf, ok := h.termBufs[hostID]
+	if !ok {
+		// 原始字节上限：环形缓冲存原始字节，清洗时再按 MaxTotalBytes 截断。
+		buf = termctx.NewRingBuffer(termctx.MaxTotalBytes * 2)
+		h.termBufs[hostID] = buf
+	}
+	h.termMu.Unlock()
+
+	if containsClearScreen(chunk) {
+		buf.Reset()
+	}
+	buf.Append(chunk)
+}
+
+// containsClearScreen 判断 chunk 是否含清屏转义序列。
+func containsClearScreen(chunk []byte) bool {
+	return bytes.Contains(chunk, []byte("\x1b[2J"))
+}
+
+// TerminalContext 返回指定主机最近终端输出的清洗文本（用于 AI 上下文）。
+// 无记录或清洗为空返回空串。
+// 注：本方法供后端 AI 会话内部调用；作为绑定方法也会暴露给前端，前端不使用即可。
+func (h *TerminalHandler) TerminalContext(hostID string) string {
+	h.termMu.Lock()
+	buf := h.termBufs[hostID]
+	h.termMu.Unlock()
+	if buf == nil {
+		return ""
+	}
+	return termctx.Clean(buf.Bytes())
 }
 
 func (h *TerminalHandler) getSession(sessionID string) (*sshexec.Session, error) {

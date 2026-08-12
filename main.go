@@ -36,6 +36,8 @@ func main() {
 	hostsStore := hoststore.NewHostsStore(app)
 	convStore := convstore.NewConvStore(app)
 	logsStore := logsstore.NewLogsStore(app)
+	// 终端会话管理：按 hostID 记录最近输出，供 AI 上下文注入。
+	terminalHandler := handler.NewTerminalHandler(hostsStore)
 
 	// AI 模型不在启动时构建（配置可能为空/变更）——
 	// SessionManager 在每轮对话开始时按最新配置懒构建（热更新）。
@@ -67,6 +69,8 @@ func main() {
 		}
 		return auto, p.ReadOnlyList
 	})
+	// 终端上下文注入：每次发消息时把当前主机终端最近输出清洗后给模型。
+	sessionManager.SetTerminalContextResolver(terminalHandler.TerminalContext)
 
 	// SFTP 管理器：按 hostID 懒建立/复用连接，应用退出时关闭。
 	sftpManager := sftppkg.NewManager(
@@ -125,7 +129,7 @@ func main() {
 			handler.NewAIConfigHandler(cfgStore, sessionManager.InvalidateConfig),
 			handler.NewApprovalPolicyHandler(policyStore, sessionManager.InvalidateConfig),
 			handler.NewSessionsHandler(convStore, sessionManager),
-			handler.NewTerminalHandler(hostsStore),
+			terminalHandler,
 			handler.NewSftpHandler(sftpManager),
 			handler.NewLogsHandler(logsStore),
 		},
