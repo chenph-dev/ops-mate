@@ -238,3 +238,65 @@ func TestSessionManager_CancelRun(t *testing.T) {
 	}
 	f.waitState(sid, StateIdle)
 }
+
+func TestSessionManager_PolicyResolverInjected(t *testing.T) {
+	f := newSessionFixture(t, []*schema.Message{schema.AssistantMessage("hi", nil)})
+	resolved := false
+	f.mgr.SetApprovalPolicyResolver(func(hostID string) (bool, []string) {
+		resolved = true
+		return true, []string{"ls"}
+	})
+	sid, _ := f.mgr.EnsureSession(f.hostID)
+	if err := f.mgr.SendMessage(sid, "在吗"); err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+	f.waitState(sid, StateIdle)
+	if !resolved {
+		t.Error("ensureGraph 应调用策略解析器")
+	}
+}
+
+func TestBuildInput_TruncationFirstNonSystemIsUser(t *testing.T) {
+	// 回归：历史超 maxHistoryMessages 触发截断时，模型输入的第一条非 system 消息
+	// 必须是 user（OpenAI/Anthropic 等 API 硬性校验，违反报 "first non-system
+	// message should be user message"）。此前截断插入的占位消息是 assistant 角色
+	// 且排在 user 之前，长会话时必现。
+	f := newSessionFixture(t, []*schema.Message{schema.AssistantMessage("hi", nil)})
+	sid, _ := f.mgr.EnsureSession(f.hostID)
+
+	// 构造超过 maxHistoryMessages 条的历史（交错 user/assistant），且会话末尾
+	// 是完整的 user → assistant(tool_call) → tool → assistant 轮次，贴近真实。
+	tcJSON := `[{"id":"call_x","name":"execute_command","arguments":"{\"command\":\"ls\"}"}]`
+	for i := 0; i < maxHistoryMessages+2; i++ {
+		_ = f.convs.SaveMessage(convstore.Message{SessionID: sid, Role: history.RoleUser, Content: "查询"})
+		_ = f.convs.SaveMessage(convstore.Message{SessionID: sid, Role: history.RoleAssistant, Content: "分析中"})
+	}
+	_ = f.convs.SaveMessage(convstore.Message{SessionID: sid, Role: history.RoleUser, Content: "看下目录"})
+	_ = f.convs.SaveMessage(convstore.Message{SessionID: sid, Role: history.RoleAssistant, Content: "", ToolCalls: tcJSON})
+	_ = f.convs.SaveMessage(convstore.Message{SessionID: sid, Role: history.RoleTool, Content: "file1", ToolCallID: "call_x", ToolName: "execute_command"})
+	_ = f.convs.SaveMessage(convstore.Message{SessionID: sid, Role: history.RoleAssistant, Content: "完成"})
+
+	s, err := f.mgr.sessionFor(sid)
+	if err != nil {
+		t.Fatalf("sessionFor: %v", err)
+	}
+	input, err := f.mgr.buildInput(s, "继续")
+	if err != nil {
+		t.Fatalf("buildInput: %v", err)
+	}
+
+	firstNonSystem := (*schema.Message)(nil)
+	for _, msg := range input {
+		if msg.Role != schema.System {
+			firstNonSystem = msg
+			break
+		}
+	}
+	if firstNonSystem == nil {
+		t.Fatal("输入中没有非 system 消息")
+	}
+	if firstNonSystem.Role != schema.User {
+		t.Errorf("截断后第一条非 system 消息角色 = %v，want user（内容: %q）",
+			firstNonSystem.Role, firstNonSystem.Content)
+	}
+}

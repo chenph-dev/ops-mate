@@ -26,6 +26,7 @@ function toHostInput(node: TreeNode): HostInput {
     user: node.user ?? '',
     authType: node.authType ?? 'password',
     secret: '',
+    autoApprove: node.autoApprove ?? 'inherit',
   };
 }
 

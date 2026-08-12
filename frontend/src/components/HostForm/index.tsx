@@ -20,6 +20,7 @@ const defaultValues: HostInput = {
   user: 'root',
   authType: 'password',
   secret: '',
+  autoApprove: 'inherit',
 };
 
 export default function HostForm({
@@ -145,6 +146,15 @@ export default function HostForm({
               placeholder={initialValues ? '留空则不修改密码' : '输入密码'}
             />
           )}
+        </Form.Item>
+        <Form.Item name="autoApprove" label="自动放行只读命令">
+          <Select
+            options={[
+              { label: '继承全局设置', value: 'inherit' },
+              { label: '允许（覆盖为开启）', value: 'on' },
+              { label: '禁止（覆盖为关闭）', value: 'off' },
+            ]}
+          />
         </Form.Item>
       </Form>
       <div style={{ textAlign: 'right', marginTop: 8 }}>

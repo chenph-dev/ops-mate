@@ -124,3 +124,41 @@ func closeDB(app *store.DB) {
 		sqlDB.Close()
 	}
 }
+
+func TestHostAutoApprove_Roundtrip(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	app, err := store.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer closeDB(app)
+
+	s := NewHostsStore(app)
+	id, err := s.SaveHost(HostInput{
+		Name: "h", Addr: "1.1.1.1", Port: 22, User: "u",
+		AuthType: "password", Secret: "x", AutoApprove: "on",
+	})
+	if err != nil {
+		t.Fatalf("SaveHost: %v", err)
+	}
+	// 默认：未显式指定时落库为 'inherit'（列默认值）
+	id2, _ := s.SaveHost(HostInput{
+		Name: "h2", Addr: "1.1.1.2", Port: 22, User: "u",
+		AuthType: "password", Secret: "x",
+	})
+	if v, _ := s.GetAutoApprove(id); v != "on" {
+		t.Errorf("GetAutoApprove = %q，want on", v)
+	}
+	if v, _ := s.GetAutoApprove(id2); v != "inherit" {
+		t.Errorf("GetAutoApprove 默认 = %q，want inherit", v)
+	}
+	if err := s.UpdateHost(id, HostInput{
+		Name: "h", Addr: "1.1.1.1", Port: 22, User: "u",
+		AuthType: "password", AutoApprove: "off",
+	}); err != nil {
+		t.Fatalf("UpdateHost: %v", err)
+	}
+	if v, _ := s.GetAutoApprove(id); v != "off" {
+		t.Errorf("UpdateHost 后 GetAutoApprove = %q，want off", v)
+	}
+}

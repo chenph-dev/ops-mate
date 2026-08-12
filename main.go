@@ -32,6 +32,7 @@ func main() {
 	}
 
 	cfgStore := cfgstore.NewConfigStore(app)
+	policyStore := cfgstore.NewPolicyStore(app)
 	hostsStore := hoststore.NewHostsStore(app)
 	convStore := convstore.NewConvStore(app)
 	logsStore := logsstore.NewLogsStore(app)
@@ -49,6 +50,23 @@ func main() {
 			return meta.Name, nil
 		},
 		emitEvent)
+	// 审批分级：全局策略 + 主机覆盖（on/off/inherit）。读取失败保守关闭自动放行。
+	sessionManager.SetApprovalPolicyResolver(func(hostID string) (bool, []string) {
+		p, err := policyStore.GetApprovalPolicy()
+		if err != nil {
+			return false, nil
+		}
+		auto := p.EnableAuto
+		if override, oerr := hostsStore.GetAutoApprove(hostID); oerr == nil {
+			switch override {
+			case "on":
+				auto = true
+			case "off":
+				auto = false
+			}
+		}
+		return auto, p.ReadOnlyList
+	})
 
 	// SFTP 管理器：按 hostID 懒建立/复用连接，应用退出时关闭。
 	sftpManager := sftppkg.NewManager(
@@ -103,8 +121,9 @@ func main() {
 		},
 		// 每个 handler 是独立模块，前端通过 wailsjs/go/main/<TypeName> 访问。
 		Bind: []interface{}{
-			handler.NewHostsHandler(hostsStore),
+			handler.NewHostsHandler(hostsStore, sessionManager.InvalidateConfig),
 			handler.NewAIConfigHandler(cfgStore, sessionManager.InvalidateConfig),
+			handler.NewApprovalPolicyHandler(policyStore, sessionManager.InvalidateConfig),
 			handler.NewSessionsHandler(convStore, sessionManager),
 			handler.NewTerminalHandler(hostsStore),
 			handler.NewSftpHandler(sftpManager),

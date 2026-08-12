@@ -91,7 +91,12 @@ function parseToolCallCommand(
     // 有相邻且同 ID 的 tool 消息 = 该命令已被处理过；审批状态直接读落库字段。
     let status: ApprovalStatus = 'pending';
     if (nextMsg?.role === 'tool' && nextMsg.toolCallId === calls[0].id) {
-      status = nextMsg.approvalStatus === 'rejected' ? 'rejected' : 'approved';
+      status =
+        nextMsg.approvalStatus === 'rejected'
+          ? 'rejected'
+          : nextMsg.approvalStatus === 'auto'
+            ? 'auto'
+            : 'approved';
     }
     return {
       command: args.command,

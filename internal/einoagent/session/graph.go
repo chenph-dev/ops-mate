@@ -75,6 +75,7 @@ func (m *SessionManager) run(s *agentSession, ctx context.Context, input []*sche
 func (m *SessionManager) ensureGraph(s *agentSession) error {
 	m.mu.Lock()
 	version := m.configVersion
+	policyFor := m.policyFor
 	m.mu.Unlock()
 
 	s.mu.Lock()
@@ -97,6 +98,10 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 	}
 
 	sshTool := agenttools.NewSSHTool(s.id, s.holder, m.emit, m.convs, s.toolCalls)
+	if policyFor != nil {
+		auto, wl := policyFor(s.hostID)
+		sshTool.SetApprovalPolicy(auto, wl)
+	}
 	planTool := agenttools.NewPlanTool(s.id, m.emit, m.convs, s.toolCalls)
 	toolsNode, err := compose.NewToolNode(ctx, &compose.ToolsNodeConfig{
 		Tools: []einotool.BaseTool{sshTool, planTool}, ExecuteSequentially: true,

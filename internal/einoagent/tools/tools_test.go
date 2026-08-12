@@ -101,7 +101,7 @@ func TestSSHTool_ExecutePersistsAndEmits(t *testing.T) {
 	holder.Add(&schema.ToolCall{ID: "call_9", Function: schema.FunctionCall{Name: "execute_command"}})
 	tool := NewSSHTool(sid, ex, rec.Emit, convs, holder)
 
-	result, err := tool.execute(context.Background(), "ls")
+	result, err := tool.execute(context.Background(), "ls", "approved")
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestSSHTool_ExecutePersistsAndEmits(t *testing.T) {
 func TestSSHTool_ExecErrorFedBackAsText(t *testing.T) {
 	ex := &testutil.FakeExec{Err: context.DeadlineExceeded}
 	tool := NewSSHTool("s1", ex, (&testutil.EmitRecorder{}).Emit, nil, NewToolCallHolder())
-	result, err := tool.execute(context.Background(), "sleep 999")
+	result, err := tool.execute(context.Background(), "sleep 999", "approved")
 	if err != nil {
 		t.Fatalf("execute 不应返回 error（应回灌文本）: %v", err)
 	}
@@ -206,7 +206,7 @@ func TestSSHTool_RunResultEmittedAfterToolMessagePersisted(t *testing.T) {
 		}
 	}
 	tool := NewSSHTool(sid, ex, emit, convs, holder)
-	if _, err := tool.execute(context.Background(), "ls"); err != nil {
+	if _, err := tool.execute(context.Background(), "ls", "approved"); err != nil {
 		t.Fatalf("execute: %v", err)
 	}
 	if !persistedAtResult {
@@ -218,3 +218,88 @@ func TestSSHTool_RunResultEmittedAfterToolMessagePersisted(t *testing.T) {
 // 工具层无法直接测试。空批准数据守卫由 graph 包测试
 // （TestApprovalFlow_ApproveWithEmptyCommandGuarded）覆盖；
 // rejected 路径的 DB 落库由 session 包测试（TestSessionManager_RejectFlow）覆盖。
+
+func TestSSHTool_AutoApproved_ReadOnlySkipsInterrupt(t *testing.T) {
+	rec := &testutil.EmitRecorder{}
+	ex := &testutil.FakeExec{Lines: []sshexec.Line{{Stream: "stdout", Text: "file1"}}}
+	tool := NewSSHTool("s1", ex, rec.Emit, nil, NewToolCallHolder())
+	tool.SetApprovalPolicy(true, []string{"ls", "df"})
+
+	_, err := tool.InvokableRun(context.Background(), `{"command":"ls -la","why":"看看"}`)
+	if err != nil {
+		t.Fatalf("只读命令自动放行不应返回中断错误: %v", err)
+	}
+	if len(ex.Commands()) != 1 {
+		t.Fatalf("应执行一次命令，得到 %v", ex.Commands())
+	}
+	// 不应有 ai:command（无审批卡）；应推 run:auto
+	events := rec.SnapshotEvents()
+	var sawCommand, sawAuto bool
+	for _, e := range events {
+		switch e {
+		case "ai:command":
+			sawCommand = true
+		case "run:auto":
+			sawAuto = true
+		}
+	}
+	if sawCommand {
+		t.Error("自动放行不应推送 ai:command")
+	}
+	if !sawAuto {
+		t.Error("自动放行应推送 run:auto")
+	}
+}
+
+func TestSSHTool_AutoApproved_WriteStillInterrupts(t *testing.T) {
+	rec := &testutil.EmitRecorder{}
+	ex := &testutil.FakeExec{}
+	tool := NewSSHTool("s1", ex, rec.Emit, nil, NewToolCallHolder())
+	tool.SetApprovalPolicy(true, []string{"ls"})
+
+	_, err := tool.InvokableRun(context.Background(), `{"command":"touch /tmp/x","why":"测试"}`)
+	if err == nil {
+		t.Fatal("写命令即使启用自动放行也应返回中断错误")
+	}
+	if len(ex.Commands()) != 0 {
+		t.Error("写命令在审批前不应执行")
+	}
+	if !testutil.ContainsEvent(rec.SnapshotEvents(), "ai:command") {
+		t.Error("写命令应推送 ai:command 审批卡")
+	}
+}
+
+func TestSSHTool_AutoDisabled_AllInterrupts(t *testing.T) {
+	// 未设置策略（默认全量审批）时只读命令也中断——回归既有行为。
+	rec := &testutil.EmitRecorder{}
+	ex := &testutil.FakeExec{}
+	tool := NewSSHTool("s1", ex, rec.Emit, nil, NewToolCallHolder())
+
+	_, err := tool.InvokableRun(context.Background(), `{"command":"ls -la","why":"看看"}`)
+	if err == nil {
+		t.Fatal("默认（自动放行关闭）时只读命令也应中断")
+	}
+}
+
+func TestSSHTool_AutoApproved_PersistsStatusAuto(t *testing.T) {
+	app := testutil.OpenTempStore(t)
+	hosts := hoststore.NewHostsStore(app)
+	convs := convstore.NewConvStore(app)
+	hostID, _ := hosts.SaveHost(hoststore.HostInput{Name: "h", Addr: "1.1.1.1", Port: 22, User: "u", AuthType: "password", Secret: "x"})
+	sid, _ := convs.NewConversation(hostID, "t")
+
+	ex := &testutil.FakeExec{Lines: []sshexec.Line{{Stream: "stdout", Text: "file1"}}}
+	holder := NewToolCallHolder()
+	holder.Add(&schema.ToolCall{ID: "call_auto", Function: schema.FunctionCall{Name: "execute_command"}})
+	tool := NewSSHTool(sid, ex, (&testutil.EmitRecorder{}).Emit, convs, holder)
+	tool.SetApprovalPolicy(true, []string{"ls"})
+
+	if _, err := tool.InvokableRun(context.Background(), `{"command":"ls","why":"看看"}`); err != nil {
+		t.Fatalf("InvokableRun: %v", err)
+	}
+	msgs, _ := convs.LoadMessages(sid)
+	if len(msgs) != 1 || msgs[0].Role != "tool" ||
+		msgs[0].ToolCallID != "call_auto" || msgs[0].ApprovalStatus != "auto" {
+		t.Errorf("自动放行应落库 ApprovalStatus=auto，得到 %+v", msgs)
+	}
+}
