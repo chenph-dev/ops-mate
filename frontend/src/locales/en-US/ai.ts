@@ -77,6 +77,7 @@ export default {
     statusPending: 'Pending',
     statusApproved: 'Approved',
     statusRejected: 'Rejected',
+    statusAuto: 'Auto-approved',
   },
   code: {
     copied: 'Copied',

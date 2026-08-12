@@ -121,6 +121,9 @@ type SessionManager struct {
 	// 默认走 einoagent.agentmodel.NewChatModel（eino-ext provider）。
 	modelFactory func(ctx context.Context, cfg configstore.AIConfig) (einomodel.ToolCallingChatModel, error)
 
+	// policyFor 按主机解析审批策略（enableAuto + 只读白名单）；nil 表示全量审批。
+	policyFor func(hostID string) (enableAuto bool, readOnlyWhitelist []string)
+
 	mu            sync.Mutex
 	sessions      map[string]*agentSession
 	configVersion int
@@ -156,4 +159,13 @@ func (m *SessionManager) InvalidateConfig() {
 	m.mu.Lock()
 	m.configVersion++
 	m.mu.Unlock()
+}
+
+// SetApprovalPolicyResolver 注入审批策略解析器（hostID → 自动放行开关 + 只读白名单）。
+// 注入同时使已构建的 Graph 失效（下一轮按新策略重建）。不注入则全部命令人工审批。
+func (m *SessionManager) SetApprovalPolicyResolver(fn func(hostID string) (bool, []string)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.policyFor = fn
+	m.configVersion++
 }

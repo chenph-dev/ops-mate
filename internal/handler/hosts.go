@@ -11,12 +11,13 @@ import (
 
 // HostsHandler 处理主机管理相关的前端调用。
 type HostsHandler struct {
-	hosts *hoststore.HostsStore
+	hosts    *hoststore.HostsStore
+	onChange func() // 主机变更后回调（通知 SessionManager 策略失效，主机覆盖即时生效）
 }
 
-// NewHostsHandler 构造 HostsHandler。
-func NewHostsHandler(hosts *hoststore.HostsStore) *HostsHandler {
-	return &HostsHandler{hosts: hosts}
+// NewHostsHandler 构造 HostsHandler。onChange 可为 nil。
+func NewHostsHandler(hosts *hoststore.HostsStore, onChange func()) *HostsHandler {
+	return &HostsHandler{hosts: hosts, onChange: onChange}
 }
 
 func (h *HostsHandler) ListHosts() ([]hoststore.HostMeta, error) {
@@ -29,7 +30,13 @@ func (h *HostsHandler) SaveHost(in hoststore.HostInput) (string, error) {
 
 // UpdateHost 更新主机信息（节点编辑）。
 func (h *HostsHandler) UpdateHost(id string, in hoststore.HostInput) error {
-	return h.hosts.UpdateHost(id, in)
+	if err := h.hosts.UpdateHost(id, in); err != nil {
+		return err
+	}
+	if h.onChange != nil {
+		h.onChange()
+	}
+	return nil
 }
 
 // GetHostSecret 返回主机解密后的凭据（编辑表单回填密码/私钥）。

@@ -44,8 +44,8 @@ export interface PlanInfo {
 export type SessionState =
   'Thinking' | 'AwaitingApproval' | 'Running' | 'Idle' | null;
 
-/** 命令审批状态：待审批 / 已批准 / 已拒绝 */
-export type ApprovalStatus = 'pending' | 'approved' | 'rejected';
+/** 命令审批状态：待审批 / 已批准 / 已拒绝 / 已自动执行 */
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'auto';
 
 interface AgentEvent {
   sessionId: string;
@@ -156,6 +156,14 @@ export function useSessions(hostId: string | null): {
       // DB 重同步失败不阻断 UI；下一事件会再次尝试
     }
   }, []);
+
+  /** 执行开始：记录命令、起点与实时输出缓冲（人工批准 run:start 与自动放行 run:auto 共用）。 */
+  const startRun = (command: string): void => {
+    setRunningCommand(command);
+    setRunStartAt(Date.now());
+    setRunElapsed(0);
+    setRunOutput('');
+  };
 
   /** 刷新当前主机的历史会话列表。 */
   const refreshConversations = useCallback(async (): Promise<void> => {
@@ -400,12 +408,13 @@ export function useSessions(hostId: string | null): {
     const offRunStart = EventsOn('run:start', (raw: AgentEvent) => {
       if (!isMine(raw)) return;
       const d = raw.data as { command?: string };
-      if (d?.command) {
-        setRunningCommand(d.command);
-        setRunStartAt(Date.now());
-        setRunElapsed(0);
-        setRunOutput('');
-      }
+      if (d?.command) startRun(d.command);
+    });
+
+    const offAutoRun = EventsOn('run:auto', (raw: AgentEvent) => {
+      if (!isMine(raw)) return;
+      const d = raw.data as { command?: string };
+      if (d?.command) startRun(d.command);
     });
 
     const offRunOutput = EventsOn('run:output', (raw: AgentEvent) => {
@@ -443,6 +452,7 @@ export function useSessions(hostId: string | null): {
       offCommand();
       offPlan();
       offRunStart();
+      offAutoRun();
       offRunOutput();
       offRunResult();
       offError();

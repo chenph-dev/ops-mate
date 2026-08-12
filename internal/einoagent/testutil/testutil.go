@@ -59,6 +59,16 @@ func (r *EmitRecorder) SnapshotCommands() []string {
 	return append([]string(nil), r.Commands...)
 }
 
+// ContainsEvent 报告事件列表中是否含指定事件名。
+func ContainsEvent(events []string, name string) bool {
+	for _, e := range events {
+		if e == name {
+			return true
+		}
+	}
+	return false
+}
+
 // FakeExec 实现 sshexec.Exec，返回预设行。
 type FakeExec struct {
 	mu      sync.Mutex

@@ -181,6 +181,10 @@ type SSHTool struct {
 	emit      func(sessionID, event string, data any)
 	convs     *convstore.ConvStore
 	holder    *ToolCallHolder
+
+	// 审批分级策略：enableAuto=true 且命令命中只读白名单时自动放行（不 Interrupt）。
+	enableAuto        bool
+	readOnlyWhitelist []string
 }
 
 // NewSSHTool 构造 SSH 工具。convs 为 nil 时不落库（测试简化）。
@@ -195,6 +199,12 @@ func NewSSHTool(
 		sessionID: sessionID, executor: executor,
 		emit: emit, convs: convs, holder: holder,
 	}
+}
+
+// SetApprovalPolicy 设置审批分级策略。enableAuto=false（默认）时全部命令走人工审批。
+func (t *SSHTool) SetApprovalPolicy(enableAuto bool, readOnlyWhitelist []string) {
+	t.enableAuto = enableAuto
+	t.readOnlyWhitelist = readOnlyWhitelist
 }
 
 // Info 返回工具元信息，供 ChatModel 生成 tool call。
@@ -259,11 +269,21 @@ func (t *SSHTool) InvokableRun(ctx context.Context, argsJSON string, opts ...ein
 			return content, nil
 		}
 		// data = 批准后的最终命令（用户可能编辑过）
-		return t.execute(ctx, data)
+		return t.execute(ctx, data, "approved")
 	}
 
 	// 首次调用，或中断上下文存在但 resume 数据不匹配当前命令（多 tool_call 的后续命令）：
 	// 每次都 emit ai:command 并中断，等待该命令的审批。
+	// 自动放行：仅首次调用路径生效（恢复路径已 return）。命中只读 → 直连 execute。
+	if t.enableAuto {
+		if _, action := guardrail.Classify(args.Command, t.readOnlyWhitelist); action == guardrail.ActionAuto {
+			if t.emit != nil {
+				t.emit(t.sessionID, "run:auto", map[string]any{"command": args.Command})
+			}
+			return t.execute(ctx, args.Command, "auto")
+		}
+	}
+
 	if t.emit != nil {
 		t.emit(t.sessionID, "ai:command", info)
 	}
@@ -271,8 +291,9 @@ func (t *SSHTool) InvokableRun(ctx context.Context, argsJSON string, opts ...ein
 }
 
 // execute 执行命令：推送事件、落库、返回回灌模型的文本（永不返回 error，
-// 执行失败也转为文本回灌，让 AI 看到并可换方案）。
-func (t *SSHTool) execute(ctx context.Context, command string) (string, error) {
+// 执行失败也转为文本回灌，让 AI 看到并可换方案）。approvalStatus 为审批状态
+// （"approved" 人工批准 / "auto" 自动放行），随 tool 消息落库供历史回放展示。
+func (t *SSHTool) execute(ctx context.Context, command, approvalStatus string) (string, error) {
 	start := time.Now()
 	if t.emit != nil {
 		t.emit(t.sessionID, "run:start", map[string]any{"command": command})
@@ -291,7 +312,7 @@ func (t *SSHTool) execute(ctx context.Context, command string) (string, error) {
 	meta := toolMeta{
 		Command: command, ExitCode: exitCode,
 		DurationMS: time.Since(start).Milliseconds(),
-		Status:     "approved", Cancelled: cancelled,
+		Status:     approvalStatus, Cancelled: cancelled,
 	}
 
 	var content string
@@ -309,7 +330,7 @@ func (t *SSHTool) execute(ctx context.Context, command string) (string, error) {
 
 	// 落库保留较完整输出（≤64KB 展示截断），回灌模型用 8KB 截断——历史回放时模型看到的 tool 结果可能比原轮次更多，属预期。
 	if t.convs != nil {
-		t.saveToolMessage(content, "approved", meta)
+		t.saveToolMessage(content, approvalStatus, meta)
 		if err := t.convs.SaveCommand(t.sessionID, command, exitCode, display); err != nil {
 			log.Printf("einoagent: save command record: %v", err)
 		}

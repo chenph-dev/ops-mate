@@ -24,6 +24,7 @@ const STATUS_META: Record<ApprovalStatus, { text: string; color: string }> = {
   pending: { text: 'cmd.statusPending', color: 'processing' },
   approved: { text: 'cmd.statusApproved', color: 'success' },
   rejected: { text: 'cmd.statusRejected', color: 'error' },
+  auto: { text: 'cmd.statusAuto', color: 'cyan' },
 };
 
 /** 命令审批卡：状态+原因一行、命令、操作按钮（紧凑布局）。 */
@@ -46,8 +47,9 @@ export default function CommandCard({
   const isHighRisk = editing
     ? isHighRiskCommand(draft)
     : command.assessedRisk === 'high' || command.risk === 'high';
-  // 已批准/已拒绝后不再可操作（执行中或结果已定）
-  const done = status === 'approved' || status === 'rejected';
+  // 已批准/已拒绝/已自动执行后不再可操作（执行中或结果已定）
+  const done =
+    status === 'approved' || status === 'rejected' || status === 'auto';
 
   const handleApprove = (): void => {
     // 高风险二次确认：首次点击只进入确认态，二次点击才批准

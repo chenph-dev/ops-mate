@@ -77,6 +77,7 @@ export default {
     statusPending: '待审批',
     statusApproved: '已批准',
     statusRejected: '已拒绝',
+    statusAuto: '已自动执行',
   },
   code: {
     copied: '已复制',

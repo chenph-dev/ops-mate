@@ -21,6 +21,7 @@ type Host struct {
 	User          string  `gorm:"column:user"`
 	AuthEncrypted []byte  `gorm:"column:auth_encrypted"`
 	AuthType      string  `gorm:"column:auth_type"`
+	AutoApprove   string  `gorm:"column:auto_approve"`
 	CreatedAt     int64   `gorm:"column:created_at"`
 }
 
@@ -28,25 +29,27 @@ func (Host) TableName() string { return "hosts" }
 
 // HostInput 主机录入数据。Secret 为密码或私钥 PEM 明文。
 type HostInput struct {
-	Name     string `json:"name"`
-	ParentID string `json:"parentId"` // 父目录 ID，空串表示根级
-	Addr     string `json:"addr"`
-	Port     int    `json:"port"`
-	User     string `json:"user"`
-	AuthType string `json:"authType"`
-	Secret   string `json:"secret"`
+	Name        string `json:"name"`
+	ParentID    string `json:"parentId"` // 父目录 ID，空串表示根级
+	Addr        string `json:"addr"`
+	Port        int    `json:"port"`
+	User        string `json:"user"`
+	AuthType    string `json:"authType"`
+	Secret      string `json:"secret"`
+	AutoApprove string `json:"autoApprove"` // inherit | on | off
 }
 
 // HostMeta 主机列表项（不含凭据）。
 type HostMeta struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	NodeType string `json:"nodeType"`
-	ParentID string `json:"parentId"`
-	Addr     string `json:"addr"`
-	Port     int    `json:"port"`
-	User     string `json:"user"`
-	AuthType string `json:"authType"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	NodeType    string `json:"nodeType"`
+	ParentID    string `json:"parentId"`
+	Addr        string `json:"addr"`
+	Port        int    `json:"port"`
+	User        string `json:"user"`
+	AuthType    string `json:"authType"`
+	AutoApprove string `json:"autoApprove"`
 }
 
 // TreeNode 树形节点返回结构。
@@ -58,10 +61,11 @@ type TreeNode struct {
 	ParentID string     `json:"parentId"`
 	Children []TreeNode `json:"children,omitempty"`
 	// Host 专属字段
-	Addr     string `json:"addr,omitempty"`
-	Port     int    `json:"port,omitempty"`
-	User     string `json:"user,omitempty"`
-	AuthType string `json:"authType,omitempty"`
+	Addr        string `json:"addr,omitempty"`
+	Port        int    `json:"port,omitempty"`
+	User        string `json:"user,omitempty"`
+	AuthType    string `json:"authType,omitempty"`
+	AutoApprove string `json:"autoApprove,omitempty"`
 }
 
 // HostsStore 提供主机/目录管理操作。
@@ -90,7 +94,8 @@ func (s *HostsStore) SaveHost(in HostInput) (string, error) {
 		ID: id, Name: in.Name, NodeType: "host", ParentID: pid,
 		Addr: in.Addr, Port: in.Port, User: in.User,
 		AuthEncrypted: enc, AuthType: in.AuthType,
-		CreatedAt: time.Now().Unix(),
+		AutoApprove: autoApproveOrDefault(in.AutoApprove),
+		CreatedAt:   time.Now().Unix(),
 	}).Error
 	if err != nil {
 		return "", fmt.Errorf("insert host: %w", err)
@@ -103,6 +108,7 @@ func (s *HostsStore) UpdateHost(id string, in HostInput) error {
 	updates := map[string]any{
 		"name": in.Name, "addr": in.Addr, "port": in.Port,
 		"user": in.User, "auth_type": in.AuthType,
+		"auto_approve": autoApproveOrDefault(in.AutoApprove),
 	}
 	if in.Secret != "" {
 		enc, err := s.app.Encrypt([]byte(in.Secret))
@@ -144,6 +150,7 @@ func (s *HostsStore) ListHosts() ([]HostMeta, error) {
 			ID: h.ID, Name: h.Name, NodeType: h.NodeType,
 			ParentID: strPtrVal(h.ParentID),
 			Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
+			AutoApprove: h.AutoApprove,
 		})
 	}
 	return out, nil
@@ -164,6 +171,7 @@ func (s *HostsStore) ListTree() ([]TreeNode, error) {
 			ID: h.ID, Key: h.ID, Name: h.Name, NodeType: h.NodeType,
 			ParentID: strPtrVal(h.ParentID),
 			Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
+			AutoApprove: h.AutoApprove,
 		}
 	}
 
@@ -238,7 +246,17 @@ func (s *HostsStore) HostMetaByID(id string) (*HostMeta, error) {
 		ID: h.ID, Name: h.Name, NodeType: h.NodeType,
 		ParentID: strPtrVal(h.ParentID),
 		Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
+		AutoApprove: h.AutoApprove,
 	}, nil
+}
+
+// GetAutoApprove 返回主机自动放行覆盖（"inherit"/"on"/"off"）。
+func (s *HostsStore) GetAutoApprove(id string) (string, error) {
+	var h Host
+	if err := s.app.GORM().First(&h, "id = ?", id).Error; err != nil {
+		return "", err
+	}
+	return autoApproveOrDefault(h.AutoApprove), nil
 }
 
 func strPtrVal(s *string) string {
@@ -246,4 +264,12 @@ func strPtrVal(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// autoApproveOrDefault 空值归一为 "inherit"（避免零值覆盖列默认）。
+func autoApproveOrDefault(v string) string {
+	if v == "" {
+		return "inherit"
+	}
+	return v
 }
