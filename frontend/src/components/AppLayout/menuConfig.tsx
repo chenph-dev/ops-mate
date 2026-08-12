@@ -4,7 +4,6 @@ import {
   DesktopOutlined,
   SettingOutlined,
   InfoCircleOutlined,
-  FileSearchOutlined,
 } from '@ant-design/icons';
 
 /** 路由项定义 — 同时驱动菜单和路由。
@@ -50,7 +49,6 @@ export const routes: RouteItem[] = [
       {
         path: '/audit',
         label: 'audit',
-        icon: <FileSearchOutlined />,
         component: lazyPage(() => import('@/pages/Audit')),
       },
     ],
