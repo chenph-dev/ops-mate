@@ -322,6 +322,42 @@ func TestBuildInput_NoSkillsCatalog(t *testing.T) {
 	}
 }
 
+func TestSessionManager_ProtocolResolverInjected(t *testing.T) {
+	f := newSessionFixture(t, []*schema.Message{schema.AssistantMessage("hi", nil)})
+	resolved := ""
+	f.mgr.SetProtocolResolver(func(hostID string) string {
+		resolved = hostID
+		return "winrm"
+	})
+	sid, _ := f.mgr.EnsureSession(f.hostID)
+	if err := f.mgr.SendMessage(sid, "在吗"); err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+	f.waitState(sid, StateIdle)
+	if resolved != f.hostID {
+		t.Errorf("ensureGraph 应调用协议解析器，得到 %q", resolved)
+	}
+}
+
+func TestBuildInput_OSInjected(t *testing.T) {
+	f := newSessionFixture(t, []*schema.Message{schema.AssistantMessage("hi", nil)})
+	f.mgr.SetProtocolResolver(func(hostID string) string { return "winrm" })
+	sid, _ := f.mgr.EnsureSession(f.hostID)
+	s, err := f.mgr.sessionFor(sid)
+	if err != nil { t.Fatalf("sessionFor: %v", err) }
+	input, err := f.mgr.buildInput(s, "继续")
+	if err != nil { t.Fatalf("buildInput: %v", err) }
+	found := false
+	for _, msg := range input {
+		if msg.Role == schema.System && strings.Contains(msg.Content, "Windows 主机") {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("winrm 协议下 system 消息应含 Windows 主机描述")
+	}
+}
+
 func TestSessionManager_PolicyResolverInjected(t *testing.T) {
 	f := newSessionFixture(t, []*schema.Message{schema.AssistantMessage("hi", nil)})
 	resolved := false

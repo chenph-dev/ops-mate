@@ -14,6 +14,7 @@ import (
 	"ops-mate/internal/store/crypto"
 	hoststore "ops-mate/internal/store/hosts"
 	"ops-mate/internal/termctx"
+	"ops-mate/internal/winrmexec"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
@@ -56,6 +57,13 @@ func (h *TerminalHandler) getHost(hostID string) (*sshexec.Host, error) {
 
 // OpenTerminal 双击主机时建立交互式 SSH 会话，返回 sessionID。
 func (h *TerminalHandler) OpenTerminal(hostID string, cols, rows int) (string, error) {
+	meta, err := h.hosts.HostMetaByID(hostID)
+	if err != nil {
+		return "", err
+	}
+	if strings.EqualFold(meta.Protocol, "winrm") {
+		return "", fmt.Errorf("WinRM 主机不支持交互式终端")
+	}
 	host, err := h.getHost(hostID)
 	if err != nil {
 		return "", err
@@ -183,6 +191,39 @@ func (h *TerminalHandler) ListHostCommands(hostID string) ([]CommandInfo, error)
 
 	ctx, cancel := context.WithTimeout(Ctx(), 10*time.Second)
 	defer cancel()
+
+	if meta, err := h.hosts.HostMetaByID(hostID); err == nil && strings.EqualFold(meta.Protocol, "winrm") {
+		secret, _, err := h.hosts.GetHostSecret(hostID)
+		if err != nil {
+			return nil, err
+		}
+		exec := winrmexec.NewExecutor(winrmexec.Host{Addr: meta.Addr, Port: meta.Port, User: meta.User, Secret: secret})
+		out, err := exec.Exec(ctx, "Get-Command | Select-Object -ExpandProperty Name")
+		if err != nil {
+			return nil, fmt.Errorf("抓取命令列表失败: %w", err)
+		}
+		var result []CommandInfo
+		nameSet := make(map[string]struct{})
+		for line := range out {
+			if line.Stream != "stdout" {
+				continue
+			}
+			name := strings.TrimSpace(line.Text)
+			if name == "" {
+				continue
+			}
+			nameSet[name] = struct{}{}
+		}
+		names := make([]string, 0, len(nameSet))
+		for name := range nameSet {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		for _, name := range names {
+			result = append(result, CommandInfo{Name: name})
+		}
+		return result, nil
+	}
 
 	exec := sshexec.NewExecutor(*host)
 	out, err := exec.Exec(ctx, "compgen -c | sort -u")

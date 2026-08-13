@@ -185,6 +185,9 @@ type SSHTool struct {
 	// 审批分级策略：enableAuto=true 且命令命中只读白名单时自动放行（不 Interrupt）。
 	enableAuto        bool
 	readOnlyWhitelist []string
+
+	// protocol 目标主机协议："ssh"（默认）/ "winrm"，影响工具描述与风险判定语义。
+	protocol string
 }
 
 // NewSSHTool 构造 SSH 工具。convs 为 nil 时不落库（测试简化）。
@@ -207,13 +210,24 @@ func (t *SSHTool) SetApprovalPolicy(enableAuto bool, readOnlyWhitelist []string)
 	t.readOnlyWhitelist = readOnlyWhitelist
 }
 
+// SetProtocol 设置协议（"ssh"/"winrm"），影响工具描述与风险判定语义。
+func (t *SSHTool) SetProtocol(protocol string) {
+	t.protocol = protocol
+}
+
 // Info 返回工具元信息，供 ChatModel 生成 tool call。
 func (t *SSHTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
+	desc := "在目标 Linux 主机上执行一条 Shell 命令。命令会先展示给用户审批，批准后才执行。"
+	cmdDesc := "要执行的 Shell 命令"
+	if strings.EqualFold(t.protocol, "winrm") {
+		desc = "在目标 Windows 主机上执行一条 PowerShell 命令。命令会先展示给用户审批，批准后才执行。"
+		cmdDesc = "要执行的 PowerShell 命令"
+	}
 	return &schema.ToolInfo{
 		Name: "execute_command",
-		Desc: "在目标 Linux 主机上执行一条 Shell 命令。命令会先展示给用户审批，批准后才执行。",
+		Desc: desc,
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
-			"command": {Type: schema.String, Desc: "要执行的 Shell 命令", Required: true},
+			"command": {Type: schema.String, Desc: cmdDesc, Required: true},
 			"why":     {Type: schema.String, Desc: "执行该命令的原因"},
 		}),
 	}, nil
@@ -230,7 +244,7 @@ func (t *SSHTool) InvokableRun(ctx context.Context, argsJSON string, opts ...ein
 		return "命令参数解析失败：" + err.Error() + "。请重新以 JSON 格式提议命令。", nil
 	}
 
-	risk := guardrail.AssessRisk(args.Command)
+	risk := guardrail.AssessRiskForProtocol(args.Command, t.protocol)
 	// AssessedRisk 是守卫的原始判定（"" = 干净）；Risk 是展示标签（"" 归一为 "low"）。
 	riskLabel := risk
 	if riskLabel == "" {
@@ -276,7 +290,7 @@ func (t *SSHTool) InvokableRun(ctx context.Context, argsJSON string, opts ...ein
 	// 每次都 emit ai:command 并中断，等待该命令的审批。
 	// 自动放行：仅首次调用路径生效（恢复路径已 return）。命中只读 → 直连 execute。
 	if t.enableAuto {
-		if _, action := guardrail.Classify(args.Command, t.readOnlyWhitelist); action == guardrail.ActionAuto {
+		if _, action := guardrail.ClassifyForProtocol(args.Command, t.readOnlyWhitelist, t.protocol); action == guardrail.ActionAuto {
 			if t.emit != nil {
 				t.emit(t.sessionID, "run:auto", map[string]any{"command": args.Command})
 			}
@@ -381,6 +395,7 @@ func (t *SSHTool) saveToolMessage(content, approvalStatus string, meta toolMeta)
 
 // runCommand 收集命令输出。返回：输出文本（截断至 displayOutputLimit）、退出码（-1 = 未知/失败/取消）、执行层错误。
 // sshexec 仅在非零退出时发 {Stream:"exit", Text:"exit_code=N"} 行。
+// 执行器在连接/认证失败时可能发 {Stream:"error", Text: ...} 行，将作为返回的错误上抛。
 // 注意：超出上限后停止累积但必须继续排空通道（拿 exit 行 + 避免执行器管道协程阻塞）。
 func runCommand(ctx context.Context, ex sshexec.Exec, command string, onOutput func(string)) (string, int, error) {
 	if ex == nil {
@@ -392,10 +407,17 @@ func runCommand(ctx context.Context, ex sshexec.Exec, command string, onOutput f
 	}
 	var sb strings.Builder
 	exitCode := 0
+	var execErr error
 	for ln := range ch {
 		if ln.Stream == "exit" {
 			if n, perr := strconv.Atoi(strings.TrimPrefix(ln.Text, "exit_code=")); perr == nil {
 				exitCode = n
+			}
+			continue
+		}
+		if ln.Stream == "error" {
+			if execErr == nil {
+				execErr = fmt.Errorf("%s", ln.Text)
 			}
 			continue
 		}
@@ -410,6 +432,9 @@ func runCommand(ctx context.Context, ex sshexec.Exec, command string, onOutput f
 	}
 	if ctx.Err() != nil {
 		return sb.String(), -1, nil
+	}
+	if execErr != nil {
+		return sb.String(), -1, execErr
 	}
 	return sb.String(), exitCode, nil
 }

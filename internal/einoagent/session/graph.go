@@ -77,6 +77,7 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 	version := m.configVersion
 	policyFor := m.policyFor
 	skillFor := m.skillFor
+	protocolFor := m.protocolFor
 	m.mu.Unlock()
 
 	s.mu.Lock()
@@ -99,6 +100,11 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 	}
 
 	sshTool := agenttools.NewSSHTool(s.id, s.holder, m.emit, m.convs, s.toolCalls)
+	protocol := "ssh"
+	if protocolFor != nil {
+		protocol = protocolFor(s.hostID)
+	}
+	sshTool.SetProtocol(protocol)
 	if policyFor != nil {
 		auto, wl := policyFor(s.hostID)
 		sshTool.SetApprovalPolicy(auto, wl)

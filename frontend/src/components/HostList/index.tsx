@@ -39,6 +39,7 @@ interface ContextMenuProps {
   onDelete: () => void;
   onTest: () => void;
   onSftp: () => void;
+  showSftp: boolean;
 }
 
 function ContextMenu({
@@ -52,6 +53,7 @@ function ContextMenu({
   onDelete,
   onTest,
   onSftp,
+  showSftp,
 }: ContextMenuProps): React.JSX.Element {
   const { token } = theme.useToken();
   const { t } = useTranslation('hosts');
@@ -85,12 +87,16 @@ function ContextMenu({
             label: t('ctx.connect'),
             onClick: onTest,
           },
-          {
-            key: 'sftp',
-            icon: <FolderOpenOutlined />,
-            label: t('ctx.sftp'),
-            onClick: onSftp,
-          },
+          ...(showSftp
+            ? [
+                {
+                  key: 'sftp',
+                  icon: <FolderOpenOutlined />,
+                  label: t('ctx.sftp'),
+                  onClick: onSftp,
+                },
+              ]
+            : []),
           {
             key: 'edit',
             icon: <EditOutlined />,
@@ -169,7 +175,19 @@ export default function HostList({
     const convert = (nodes: TreeNode[]): TreeNodeData[] =>
       nodes.map((n) => ({
         key: n.id,
-        title: n.name,
+        title:
+          n.nodeType === 'host' ? (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              {n.name}
+              {n.protocol === 'winrm' ? (
+                <span style={{ fontSize: 10, padding: '0 4px', borderRadius: 3, background: token.colorPrimaryBg, color: token.colorPrimary }}>WinRM</span>
+              ) : (
+                <span style={{ fontSize: 10, padding: '0 4px', borderRadius: 3, background: token.colorFillSecondary, color: token.colorTextSecondary }}>SSH</span>
+              )}
+            </span>
+          ) : (
+            n.name
+          ),
         isLeaf: n.nodeType === 'host',
         icon:
           n.nodeType === 'folder' ? <FolderOutlined /> : <DesktopOutlined />,
@@ -178,7 +196,7 @@ export default function HostList({
         data: n,
       }));
     return convert(treeData);
-  }, [treeData]);
+  }, [treeData, token]);
 
   const handleRightClick = useCallback(
     ({ event, node }: { event: React.MouseEvent; node: TreeNodeData }) => {
@@ -309,6 +327,7 @@ export default function HostList({
             onSftp(contextMenu.node);
             setContextMenu(null);
           }}
+          showSftp={contextMenu.node.protocol !== 'winrm'}
         />
       )}
     </div>

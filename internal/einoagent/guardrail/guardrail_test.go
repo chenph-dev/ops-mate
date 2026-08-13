@@ -104,3 +104,61 @@ func TestAssessRisk_UnchangedForClean(t *testing.T) {
 		t.Errorf("AssessRisk 应返回 high，得到 %q", got)
 	}
 }
+
+func TestAssessRiskForProtocol_Windows(t *testing.T) {
+	cases := []struct {
+		cmd   string
+		proto string
+		level string // "" no risk, "high"
+	}{
+		{"format c:", "winrm", "high"},
+		{"del /s /q C:\\temp\\*", "winrm", "high"},
+		{"rd /s /q C:\\data", "winrm", "high"},
+		{"rmdir /s foo", "winrm", "high"},
+		{"shutdown /s /t 0", "winrm", "high"},
+		{"shutdown /r", "winrm", "high"},
+		{"Remove-Item -Path X -Recurse -Force", "winrm", "high"},
+		{"diskpart", "winrm", ""},
+		{"select disk 0\nclean", "winrm", "high"},
+		{"Get-Process", "winrm", ""},
+		{"format c:", "ssh", ""},
+		{"del /s /q", "ssh", ""},
+		{"Get-Process", "ssh", ""},
+		{"format c:", "", ""},
+		{"FORMAT C:", "winrm", "high"},
+		{"DEL /S /Q", "winrm", "high"},
+		{"Remove-Item -Force -Recurse C:\\x", "winrm", "high"},
+		{"SHUTDOWN /S", "winrm", "high"},
+	}
+	for _, c := range cases {
+		got := AssessRiskForProtocol(c.cmd, c.proto)
+		if c.level == "" {
+			if got != "" {
+				t.Errorf("command %q (proto=%q) expected no risk, got %q", c.cmd, c.proto, got)
+			}
+		} else if got != c.level {
+			t.Errorf("command %q (proto=%q) expected %q, got %q", c.cmd, c.proto, c.level, got)
+		}
+	}
+}
+
+func TestClassifyForProtocol_WindowsWhitelist(t *testing.T) {
+	if risk, action := ClassifyForProtocol("Get-Process", nil, "winrm"); risk != "read" || action != ActionAuto {
+		t.Errorf("winrm Get-Process should be read-only auto-approved, got (%q,%q)", risk, action)
+	}
+	if risk, _ := ClassifyForProtocol("Get-ChildItem", nil, "winrm"); risk != "read" {
+		t.Errorf("winrm Get-ChildItem should be read-only, got %q", risk)
+	}
+	if risk, action := ClassifyForProtocol("format c:", nil, "winrm"); risk != "high" || action != ActionApprove {
+		t.Errorf("winrm format should be high-risk approve, got (%q,%q)", risk, action)
+	}
+	if risk, action := ClassifyForProtocol("Get-Process", nil, "ssh"); risk != "write" || action != ActionApprove {
+		t.Errorf("ssh Get-Process should be write (not in Linux whitelist), got (%q,%q)", risk, action)
+	}
+}
+
+func TestDefaultReadOnlyCommandsWindows_NotEmpty(t *testing.T) {
+	if len(DefaultReadOnlyCommandsWindows) == 0 {
+		t.Error("Windows read-only whitelist should not be empty")
+	}
+}

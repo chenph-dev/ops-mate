@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"ops-mate/internal/sshexec"
 	hoststore "ops-mate/internal/store/hosts"
 )
 
@@ -70,17 +69,20 @@ func (h *HostsHandler) DeleteNode(nodeID string) error {
 // 1~2 个返回值，返回 3 个值（如 bool+string+error）时前端恒得到空值，
 // 导致连接成功也显示"失败"。失败原因走 error 供前端 catch 展示。
 func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, error) {
-	ex := sshexec.NewExecutor(sshexec.Host{
-		Addr: in.Addr, Port: in.Port, User: in.User,
-		AuthType: in.AuthType, Secret: in.Secret,
-	})
+	ex := executorForHost(in.Protocol, in.Addr, in.Port, in.User, in.AuthType, in.Secret)
 	ctx, cancel := context.WithTimeout(Ctx(), 15*time.Second)
 	defer cancel()
 	ch, err := ex.Exec(ctx, "echo ok")
 	if err != nil {
 		return false, err
 	}
-	for range ch {
+	for ln := range ch {
+		if ln.Stream == "error" {
+			return false, fmt.Errorf("%s", ln.Text)
+		}
+		if ln.Stream == "exit" {
+			return false, fmt.Errorf("命令执行失败：%s", ln.Text)
+		}
 	}
 	return true, nil
 }
@@ -95,10 +97,7 @@ func (h *HostsHandler) ExecuteCommand(hostID, command string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("获取主机信息失败: %w", err)
 	}
-	ex := sshexec.NewExecutor(sshexec.Host{
-		Addr: meta.Addr, Port: meta.Port, User: meta.User,
-		AuthType: authType, Secret: secret,
-	})
+	ex := executorForHost(meta.Protocol, meta.Addr, meta.Port, meta.User, authType, secret)
 	ctx, cancel := context.WithTimeout(Ctx(), 30*time.Second)
 	defer cancel()
 	ch, err := ex.Exec(ctx, command)
@@ -112,6 +111,10 @@ func (h *HostsHandler) ExecuteCommand(hostID, command string) (string, error) {
 			output += line.Text + "\n"
 		case "stderr":
 			output += line.Text + "\n"
+		case "error":
+			return "", fmt.Errorf("%s", line.Text)
+		case "exit":
+			return "", fmt.Errorf("命令执行失败：%s", line.Text)
 		}
 	}
 	return output, nil

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -23,6 +24,7 @@ import (
 	hoststore "ops-mate/internal/store/hosts"
 	logsstore "ops-mate/internal/store/logs"
 	skillsstore "ops-mate/internal/store/skills"
+	"ops-mate/internal/winrmexec"
 )
 
 //go:embed all:frontend/dist
@@ -90,6 +92,14 @@ func main() {
 	sessionManager.SetTerminalContextResolver(terminalHandler.TerminalContext)
 	// 运维技能：技能目录注入系统提示词 + 技能工具解析（load_skill / run_skill_script）。
 	sessionManager.SetSkillResolver(skillManager.Catalog, skillManager.Lookup)
+	// 协议解析：AI 智能体按主机协议切换 Linux/PowerShell 语义。
+	sessionManager.SetProtocolResolver(func(hostID string) string {
+		meta, err := hostsStore.HostMetaByID(hostID)
+		if err != nil || meta == nil {
+			return "ssh"
+		}
+		return meta.Protocol
+	})
 
 	// SFTP 管理器：按 hostID 懒建立/复用连接，应用退出时关闭。
 	sftpManager := sftppkg.NewManager(
@@ -152,6 +162,7 @@ func main() {
 			handler.NewSkillsHandler(skillManager, sessionManager.InvalidateConfig),
 			handler.NewSftpHandler(sftpManager),
 			handler.NewLogsHandler(logsStore),
+			handler.NewRdpHandler(hostsStore),
 		},
 	})
 
@@ -171,6 +182,11 @@ func executorFor(hosts *hoststore.HostsStore) func(hostID string) sshexec.Exec {
 		meta, err := hosts.HostMetaByID(hostID)
 		if err != nil || meta == nil {
 			return nil
+		}
+		if strings.EqualFold(meta.Protocol, "winrm") {
+			return winrmexec.NewExecutor(winrmexec.Host{
+				Addr: meta.Addr, Port: meta.Port, User: meta.User, Secret: secret,
+			})
 		}
 		return sshexec.NewExecutor(sshexec.Host{
 			Addr: meta.Addr, Port: meta.Port, User: meta.User,
