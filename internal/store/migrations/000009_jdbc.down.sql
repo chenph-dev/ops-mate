@@ -1,0 +1,2 @@
+ALTER TABLE hosts DROP COLUMN database;
+ALTER TABLE hosts DROP COLUMN driver;

@@ -281,7 +281,7 @@ export default function Terminal({
     }
   }, [connected]);
 
-  // 连接成功后异步抓取该主机命令列表，用于补全
+  // 连接成功后异步抓取该资产命令列表，用于补全
   useEffect(() => {
     if (connected && hostID) {
       void loadRemoteCommands(hostID, ListHostCommands);

@@ -10,7 +10,7 @@ import (
 	sftppkg "ops-mate/internal/sftp"
 )
 
-// SftpHandler 处理主机 SFTP 文件传输（目录浏览 + 传输任务）。
+// SftpHandler 处理资产 SFTP 文件传输（目录浏览 + 传输任务）。
 type SftpHandler struct {
 	mgr *sftppkg.Manager
 }

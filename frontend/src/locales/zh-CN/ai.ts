@@ -1,7 +1,7 @@
 export default {
   ssh: {
     disconnected:
-      '⚠ SSH 连接已断开，AI 命令无法在主机执行。请先在终端建立连接。',
+      '⚠ SSH 连接已断开，AI 命令无法在资产执行。请先在终端建立连接。',
   },
   header: {
     title: '智能体',
@@ -34,7 +34,7 @@ export default {
     running: '执行中',
   },
   empty: {
-    hint: '尝试让 AI 帮你操作这台主机，例如：',
+    hint: '尝试让 AI 帮你操作这台资产，例如：',
     clickHint: '点击填入输入框',
     suggestDisk: '检查磁盘使用情况并给出清理建议',
     suggestLoad: '查看系统负载和内存占用',

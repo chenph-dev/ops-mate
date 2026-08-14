@@ -16,6 +16,7 @@ import (
 	"ops-mate/internal/handler/aiconfig"
 	"ops-mate/internal/handler/approvalpolicy"
 	"ops-mate/internal/handler/base"
+	"ops-mate/internal/handler/db"
 	"ops-mate/internal/handler/hosts"
 	"ops-mate/internal/handler/logs"
 	"ops-mate/internal/handler/rdp"
@@ -61,7 +62,7 @@ func main() {
 	}
 	skillStore := skillsstore.NewSkillStore(app)
 	skillManager := skill.NewManager(skillStore, skillRoot)
-	// 主机连接解析器：收敛凭据读取 + 协议分流（ssh/winrm），
+	// 资产连接解析器：收敛凭据读取 + 协议分流（ssh/winrm），
 	// AI 会话、命令执行、连接测试、SFTP、终端共用一个解析入口。
 	resolver := base.NewExecutorResolver(hostsStore)
 
@@ -72,7 +73,7 @@ func main() {
 	// SessionManager 在每轮对话开始时按最新配置懒构建（热更新）。
 	sessionManager := session.NewSessionManager(app, cfgStore,
 		resolver.ExecFor,
-		// 解析主机名，注入系统提示词模板
+		// 解析资产名，注入系统提示词模板
 		func(hostID string) (string, error) {
 			meta, err := hostsStore.HostMetaByID(hostID)
 			if err != nil {
@@ -81,7 +82,7 @@ func main() {
 			return meta.Name, nil
 		},
 		emitEvent)
-	// 审批分级：全局策略 + 主机覆盖（on/off/inherit）。读取失败保守关闭自动放行。
+	// 审批分级：全局策略 + 资产覆盖（on/off/inherit）。读取失败保守关闭自动放行。
 	sessionManager.SetApprovalPolicyResolver(func(hostID string) (bool, []string) {
 		p, err := policyStore.GetApprovalPolicy()
 		if err != nil {
@@ -98,11 +99,11 @@ func main() {
 		}
 		return auto, p.ReadOnlyList
 	})
-	// 终端上下文注入：每次发消息时把当前主机终端最近输出清洗后给模型。
+	// 终端上下文注入：每次发消息时把当前资产终端最近输出清洗后给模型。
 	sessionManager.SetTerminalContextResolver(terminalHandler.TerminalContext)
 	// 运维技能：技能目录注入系统提示词 + 技能工具解析（load_skill / run_skill_script）。
 	sessionManager.SetSkillResolver(skillManager.Catalog, skillManager.Lookup)
-	// 协议解析：AI 智能体按主机协议切换 Linux/PowerShell 语义。
+	// 协议解析：AI 智能体按资产协议切换 Linux/PowerShell/SQL 语义。
 	sessionManager.SetProtocolResolver(func(hostID string) string {
 		meta, err := hostsStore.HostMetaByID(hostID)
 		if err != nil || meta == nil {
@@ -110,6 +111,8 @@ func main() {
 		}
 		return meta.Protocol
 	})
+	// 数据库执行器解析：jdbc 资产供 AI 的 execute_sql 工具使用。
+	sessionManager.SetDbExecutorResolver(resolver.DbFor)
 
 	// SFTP 管理器：按 hostID 懒建立/复用连接，应用退出时关闭。
 	// hostFor 由 resolver.HostFor 提供（仅 SSH，WinRM 返回错误）。
@@ -161,6 +164,7 @@ func main() {
 			sftp.NewSftpHandler(sftpManager),
 			logs.NewLogsHandler(logsStore),
 			rdp.NewRdpHandler(hostsStore),
+			db.NewDbHandler(resolver),
 		},
 	})
 

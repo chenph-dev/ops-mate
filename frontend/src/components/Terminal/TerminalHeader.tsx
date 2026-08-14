@@ -33,7 +33,7 @@ interface TerminalHeaderProps {
   onDisconnect: () => void;
 }
 
-/** 终端标题栏：主机信息 + 智能体面板开关/刷新/缩放/搜索/清空/复制/断开操作。 */
+/** 终端标题栏：资产信息 + 智能体面板开关/刷新/缩放/搜索/清空/复制/断开操作。 */
 export default function TerminalHeader({
   hostName,
   hostAddr,

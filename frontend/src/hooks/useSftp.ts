@@ -19,7 +19,7 @@ import type { sftp } from '@wailsjs/go/models';
 type SftpTask = sftp.TaskInfo;
 
 /**
- * 主机 SFTP 文件浏览状态与传输任务。
+ * 资产 SFTP 文件浏览状态与传输任务。
  * 当前路径 path 为远端绝对路径；操作成功后自动刷新当前目录。
  */
 export function useSftp(hostId: string | null): {
@@ -65,7 +65,7 @@ export function useSftp(hostId: string | null): {
     [hostId],
   );
 
-  // 主机变化时进入根目录（异步加载，setState 在 await 之后，避免 effect 同步 setState）
+  // 资产变化时进入根目录（异步加载，setState 在 await 之后，避免 effect 同步 setState）
   useEffect(() => {
     if (!hostId) return;
     let alive = true;

@@ -11,7 +11,7 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
-// Dial 建立到目标主机的 SSH 连接，供 Executor（单命令）、Session（交互终端）与 SFTP 复用。
+// Dial 建立到目标资产的 SSH 连接，供 Executor（单命令）、Session（交互终端）与 SFTP 复用。
 func Dial(ctx context.Context, host Host) (*ssh.Client, error) {
 	addr := host.Addr
 	if !strings.Contains(addr, ":") {

@@ -53,7 +53,7 @@ interface AgentEvent {
 }
 
 /**
- * 每主机单会话模型：
+ * 每资产单会话模型：
  * - attach() 懒获取/创建会话并加载历史（DB 是历史唯一真相源）；
  * - 事件驱动流式态（ai:text 累加到 streamingText）；
  * - 关键节点（命令卡出现、执行完成、回到 Idle）后从 DB 重同步消息。
@@ -165,7 +165,7 @@ export function useSessions(hostId: string | null): {
     setRunOutput('');
   };
 
-  /** 刷新当前主机的历史会话列表。 */
+  /** 刷新当前资产的历史会话列表。 */
   const refreshConversations = useCallback(async (): Promise<void> => {
     if (!hostId) return;
     try {
@@ -191,7 +191,7 @@ export function useSessions(hostId: string | null): {
     [resync],
   );
 
-  /** 主机选中时调用：懒获取/创建会话并加载历史。 */
+  /** 资产选中时调用：懒获取/创建会话并加载历史。 */
   const attach = useCallback(async (): Promise<void> => {
     if (!hostId) return;
     await refreshConversations();

@@ -1,7 +1,7 @@
 export default {
   ssh: {
     disconnected:
-      '⚠ SSH disconnected. AI commands cannot run on this host. Connect first in the terminal.',
+      '⚠ SSH disconnected. AI commands cannot run on this asset. Connect first in the terminal.',
   },
   header: {
     title: 'Agent',
@@ -34,7 +34,7 @@ export default {
     running: 'Running',
   },
   empty: {
-    hint: 'Try asking AI to manage this host, e.g.:',
+    hint: 'Try asking AI to manage this asset, e.g.:',
     clickHint: 'Click to fill input',
     suggestDisk: 'Check disk usage and suggest cleanup',
     suggestLoad: 'Check system load and memory usage',

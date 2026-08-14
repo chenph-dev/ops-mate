@@ -181,6 +181,8 @@ export default function HostList({
               {n.name}
               {n.protocol === 'winrm' ? (
                 <span style={{ fontSize: 10, padding: '0 4px', borderRadius: 3, background: token.colorPrimaryBg, color: token.colorPrimary }}>WinRM</span>
+              ) : n.protocol === 'jdbc' ? (
+                <span style={{ fontSize: 10, padding: '0 4px', borderRadius: 3, background: token.colorSuccessBg, color: token.colorSuccess }}>DB</span>
               ) : (
                 <span style={{ fontSize: 10, padding: '0 4px', borderRadius: 3, background: token.colorFillSecondary, color: token.colorTextSecondary }}>SSH</span>
               )}
@@ -327,7 +329,7 @@ export default function HostList({
             onSftp(contextMenu.node);
             setContextMenu(null);
           }}
-          showSftp={contextMenu.node.protocol !== 'winrm'}
+          showSftp={contextMenu.node.protocol !== 'winrm' && contextMenu.node.protocol !== 'jdbc'}
         />
       )}
     </div>

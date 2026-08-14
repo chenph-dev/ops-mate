@@ -15,6 +15,7 @@ import SftpPanel from '@/components/SftpPanel';
 import Terminal from '@/components/Terminal';
 import AIPanel from '@/components/AIPanel';
 import WinRmPanel from '@/components/WinRmPanel';
+import DbPanel from '@/components/DbPanel';
 
 const MAX_TABS = 6;
 
@@ -31,6 +32,8 @@ function toHostInput(node: TreeNode): HostInput {
     autoApprove: node.autoApprove ?? 'inherit',
     protocol: node.protocol ?? 'ssh',
     rdpPort: node.rdpPort ?? 3389,
+    driver: node.driver ?? 'mysql',
+    database: node.database ?? '',
   };
 }
 
@@ -53,10 +56,10 @@ export default function HostsPage(): React.JSX.Element {
     deleteNode,
   } = useHosts();
   const [selectedHost, setSelectedHost] = useState<TreeNode | null>(null);
-  const [winrmHost, setWinrmHost] = useState<TreeNode | null>(null);
+  const [panelHost, setPanelHost] = useState<TreeNode | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formParentId, setFormParentId] = useState('');
-  // 节点编辑：非空表示编辑该主机，空表示新增
+  // 节点编辑：非空表示编辑该资产，空表示新增
   const [editingHostId, setEditingHostId] = useState<string | null>(null);
   const [formInitialValues, setFormInitialValues] = useState<HostInput | null>(
     null,
@@ -75,16 +78,19 @@ export default function HostsPage(): React.JSX.Element {
 
   // 多标签终端会话
   const terminal = useTerminalSessions();
-  // 当前激活标签及其主机（AI 面板绑定激活标签，不随标签重复）
+  // 当前激活标签及其资产（AI 面板绑定激活标签，不随标签重复）
   const activeTab =
     terminal.tabs.find((t) => t.key === terminal.activeKey) ?? null;
   const activeHostID =
     activeTab?.hostID ??
-    (winrmHost?.protocol === 'winrm' ? winrmHost.id : null) ??
+    (panelHost &&
+    (panelHost.protocol === 'winrm' || panelHost.protocol === 'jdbc')
+      ? panelHost.id
+      : null) ??
     null;
   const sessions = useSessions(activeHostID);
 
-  // 分隔条左右拖动调整左侧主机列表宽度，实时持久化。
+  // 分隔条左右拖动调整左侧资产列表宽度，实时持久化。
   const onSidebarResize = useCallback(
     (e: React.MouseEvent<HTMLDivElement>): void => {
       e.preventDefault();
@@ -137,7 +143,7 @@ export default function HostsPage(): React.JSX.Element {
     };
   }, []);
 
-  // 激活标签变化时接入对应主机的 AI 会话（懒创建 + 加载历史）
+  // 激活标签变化时接入对应资产的 AI 会话（懒创建 + 加载历史）
   useEffect(() => {
     if (activeHostID) {
       void attachRef.current();
@@ -147,12 +153,12 @@ export default function HostsPage(): React.JSX.Element {
   // 双击/连接入口：按协议分流。SSH 走多标签终端，WinRM 走命令执行器面板。
   const openHost = (node: TreeNode): void => {
     setSelectedHost(node);
-    if (node.protocol === 'winrm') {
-      setWinrmHost(node);
+    if (node.protocol === 'winrm' || node.protocol === 'jdbc') {
+      setPanelHost(node);
       setView('terminal');
       return;
     }
-    setWinrmHost(null);
+    setPanelHost(null);
     if (terminal.tabs.length >= MAX_TABS) {
       message.warning(t('tabs.maxWarning', { count: MAX_TABS }));
       return;
@@ -214,13 +220,13 @@ export default function HostsPage(): React.JSX.Element {
           node.nodeType === 'folder' ? t('modal.deleteFolderContent') : '',
         onOk: () => {
           void deleteNode(node.id);
-          // 删除当前打开的主机时清理右侧面板/选中态，避免渲染已删除节点
-          if (winrmHost?.id === node.id) setWinrmHost(null);
+          // 删除当前打开的资产时清理右侧面板/选中态，避免渲染已删除节点
+          if (panelHost?.id === node.id) setPanelHost(null);
           if (selectedHost?.id === node.id) setSelectedHost(null);
         },
       });
     },
-    [deleteNode, modal, t, winrmHost, selectedHost],
+    [deleteNode, modal, t, panelHost, selectedHost],
   );
 
   // 右键「连接」菜单：与双击一致，新建终端标签（普通函数，依赖最新 openHost）
@@ -228,7 +234,7 @@ export default function HostsPage(): React.JSX.Element {
     openHost(node);
   };
 
-  // 右键「SFTP 文件」：确保该主机成为激活标签后切到 SFTP 视图（SFTP 绑定激活标签主机）
+  // 右键「SFTP 文件」：确保该资产成为激活标签后切到 SFTP 视图（SFTP 绑定激活标签资产）
   const handleSftp = (node: TreeNode): void => {
     openHost(node);
     setView('sftp');
@@ -238,7 +244,7 @@ export default function HostsPage(): React.JSX.Element {
     setSelectedHost(node);
   }, []);
 
-  // 双击主机：新建终端标签（普通函数，依赖最新 openHost）
+  // 双击资产：新建终端标签（普通函数，依赖最新 openHost）
   const handleDoubleClick = (node: TreeNode): void => {
     openHost(node);
   };
@@ -277,7 +283,7 @@ export default function HostsPage(): React.JSX.Element {
     <div
       style={{
         display: 'grid',
-        // 左侧主机列表固定宽度 + 分隔条 + 右侧自适应
+        // 左侧资产列表固定宽度 + 分隔条 + 右侧自适应
         gridTemplateColumns: `${sidebarWidth}px 5px minmax(0, 1fr)`,
         // 行高必须确定，否则子元素 height:100% 解析不到高度，会按内容撑开（终端残留最大化高度）
         gridTemplateRows: '100%',
@@ -285,7 +291,7 @@ export default function HostsPage(): React.JSX.Element {
         gap: 0,
       }}
     >
-      {/* 左：主机树 */}
+      {/* 左：资产树 */}
       <HostList
         treeData={tree}
         selectedId={selectedHost?.id ?? null}
@@ -324,7 +330,7 @@ export default function HostsPage(): React.JSX.Element {
           minWidth: 0,
         }}
       >
-        {winrmHost ? (
+        {panelHost ? (
           <div
             style={{
               flex: 1,
@@ -333,15 +339,23 @@ export default function HostsPage(): React.JSX.Element {
               minWidth: 0,
             }}
           >
-            <WinRmPanel
-              host={winrmHost}
-              aiCollapsed={aiCollapsed}
-              onToggleAI={() => setAiCollapsed(!aiCollapsed)}
-            />
+            {panelHost.protocol === 'jdbc' ? (
+              <DbPanel
+                host={panelHost}
+                aiCollapsed={aiCollapsed}
+                onToggleAI={() => setAiCollapsed(!aiCollapsed)}
+              />
+            ) : (
+              <WinRmPanel
+                host={panelHost}
+                aiCollapsed={aiCollapsed}
+                onToggleAI={() => setAiCollapsed(!aiCollapsed)}
+              />
+            )}
             <AIPanel
               {...aiPanelProps}
               sshConnected={true}
-              hostName={winrmHost.name}
+              hostName={panelHost.name}
               onRunInTerminal={() => {}}
             />
           </div>
@@ -447,7 +461,7 @@ export default function HostsPage(): React.JSX.Element {
             ))}
           </div>
 
-          {/* 智能体面板：绑定当前激活标签的主机；收起时渲染右下角按钮（不占位） */}
+          {/* 智能体面板：绑定当前激活标签的资产；收起时渲染右下角按钮（不占位） */}
           <AIPanel
             {...aiPanelProps}
             sshConnected={activeTab?.connected ?? false}
@@ -458,7 +472,7 @@ export default function HostsPage(): React.JSX.Element {
           </>
         )}
 
-        {/* SFTP 视图：绑定当前激活标签的主机；条件挂载（切走卸载，重进重新加载根目录） */}
+        {/* SFTP 视图：绑定当前激活标签的资产；条件挂载（切走卸载，重进重新加载根目录） */}
         {view === 'sftp' && (
           <div
             style={{
@@ -496,7 +510,7 @@ export default function HostsPage(): React.JSX.Element {
         )}
       </div>
 
-      {/* 主机表单弹窗 */}
+      {/* 资产表单弹窗 */}
       <HostForm
         open={formOpen}
         initialValues={formInitialValues}

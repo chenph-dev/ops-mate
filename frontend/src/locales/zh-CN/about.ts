@@ -1,10 +1,10 @@
 export default {
   title: '关于 ops-mate',
   tagline:
-    '基于 Wails + React 的 AI 运维智能体，通过 AI 对话远程管理 Linux 主机。',
+    '基于 Wails + React 的 AI 运维智能体，通过 AI 对话远程管理 Linux 资产。',
   feat: {
-    hostsTitle: '主机管理',
-    hostsDesc: '文件夹树状组织主机、连接测试、命令执行',
+    hostsTitle: '资产管理',
+    hostsDesc: '文件夹树状组织资产、连接测试、命令执行',
     terminalTitle: 'SSH 终端',
     terminalDesc: '交互式终端，动态缩放、搜索、命令历史',
     sftpTitle: 'SFTP 传输',

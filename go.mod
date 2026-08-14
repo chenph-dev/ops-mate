@@ -7,7 +7,9 @@ require (
 	github.com/cloudwego/eino-ext/components/model/claude v0.1.24
 	github.com/cloudwego/eino-ext/components/model/ollama v0.1.9
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
+	github.com/go-sql-driver/mysql v1.10.0
 	github.com/golang-migrate/migrate/v4 v4.19.1
+	github.com/lib/pq v1.12.3
 	github.com/masterzen/winrm v0.0.0-20260407182533-5570be7f80cf
 	github.com/pkg/sftp v1.13.11
 	github.com/wailsapp/wails/v2 v2.12.0
@@ -24,6 +26,7 @@ require (
 	cloud.google.com/go/auth v0.16.4 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.8.0 // indirect
+	filippo.io/edwards25519 v1.2.0 // indirect
 	git.sr.ht/~jackmordaunt/go-toast/v2 v2.0.3 // indirect
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358 // indirect
 	github.com/ChrisTrenkamp/goxpath v0.0.0-20210404020558-97928f7e12b6 // indirect

@@ -162,3 +162,48 @@ func TestDefaultReadOnlyCommandsWindows_NotEmpty(t *testing.T) {
 		t.Error("Windows read-only whitelist should not be empty")
 	}
 }
+
+func TestClassifyForProtocol_JdbcSQL(t *testing.T) {
+	cases := []struct {
+		sql    string
+		risk   string
+		action Action
+	}{
+		{"SELECT * FROM users", "read", ActionAuto},
+		{"SHOW TABLES", "read", ActionAuto},
+		{"DESCRIBE users", "read", ActionAuto},
+		{"EXPLAIN SELECT 1", "read", ActionAuto},
+		{"USE app", "read", ActionAuto},
+		{"INSERT INTO t VALUES (1)", "write", ActionApprove},
+		{"UPDATE users SET name='x'", "write", ActionApprove},
+		{"DELETE FROM users", "write", ActionApprove},
+		{"CREATE TABLE t (id INT)", "write", ActionApprove},
+		{"DROP TABLE users", "high", ActionApprove},
+		{"TRUNCATE TABLE t", "high", ActionApprove},
+		{"ALTER TABLE t ADD COLUMN c INT", "high", ActionApprove},
+		{"SELECT 1; DROP TABLE users", "write", ActionApprove},              // 多语句保守审批
+		{"WITH x AS (SELECT 1) UPDATE t SET a=1", "write", ActionApprove},  // CTE 写保守审批
+	}
+	for _, c := range cases {
+		risk, action := ClassifyForProtocol(c.sql, nil, "jdbc")
+		if risk != c.risk || action != c.action {
+			t.Errorf("ClassifyForProtocol(%q, jdbc) = (%q,%q), want (%q,%q)", c.sql, risk, action, c.risk, c.action)
+		}
+	}
+}
+
+func TestAssessRiskForProtocol_Jdbc(t *testing.T) {
+	if AssessRiskForProtocol("SELECT * FROM users", "jdbc") != "" {
+		t.Error("jdbc SELECT 不应判高风险")
+	}
+	if AssessRiskForProtocol("DROP TABLE users", "jdbc") != "high" {
+		t.Error("jdbc DROP 应判高风险")
+	}
+	if AssessRiskForProtocol("UPDATE users SET name='x'", "jdbc") != "" {
+		t.Error("jdbc UPDATE 不应判高风险（写操作由审批而非 high 标红）")
+	}
+	// jdbc 不受 Linux/Windows shell 危险模式影响
+	if AssessRiskForProtocol("rm -rf /", "jdbc") != "" {
+		t.Error("jdbc 不应套用 shell 危险模式")
+	}
+}

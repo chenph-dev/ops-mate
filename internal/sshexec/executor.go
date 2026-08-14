@@ -26,7 +26,7 @@ type Line struct {
 }
 
 // Exec 执行器接口（供测试 stub 与真实 Executor 实现）。
-// 执行器构造时已绑定目标主机，故 Exec 只接收命令本身。
+// 执行器构造时已绑定目标资产，故 Exec 只接收命令本身。
 type Exec interface {
 	Exec(ctx context.Context, command string) (<-chan Line, error)
 }

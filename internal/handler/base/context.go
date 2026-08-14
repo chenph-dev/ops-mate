@@ -1,4 +1,4 @@
-// Package base 提供 handler 层共享的基础设施：Wails 应用上下文与主机连接解析。
+// Package base 提供 handler 层共享的基础设施：Wails 应用上下文与资产连接解析。
 package base
 
 import "context"

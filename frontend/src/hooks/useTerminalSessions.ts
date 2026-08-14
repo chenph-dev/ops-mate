@@ -7,7 +7,7 @@ import {
   CloseTerminal,
 } from '@wailsjs/go/terminal/TerminalHandler';
 
-// 多标签终端会话：同一主机可开多个标签，每标签独立 SSH 会话、独立状态。
+// 多标签终端会话：同一资产可开多个标签，每标签独立 SSH 会话、独立状态。
 // 后端 TerminalHandler 已支持多会话（sessionId 路由），本 hook 负责前端多实例管理。
 
 const MAX_TABS = 6; // 标签上限

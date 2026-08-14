@@ -106,7 +106,7 @@ func (x *skillTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	}
 	return &schema.ToolInfo{
 		Name: "run_skill_script",
-		Desc: "在目标主机上执行某运维技能 scripts/ 目录下的脚本（自动上传到临时目录后执行，由脚本 shebang 决定解释器）。仅当技能自带可执行脚本时使用；脚本会先展示给用户审批，批准后才执行。",
+		Desc: "在目标资产上执行某运维技能 scripts/ 目录下的脚本（自动上传到临时目录后执行，由脚本 shebang 决定解释器）。仅当技能自带可执行脚本时使用；脚本会先展示给用户审批，批准后才执行。",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"skillName": {Type: schema.String, Desc: "技能名称", Required: true},
 			"script":    {Type: schema.String, Desc: "scripts/ 下的脚本文件名", Required: true},
@@ -165,7 +165,7 @@ type scriptArgs struct {
 	Args      string `json:"args"`
 }
 
-// runSkillScript 审批后上传脚本到目标主机执行。
+// runSkillScript 审批后上传脚本到目标资产执行。
 func (t *SkillTools) runSkillScript(ctx context.Context, argsJSON string) (string, error) {
 	var args scriptArgs
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {

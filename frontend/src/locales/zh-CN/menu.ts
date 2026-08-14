@@ -1,5 +1,5 @@
 export default {
-  hosts: '主机',
+  hosts: '资产',
   system: '系统',
   config: 'LLM模型配置',
   audit: '审计日志',

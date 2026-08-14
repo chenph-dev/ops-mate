@@ -54,7 +54,7 @@ function formatSize(n: number): string {
 
 type SortKey = 'name' | 'modTime' | 'type' | 'size';
 
-/** 主机 SFTP 文件浏览面板（单栏远端文件管理器）。 */
+/** 资产 SFTP 文件浏览面板（单栏远端文件管理器）。 */
 export default function SftpPanel({
   hostId,
   hostName,
