@@ -21,7 +21,7 @@ type Host struct {
 
 // Line 一行输出，带来源 stdout/stderr。
 type Line struct {
-	Stream string `json:"stream"` // "stdout" | "stderr"
+	Stream string `json:"stream"` // "stdout" | "stderr" | "exit" | "error"
 	Text   string `json:"text"`
 }
 

@@ -40,3 +40,60 @@ func TestBuildSystemMessages_NoTerminalContext(t *testing.T) {
 		t.Errorf("无终端上下文时不应输出该段落: %q", content)
 	}
 }
+
+func TestBuildSystemMessages_WindowsOS(t *testing.T) {
+	msgs, err := BuildSystemMessages(context.Background(), map[string]any{
+		"HostName": "", "Memory": "", "TerminalContext": "", "SkillsCatalog": "", "OS": "windows",
+	})
+	if err != nil {
+		t.Fatalf("BuildSystemMessages: %v", err)
+	}
+	content := msgs[0].Content
+	if !strings.Contains(content, "Windows 主机") {
+		t.Errorf("windows 应含 Windows 主机描述: %q", content)
+	}
+	if !strings.Contains(content, "PowerShell 命令") {
+		t.Errorf("windows 应含 PowerShell 语义: %q", content)
+	}
+	if strings.Contains(content, "Linux 主机") {
+		t.Errorf("windows 不应含 Linux 主机描述: %q", content)
+	}
+	if !strings.Contains(content, "diskpart clean") {
+		t.Errorf("windows 应含 Windows 危险操作提示: %q", content)
+	}
+}
+
+func TestBuildSystemMessages_LinuxOS(t *testing.T) {
+	msgs, err := BuildSystemMessages(context.Background(), map[string]any{
+		"HostName": "", "Memory": "", "TerminalContext": "", "SkillsCatalog": "",
+	})
+	if err != nil {
+		t.Fatalf("BuildSystemMessages: %v", err)
+	}
+	content := msgs[0].Content
+	if !strings.Contains(content, "Linux 主机") {
+		t.Errorf("默认应含 Linux 主机描述: %q", content)
+	}
+	if strings.Contains(content, "PowerShell 命令") {
+		t.Errorf("linux 不应含 PowerShell 语义: %q", content)
+	}
+	if strings.Contains(content, "diskpart clean") {
+		t.Errorf("linux 不应含 Windows 危险操作提示: %q", content)
+	}
+}
+
+func TestBuildSystemMessages_WindowsHostnameKeepsPowerShellSemantics(t *testing.T) {
+	msgs, err := BuildSystemMessages(context.Background(), map[string]any{
+		"HostName": "win01", "Memory": "", "TerminalContext": "", "SkillsCatalog": "", "OS": "windows",
+	})
+	if err != nil {
+		t.Fatalf("BuildSystemMessages: %v", err)
+	}
+	content := msgs[0].Content
+	if !strings.Contains(content, "PowerShell 命令") {
+		t.Errorf("有主机名时也应含 PowerShell 语义: %q", content)
+	}
+	if !strings.Contains(content, "目标主机 win01") {
+		t.Errorf("应含主机名: %q", content)
+	}
+}

@@ -1,5 +1,6 @@
-import { Modal, Form, Input, InputNumber, Select, message } from 'antd';
+import { Modal, Form, Input, InputNumber, Select, message, Row, Col } from 'antd';
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { hoststore } from '@wailsjs/go/models';
 
@@ -22,6 +23,8 @@ const defaultValues: HostInput = {
   authType: 'password',
   secret: '',
   autoApprove: 'inherit',
+  protocol: 'ssh',
+  rdpPort: 3389,
 };
 
 export default function HostForm({
@@ -35,10 +38,16 @@ export default function HostForm({
   const [submitting, setSubmitting] = useState(false);
   const [testing, setTesting] = useState(false);
   const authType = Form.useWatch('authType', form);
+  const protocol = Form.useWatch('protocol', form);
   const { t } = useTranslation('hosts');
+  const itemStyle: CSSProperties = { marginBottom: 12 };
+  const secretIsKey = protocol === 'ssh' && authType === 'privatekey';
 
   const handleSubmit = async (): Promise<void> => {
     const values = await form.validateFields();
+    if (values.protocol === 'winrm') {
+      values.authType = 'password';
+    }
     setSubmitting(true);
     try {
       await onSubmit(values);
@@ -76,6 +85,7 @@ export default function HostForm({
   return (
     <Modal
       title={initialValues ? t('form.titleEdit') : t('form.titleAdd')}
+      width={480}
       open={open}
       onCancel={onCancel}
       onOk={handleSubmit}
@@ -88,80 +98,139 @@ export default function HostForm({
       }}
     >
       <Form form={form} layout="vertical" size="small">
-        <Form.Item
-          name="name"
-          label={t('form.name')}
-          rules={[{ required: true, message: t('form.nameRequired') }]}
-        >
-          <Input placeholder="web-01" />
-        </Form.Item>
-        <Form.Item
-          name="addr"
-          label={t('form.addr')}
-          rules={[{ required: true, message: t('form.addrRequired') }]}
-        >
-          <Input placeholder="10.0.0.1 或 example.com" />
-        </Form.Item>
-        <Form.Item
-          name="port"
-          label={t('form.port')}
-          rules={[{ required: true, message: t('form.portRequired') }]}
-        >
-          <InputNumber min={1} max={65535} style={{ width: '100%' }} />
-        </Form.Item>
-        <Form.Item
-          name="user"
-          label={t('form.user')}
-          rules={[{ required: true, message: t('form.userRequired') }]}
-        >
-          <Input placeholder="root" />
-        </Form.Item>
-        <Form.Item
-          name="authType"
-          label={t('form.authType')}
-          rules={[{ required: true }]}
-        >
-          <Select
-            options={[
-              { label: t('form.password'), value: 'password' },
-              { label: t('form.privateKey'), value: 'privatekey' },
-            ]}
-          />
-        </Form.Item>
-        <Form.Item
-          name="secret"
-          label={authType === 'privatekey' ? t('form.privateKey') : t('form.password')}
-          // 编辑模式 secret 非必填（留空保留原密码），新增必填
-          rules={[{ required: !initialValues, message: t('form.secretRequired') }]}
-        >
-          {authType === 'privatekey' ? (
-            <Input.TextArea
-              rows={3}
-              placeholder={
-                initialValues
-                  ? t('form.keepSecretPlaceholder')
-                  : '-----BEGIN RSA PRIVATE KEY-----...'
-              }
-            />
-          ) : (
-            <Input.Password
-              placeholder={
-                initialValues
-                  ? t('form.keepPasswordPlaceholder')
-                  : t('form.passwordPlaceholder')
-              }
-            />
+        <Row gutter={12}>
+          <Col span={12}>
+            <Form.Item
+              name="name"
+              label={t('form.name')}
+              rules={[{ required: true, message: t('form.nameRequired') }]}
+              style={itemStyle}
+            >
+              <Input placeholder="web-01" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item name="protocol" label={t('form.protocol')} style={itemStyle}>
+              <Select
+                options={[
+                  { label: t('form.protocolSsh'), value: 'ssh' },
+                  { label: t('form.protocolWinrm'), value: 'winrm' },
+                ]}
+                onChange={(value) => {
+                  if (value === 'winrm') {
+                    form.setFieldsValue({
+                      port: 5985,
+                      rdpPort: form.getFieldValue('rdpPort') || 3389,
+                    });
+                  } else {
+                    form.setFieldsValue({ port: 22 });
+                  }
+                }}
+              />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              name="addr"
+              label={t('form.addr')}
+              rules={[{ required: true, message: t('form.addrRequired') }]}
+              style={itemStyle}
+            >
+              <Input placeholder="10.0.0.1 或 example.com" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              name="port"
+              label={protocol === 'winrm' ? t('form.winrmPort') : t('form.port')}
+              rules={[{ required: true, message: t('form.portRequired') }]}
+              style={itemStyle}
+            >
+              <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              name="user"
+              label={t('form.user')}
+              rules={[{ required: true, message: t('form.userRequired') }]}
+              style={itemStyle}
+            >
+              <Input placeholder="root" />
+            </Form.Item>
+          </Col>
+          {protocol === 'ssh' && (
+            <Col span={12}>
+              <Form.Item
+                name="authType"
+                label={t('form.authType')}
+                rules={[{ required: true }]}
+                style={itemStyle}
+              >
+                <Select
+                  options={[
+                    { label: t('form.password'), value: 'password' },
+                    { label: t('form.privateKey'), value: 'privatekey' },
+                  ]}
+                />
+              </Form.Item>
+            </Col>
           )}
-        </Form.Item>
-        <Form.Item name="autoApprove" label="自动放行只读命令">
-          <Select
-            options={[
-              { label: '继承全局设置', value: 'inherit' },
-              { label: '允许（覆盖为开启）', value: 'on' },
-              { label: '禁止（覆盖为关闭）', value: 'off' },
-            ]}
-          />
-        </Form.Item>
+          <Col span={secretIsKey ? 24 : 12}>
+            <Form.Item
+              name="secret"
+              label={
+                protocol === 'winrm' || authType !== 'privatekey'
+                  ? t('form.password')
+                  : t('form.privateKey')
+              }
+              rules={[{ required: !initialValues, message: t('form.secretRequired') }]}
+              style={itemStyle}
+            >
+              {protocol === 'winrm' || authType !== 'privatekey' ? (
+                <Input.Password
+                  placeholder={
+                    initialValues
+                      ? t('form.keepPasswordPlaceholder')
+                      : t('form.passwordPlaceholder')
+                  }
+                />
+              ) : (
+                <Input.TextArea
+                  rows={3}
+                  placeholder={
+                    initialValues
+                      ? t('form.keepSecretPlaceholder')
+                      : '-----BEGIN RSA PRIVATE KEY-----...'
+                  }
+                />
+              )}
+            </Form.Item>
+          </Col>
+          {protocol === 'winrm' && (
+            <Col span={12}>
+              <Form.Item
+                name="rdpPort"
+                label={t('form.rdpPort')}
+                rules={[{ required: true, message: t('form.rdpPortRequired') }]}
+                style={itemStyle}
+              >
+                <InputNumber min={1} max={65535} placeholder="3389" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          )}
+          <Col span={24}>
+            <Form.Item name="autoApprove" label="自动放行只读命令" style={itemStyle}>
+              <Select
+                options={[
+                  { label: '继承全局设置', value: 'inherit' },
+                  { label: '允许（覆盖为开启）', value: 'on' },
+                  { label: '禁止（覆盖为关闭）', value: 'off' },
+                ]}
+              />
+            </Form.Item>
+          </Col>
+        </Row>
       </Form>
       <div style={{ textAlign: 'right', marginTop: 8 }}>
         <a onClick={handleTest} style={{ fontSize: 12 }}>

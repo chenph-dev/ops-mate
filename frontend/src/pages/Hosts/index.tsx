@@ -14,6 +14,7 @@ import HostForm from '@/components/HostForm';
 import SftpPanel from '@/components/SftpPanel';
 import Terminal from '@/components/Terminal';
 import AIPanel from '@/components/AIPanel';
+import WinRmPanel from '@/components/WinRmPanel';
 
 const MAX_TABS = 6;
 
@@ -28,6 +29,8 @@ function toHostInput(node: TreeNode): HostInput {
     authType: node.authType ?? 'password',
     secret: '',
     autoApprove: node.autoApprove ?? 'inherit',
+    protocol: node.protocol ?? 'ssh',
+    rdpPort: node.rdpPort ?? 3389,
   };
 }
 
@@ -50,6 +53,7 @@ export default function HostsPage(): React.JSX.Element {
     deleteNode,
   } = useHosts();
   const [selectedHost, setSelectedHost] = useState<TreeNode | null>(null);
+  const [winrmHost, setWinrmHost] = useState<TreeNode | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [formParentId, setFormParentId] = useState('');
   // 节点编辑：非空表示编辑该主机，空表示新增
@@ -74,7 +78,10 @@ export default function HostsPage(): React.JSX.Element {
   // 当前激活标签及其主机（AI 面板绑定激活标签，不随标签重复）
   const activeTab =
     terminal.tabs.find((t) => t.key === terminal.activeKey) ?? null;
-  const activeHostID = activeTab?.hostID ?? null;
+  const activeHostID =
+    activeTab?.hostID ??
+    (winrmHost?.protocol === 'winrm' ? winrmHost.id : null) ??
+    null;
   const sessions = useSessions(activeHostID);
 
   // 分隔条左右拖动调整左侧主机列表宽度，实时持久化。
@@ -137,8 +144,15 @@ export default function HostsPage(): React.JSX.Element {
     }
   }, [activeHostID]);
 
-  // 普通函数（非 useCallback）：需读取每轮 render 最新的 terminal 状态，无 memo 价值。
-  const openTerminal = (node: TreeNode): void => {
+  // 双击/连接入口：按协议分流。SSH 走多标签终端，WinRM 走命令执行器面板。
+  const openHost = (node: TreeNode): void => {
+    setSelectedHost(node);
+    if (node.protocol === 'winrm') {
+      setWinrmHost(node);
+      setView('terminal');
+      return;
+    }
+    setWinrmHost(null);
     if (terminal.tabs.length >= MAX_TABS) {
       message.warning(t('tabs.maxWarning', { count: MAX_TABS }));
       return;
@@ -198,22 +212,25 @@ export default function HostsPage(): React.JSX.Element {
         title: t('modal.deleteTitle', { name: node.name }),
         content:
           node.nodeType === 'folder' ? t('modal.deleteFolderContent') : '',
-        onOk: () => deleteNode(node.id),
+        onOk: () => {
+          void deleteNode(node.id);
+          // 删除当前打开的主机时清理右侧面板/选中态，避免渲染已删除节点
+          if (winrmHost?.id === node.id) setWinrmHost(null);
+          if (selectedHost?.id === node.id) setSelectedHost(null);
+        },
       });
     },
-    [deleteNode, modal, t],
+    [deleteNode, modal, t, winrmHost, selectedHost],
   );
 
-  // 右键「连接」菜单：与双击一致，新建终端标签（普通函数，依赖最新 openTerminal）
+  // 右键「连接」菜单：与双击一致，新建终端标签（普通函数，依赖最新 openHost）
   const handleTest = (node: TreeNode): void => {
-    setSelectedHost(node);
-    openTerminal(node);
+    openHost(node);
   };
 
   // 右键「SFTP 文件」：确保该主机成为激活标签后切到 SFTP 视图（SFTP 绑定激活标签主机）
   const handleSftp = (node: TreeNode): void => {
-    setSelectedHost(node);
-    openTerminal(node);
+    openHost(node);
     setView('sftp');
   };
 
@@ -221,10 +238,39 @@ export default function HostsPage(): React.JSX.Element {
     setSelectedHost(node);
   }, []);
 
-  // 双击主机：新建终端标签（普通函数，依赖最新 openTerminal）
+  // 双击主机：新建终端标签（普通函数，依赖最新 openHost）
   const handleDoubleClick = (node: TreeNode): void => {
-    setSelectedHost(node);
-    openTerminal(node);
+    openHost(node);
+  };
+
+  const aiPanelProps = {
+    activeSession: sessions.activeSession,
+    messages: sessions.messages,
+    conversations: sessions.conversations,
+    streamingText: sessions.streamingText,
+    pendingCommand: sessions.pendingCommand,
+    commandStatus: sessions.commandStatus,
+    pendingPlan: sessions.pendingPlan,
+    planStatus: sessions.planStatus,
+    sessionState: sessions.sessionState,
+    lastError: sessions.lastError,
+    runningCommand: sessions.runningCommand,
+    runElapsed: sessions.runElapsed,
+    runOutput: sessions.runOutput,
+    collapsed: aiCollapsed,
+    onRefreshConversations: sessions.refreshConversations,
+    onSwitchConversation: sessions.switchConversation,
+    onDeleteConversation: sessions.deleteConversation,
+    onRenameConversation: sessions.renameConversation,
+    onToggleCollapse: () => setAiCollapsed(!aiCollapsed),
+    onSendMessage: sessions.sendMessage,
+    onClearMessages: sessions.clearMessages,
+    onApprove: sessions.approve,
+    onReject: sessions.reject,
+    onApprovePlan: sessions.approvePlan,
+    onRejectPlan: sessions.rejectPlan,
+    onCancel: sessions.cancel,
+    onNewConversation: sessions.newConversation,
   };
 
   return (
@@ -278,6 +324,29 @@ export default function HostsPage(): React.JSX.Element {
           minWidth: 0,
         }}
       >
+        {winrmHost ? (
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              display: view === 'sftp' ? 'none' : 'flex',
+              minWidth: 0,
+            }}
+          >
+            <WinRmPanel
+              host={winrmHost}
+              aiCollapsed={aiCollapsed}
+              onToggleAI={() => setAiCollapsed(!aiCollapsed)}
+            />
+            <AIPanel
+              {...aiPanelProps}
+              sshConnected={true}
+              hostName={winrmHost.name}
+              onRunInTerminal={() => {}}
+            />
+          </div>
+        ) : (
+          <>
         {/* 标签栏：横跨整个右列顶部，终端区与 AI 面板在其下对齐（SFTP 时隐藏） */}
         <div
           style={{
@@ -380,38 +449,14 @@ export default function HostsPage(): React.JSX.Element {
 
           {/* 智能体面板：绑定当前激活标签的主机；收起时渲染右下角按钮（不占位） */}
           <AIPanel
-            activeSession={sessions.activeSession}
-            messages={sessions.messages}
-            conversations={sessions.conversations}
-            streamingText={sessions.streamingText}
-            pendingCommand={sessions.pendingCommand}
-            commandStatus={sessions.commandStatus}
-            pendingPlan={sessions.pendingPlan}
-            planStatus={sessions.planStatus}
-            sessionState={sessions.sessionState}
-            lastError={sessions.lastError}
-            runningCommand={sessions.runningCommand}
-            runElapsed={sessions.runElapsed}
-            runOutput={sessions.runOutput}
+            {...aiPanelProps}
             sshConnected={activeTab?.connected ?? false}
             hostName={activeTab?.hostName ?? ''}
-            collapsed={aiCollapsed}
-            onRefreshConversations={sessions.refreshConversations}
-            onSwitchConversation={sessions.switchConversation}
-            onDeleteConversation={sessions.deleteConversation}
-            onRenameConversation={sessions.renameConversation}
-            onToggleCollapse={() => setAiCollapsed(!aiCollapsed)}
-            onSendMessage={sessions.sendMessage}
-            onClearMessages={sessions.clearMessages}
             onRunInTerminal={runInTerminal}
-            onApprove={sessions.approve}
-            onReject={sessions.reject}
-            onApprovePlan={sessions.approvePlan}
-            onRejectPlan={sessions.rejectPlan}
-            onCancel={sessions.cancel}
-            onNewConversation={sessions.newConversation}
           />
         </div>
+          </>
+        )}
 
         {/* SFTP 视图：绑定当前激活标签的主机；条件挂载（切走卸载，重进重新加载根目录） */}
         {view === 'sftp' && (

@@ -22,6 +22,8 @@ type Host struct {
 	AuthEncrypted []byte  `gorm:"column:auth_encrypted"`
 	AuthType      string  `gorm:"column:auth_type"`
 	AutoApprove   string  `gorm:"column:auto_approve"`
+	Protocol      string  `gorm:"column:protocol"`
+	RdpPort       int     `gorm:"column:rdp_port"`
 	CreatedAt     int64   `gorm:"column:created_at"`
 }
 
@@ -37,6 +39,8 @@ type HostInput struct {
 	AuthType    string `json:"authType"`
 	Secret      string `json:"secret"`
 	AutoApprove string `json:"autoApprove"` // inherit | on | off
+	Protocol    string `json:"protocol"`
+	RdpPort     int    `json:"rdpPort"`
 }
 
 // HostMeta 主机列表项（不含凭据）。
@@ -50,6 +54,8 @@ type HostMeta struct {
 	User        string `json:"user"`
 	AuthType    string `json:"authType"`
 	AutoApprove string `json:"autoApprove"`
+	Protocol    string `json:"protocol"`
+	RdpPort     int    `json:"rdpPort"`
 }
 
 // TreeNode 树形节点返回结构。
@@ -66,6 +72,8 @@ type TreeNode struct {
 	User        string `json:"user,omitempty"`
 	AuthType    string `json:"authType,omitempty"`
 	AutoApprove string `json:"autoApprove,omitempty"`
+	Protocol    string `json:"protocol,omitempty"`
+	RdpPort     int    `json:"rdpPort,omitempty"`
 }
 
 // HostsStore 提供主机/目录管理操作。
@@ -95,6 +103,8 @@ func (s *HostsStore) SaveHost(in HostInput) (string, error) {
 		Addr: in.Addr, Port: in.Port, User: in.User,
 		AuthEncrypted: enc, AuthType: in.AuthType,
 		AutoApprove: autoApproveOrDefault(in.AutoApprove),
+		Protocol:    protocolOrDefault(in.Protocol),
+		RdpPort:     rdpPortOrDefault(in.RdpPort),
 		CreatedAt:   time.Now().Unix(),
 	}).Error
 	if err != nil {
@@ -109,6 +119,8 @@ func (s *HostsStore) UpdateHost(id string, in HostInput) error {
 		"name": in.Name, "addr": in.Addr, "port": in.Port,
 		"user": in.User, "auth_type": in.AuthType,
 		"auto_approve": autoApproveOrDefault(in.AutoApprove),
+		"protocol":     protocolOrDefault(in.Protocol),
+		"rdp_port":     rdpPortOrDefault(in.RdpPort),
 	}
 	if in.Secret != "" {
 		enc, err := s.app.Encrypt([]byte(in.Secret))
@@ -151,6 +163,7 @@ func (s *HostsStore) ListHosts() ([]HostMeta, error) {
 			ParentID: strPtrVal(h.ParentID),
 			Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
 			AutoApprove: h.AutoApprove,
+			Protocol:    h.Protocol, RdpPort: h.RdpPort,
 		})
 	}
 	return out, nil
@@ -172,6 +185,7 @@ func (s *HostsStore) ListTree() ([]TreeNode, error) {
 			ParentID: strPtrVal(h.ParentID),
 			Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
 			AutoApprove: h.AutoApprove,
+			Protocol:    h.Protocol, RdpPort: h.RdpPort,
 		}
 	}
 
@@ -247,6 +261,7 @@ func (s *HostsStore) HostMetaByID(id string) (*HostMeta, error) {
 		ParentID: strPtrVal(h.ParentID),
 		Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
 		AutoApprove: h.AutoApprove,
+		Protocol:    h.Protocol, RdpPort: h.RdpPort,
 	}, nil
 }
 
@@ -270,6 +285,22 @@ func strPtrVal(s *string) string {
 func autoApproveOrDefault(v string) string {
 	if v == "" {
 		return "inherit"
+	}
+	return v
+}
+
+// protocolOrDefault normalizes empty protocol to "ssh".
+func protocolOrDefault(v string) string {
+	if v == "" {
+		return "ssh"
+	}
+	return v
+}
+
+// rdpPortOrDefault normalizes empty RDP port to default 3389.
+func rdpPortOrDefault(v int) int {
+	if v == 0 {
+		return 3389
 	}
 	return v
 }

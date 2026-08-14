@@ -281,6 +281,50 @@ func TestSSHTool_AutoDisabled_AllInterrupts(t *testing.T) {
 	}
 }
 
+func TestSSHTool_WindowsInfoDesc(t *testing.T) {
+	tool := NewSSHTool("s1", &testutil.FakeExec{}, (&testutil.EmitRecorder{}).Emit, nil, NewToolCallHolder())
+	tool.SetProtocol("winrm")
+	info, err := tool.Info(context.Background())
+	if err != nil {
+		t.Fatalf("Info: %v", err)
+	}
+	if !strings.Contains(info.Desc, "PowerShell") {
+		t.Errorf("winrm 工具描述应含 PowerShell: %q", info.Desc)
+	}
+}
+
+func TestSSHTool_WindowsRiskClassified(t *testing.T) {
+	var gotInfo commandInfo
+	rec := &testutil.EmitRecorder{}
+	emit := func(sid, event string, data any) {
+		rec.Emit(sid, event, data)
+		if event == "ai:command" {
+			gotInfo, _ = data.(commandInfo)
+		}
+	}
+	tool := NewSSHTool("s1", &testutil.FakeExec{}, emit, nil, NewToolCallHolder())
+	tool.SetProtocol("winrm")
+	_, _ = tool.InvokableRun(context.Background(), `{"command":"format c:","why":"清理"}`)
+	if gotInfo.AssessedRisk != "high" {
+		t.Errorf("winrm format 应判高风险，得到 %q", gotInfo.AssessedRisk)
+	}
+}
+
+func TestSSHTool_ErrorStreamFedBackAsText(t *testing.T) {
+	ex := &testutil.FakeExec{Lines: []sshexec.Line{{Stream: "error", Text: "authentication failed"}}}
+	tool := NewSSHTool("s1", ex, (&testutil.EmitRecorder{}).Emit, nil, NewToolCallHolder())
+	result, err := tool.execute(context.Background(), "whoami", "approved")
+	if err != nil {
+		t.Fatalf("execute 不应返回 error（应回灌文本）: %v", err)
+	}
+	if !strings.Contains(result, "authentication failed") {
+		t.Errorf("error 流应回灌模型文本: %q", result)
+	}
+	if !strings.Contains(result, "执行失败") {
+		t.Errorf("error 流应标记执行失败: %q", result)
+	}
+}
+
 func TestSSHTool_AutoApproved_PersistsStatusAuto(t *testing.T) {
 	app := testutil.OpenTempStore(t)
 	hosts := hoststore.NewHostsStore(app)

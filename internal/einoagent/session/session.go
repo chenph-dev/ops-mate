@@ -132,6 +132,9 @@ type SessionManager struct {
 	skillCatalogFor func() string
 	skillFor        func(name string) (*skill.Skill, error)
 
+	// protocolFor 按主机解析协议（"ssh"/"winrm"）；nil 表示默认 ssh。
+	protocolFor func(hostID string) string
+
 	mu            sync.Mutex
 	sessions      map[string]*agentSession
 	configVersion int
@@ -193,5 +196,14 @@ func (m *SessionManager) SetSkillResolver(catalog func() string, lookup func(nam
 	defer m.mu.Unlock()
 	m.skillCatalogFor = catalog
 	m.skillFor = lookup
+	m.configVersion++
+}
+
+// SetProtocolResolver 注入协议解析器（hostID → "ssh"/"winrm"）。
+// 注入同时使已构建 Graph 失效（下一轮按新协议重建工具语义）。
+func (m *SessionManager) SetProtocolResolver(fn func(hostID string) string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.protocolFor = fn
 	m.configVersion++
 }

@@ -21,13 +21,38 @@ var dangerPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`:\(\)\s*\{\s*:\|:&\s*\}\s*;`), // fork bomb
 }
 
+// windowsDangerPatterns WinRM 额外匹配的危险 PowerShell/cmd 模式。
+var windowsDangerPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`(?i)\bformat\s+[a-zA-Z]:`),
+	regexp.MustCompile(`(?i)\bdel\s+.*\/s`),
+	regexp.MustCompile(`(?i)\brd\s+.*\/s`),
+	regexp.MustCompile(`(?i)\brmdir\s+.*\/s`),
+	regexp.MustCompile(`(?i)\bshutdown\s+\/[sr]`),
+	regexp.MustCompile(`(?i)Remove-Item.*(-Recurse.*-Force|-Force.*-Recurse)`),
+	regexp.MustCompile(`(?i)(?:\bdiskpart\b|\bselect\s+disk\b)[\s\S]*\bclean\b`),
+}
+
 // AssessRisk 返回命令风险等级："" 无风险，"high" 危险。
 // 引擎层永不硬拒——只用于前端标红与二次确认。
+// 为向后兼容，沿用 Linux 语义。
 func AssessRisk(command string) string {
+	return AssessRiskForProtocol(command, "ssh")
+}
+
+// AssessRiskForProtocol 按协议返回命令风险等级："" 无风险，"high" 危险。
+// protocol 为 "winrm" 时额外套用 Windows 危险模式。
+func AssessRiskForProtocol(command, protocol string) string {
 	c := strings.TrimSpace(command)
 	for _, p := range dangerPatterns {
 		if p.MatchString(c) {
 			return "high"
+		}
+	}
+	if strings.EqualFold(protocol, "winrm") {
+		for _, p := range windowsDangerPatterns {
+			if p.MatchString(c) {
+				return "high"
+			}
 		}
 	}
 	return ""
@@ -47,6 +72,14 @@ var DefaultReadOnlyCommands = []string{
 	"ls", "df", "free", "tail", "cat", "ps", "grep", "awk", "top",
 	"uptime", "who", "hostname", "date", "du", "stat", "whoami",
 	"echo", "env", "uname",
+}
+
+// DefaultReadOnlyCommandsWindows WinRM 主机内置只读 PowerShell/cmd 命令白名单。
+var DefaultReadOnlyCommandsWindows = []string{
+	"Get-Command", "Get-Process", "Get-Service", "Get-EventLog", "Get-WinEvent",
+	"Get-Content", "Get-ChildItem", "Get-NetIPAddress", "Get-Date",
+	"ipconfig", "systeminfo", "hostname", "whoami", "netstat", "tasklist",
+	"Test-Connection",
 }
 
 // ParseReadOnlyList 把逗号/空白/换行分隔的白名单配置解析为去重、去空白的命令列表。
@@ -97,13 +130,25 @@ func IsReadOnlyCommand(command string, whitelist []string) bool {
 // Classify 综合分类：返回风险等级（"high"/"read"/"write"）与建议动作。
 // readOnlyWhitelist 为空时回退内置默认白名单。
 // 高危命令永远 approve；只读命中 auto；其余 write → approve。
+// 为向后兼容，沿用 Linux（ssh）语义。
 func Classify(command string, readOnlyWhitelist []string) (string, Action) {
-	if AssessRisk(command) == "high" {
+	return ClassifyForProtocol(command, readOnlyWhitelist, "ssh")
+}
+
+// ClassifyForProtocol 按协议综合分类：返回风险等级（"high"/"read"/"write"）与建议动作。
+// readOnlyWhitelist 为空时回退协议对应的内置默认白名单。
+// 高危命令永远 approve；只读命中 auto；其余 write → approve。
+func ClassifyForProtocol(command string, readOnlyWhitelist []string, protocol string) (string, Action) {
+	if AssessRiskForProtocol(command, protocol) == "high" {
 		return "high", ActionApprove
 	}
 	wl := readOnlyWhitelist
 	if len(wl) == 0 {
-		wl = DefaultReadOnlyCommands
+		if strings.EqualFold(protocol, "winrm") {
+			wl = DefaultReadOnlyCommandsWindows
+		} else {
+			wl = DefaultReadOnlyCommands
+		}
 	}
 	if IsReadOnlyCommand(command, wl) {
 		return "read", ActionAuto

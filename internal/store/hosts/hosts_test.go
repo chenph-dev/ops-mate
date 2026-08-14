@@ -125,6 +125,67 @@ func closeDB(app *store.DB) {
 	}
 }
 
+func TestHostProtocolRdpPort_Roundtrip(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	app, err := store.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer closeDB(app)
+
+	s := NewHostsStore(app)
+
+	// winrm host: save protocol + rdp_port and read back
+	id, err := s.SaveHost(HostInput{
+		Name: "win01", Addr: "10.0.0.9", Port: 5985, User: "admin",
+		AuthType: "password", Secret: "x", Protocol: "winrm", RdpPort: 3390,
+	})
+	if err != nil {
+		t.Fatalf("SaveHost: %v", err)
+	}
+	meta, err := s.HostMetaByID(id)
+	if err != nil {
+		t.Fatalf("HostMetaByID: %v", err)
+	}
+	if meta.Protocol != "winrm" || meta.RdpPort != 3390 {
+		t.Errorf("winrm fields not persisted: %+v", meta)
+	}
+
+	// default normalization: empty protocol -> ssh, 0 rdp_port -> 3389
+	id2, _ := s.SaveHost(HostInput{
+		Name: "linux01", Addr: "10.0.0.10", Port: 22, User: "root",
+		AuthType: "password", Secret: "x",
+	})
+	meta2, _ := s.HostMetaByID(id2)
+	if meta2.Protocol != "ssh" || meta2.RdpPort != 3389 {
+		t.Errorf("default normalization wrong: %+v", meta2)
+	}
+
+	// UpdateHost updates protocol
+	if err := s.UpdateHost(id, HostInput{
+		Name: "win01", Addr: "10.0.0.9", Port: 5986, User: "admin",
+		AuthType: "password", Protocol: "winrm", RdpPort: 3390,
+	}); err != nil {
+		t.Fatalf("UpdateHost: %v", err)
+	}
+	meta, _ = s.HostMetaByID(id)
+	if meta.Port != 5986 {
+		t.Errorf("UpdateHost did not update port: %+v", meta)
+	}
+
+	// ListTree fills new fields
+	tree, _ := s.ListTree()
+	var found bool
+	for _, n := range tree {
+		if n.ID == id && n.Protocol == "winrm" && n.RdpPort == 3390 {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("ListTree did not fill protocol/rdpPort")
+	}
+}
+
 func TestHostAutoApprove_Roundtrip(t *testing.T) {
 	t.Setenv("APPDATA", t.TempDir())
 	app, err := store.Open()

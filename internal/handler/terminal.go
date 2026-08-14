@@ -20,7 +20,7 @@ import (
 
 // TerminalHandler 管理交互式 SSH 终端会话，并通过 Wails 事件推送输出。
 type TerminalHandler struct {
-	hosts    *hoststore.HostsStore
+	resolver *ExecutorResolver
 	sessions map[string]*sshexec.Session
 	mu       sync.Mutex
 
@@ -29,34 +29,20 @@ type TerminalHandler struct {
 	termMu   sync.Mutex
 }
 
-// NewTerminalHandler 构造 TerminalHandler。
+// NewTerminalHandler 构造 TerminalHandler。hosts 仅供构造 resolver（可为 nil——
+// 终端上下文等不触达远程的功能不依赖）。交互式会话仅支持 SSH，WinRM 由 resolver.HostFor 拦截。
 func NewTerminalHandler(hosts *hoststore.HostsStore) *TerminalHandler {
 	return &TerminalHandler{
-		hosts:    hosts,
+		resolver: NewExecutorResolver(hosts),
 		sessions: map[string]*sshexec.Session{},
 		termBufs: map[string]*termctx.RingBuffer{},
 	}
 }
 
-// getHost 按 hostID 取凭据与元信息，构造 SSH 目标。
-func (h *TerminalHandler) getHost(hostID string) (*sshexec.Host, error) {
-	secret, authType, err := h.hosts.GetHostSecret(hostID)
-	if err != nil {
-		return nil, fmt.Errorf("获取主机凭据失败: %w", err)
-	}
-	meta, err := h.hosts.HostMetaByID(hostID)
-	if err != nil {
-		return nil, fmt.Errorf("获取主机信息失败: %w", err)
-	}
-	return &sshexec.Host{
-		Addr: meta.Addr, Port: meta.Port, User: meta.User,
-		AuthType: authType, Secret: secret,
-	}, nil
-}
-
 // OpenTerminal 双击主机时建立交互式 SSH 会话，返回 sessionID。
+// WinRM 主机由 HostFor 拦截（不支持交互式会话）。
 func (h *TerminalHandler) OpenTerminal(hostID string, cols, rows int) (string, error) {
-	host, err := h.getHost(hostID)
+	host, err := h.resolver.HostFor(hostID)
 	if err != nil {
 		return "", err
 	}
@@ -174,18 +160,17 @@ type CommandInfo struct {
 }
 
 // ListHostCommands 抓取指定主机上可用的命令列表（compgen -c），并尝试用 whatis 获取简介。
-// 结果按名称去重排序；whatis 失败或不存在时 Desc 为空。
+// 结果按名称去重排序；whatis 失败或不存在时 Desc 为空。仅支持 SSH 主机（WinRM 无交互式补全场景）。
 func (h *TerminalHandler) ListHostCommands(hostID string) ([]CommandInfo, error) {
-	host, err := h.getHost(hostID)
-	if err != nil {
-		return nil, err
+	ex := h.resolver.ExecFor(hostID)
+	if ex == nil {
+		return nil, fmt.Errorf("无法解析主机执行器，请确认主机凭据已录入")
 	}
 
 	ctx, cancel := context.WithTimeout(Ctx(), 10*time.Second)
 	defer cancel()
 
-	exec := sshexec.NewExecutor(*host)
-	out, err := exec.Exec(ctx, "compgen -c | sort -u")
+	out, err := ex.Exec(ctx, "compgen -c | sort -u")
 	if err != nil {
 		return nil, fmt.Errorf("抓取命令列表失败: %w", err)
 	}
@@ -209,7 +194,7 @@ func (h *TerminalHandler) ListHostCommands(hostID string) ([]CommandInfo, error)
 	sort.Strings(names)
 
 	// 尝试获取命令描述，失败不影响主结果。
-	descMap := h.fetchCommandDescriptions(ctx, host, names)
+	descMap := h.fetchCommandDescriptions(ctx, ex, names)
 
 	result := make([]CommandInfo, 0, len(names))
 	for _, name := range names {
@@ -219,7 +204,7 @@ func (h *TerminalHandler) ListHostCommands(hostID string) ([]CommandInfo, error)
 }
 
 // fetchCommandDescriptions 分批执行 whatis 获取命令描述。
-func (h *TerminalHandler) fetchCommandDescriptions(ctx context.Context, host *sshexec.Host, names []string) map[string]string {
+func (h *TerminalHandler) fetchCommandDescriptions(ctx context.Context, ex sshexec.Exec, names []string) map[string]string {
 	descMap := make(map[string]string)
 	if len(names) == 0 {
 		return descMap
@@ -245,8 +230,7 @@ func (h *TerminalHandler) fetchCommandDescriptions(ctx context.Context, host *ss
 			cmd := "whatis " + strings.Join(batch, " ") + " 2>/dev/null"
 			execCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 			defer cancel()
-			exec := sshexec.NewExecutor(*host)
-			out, err := exec.Exec(execCtx, cmd)
+			out, err := ex.Exec(execCtx, cmd)
 			if err != nil {
 				return
 			}
