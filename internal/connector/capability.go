@@ -35,3 +35,8 @@ type ObjectBrowser interface {
 type CommandRunner interface {
 	Run(ctx context.Context, command string) (string, error)
 }
+
+// Pingable 连接可测试能力（TestConnection / 探活）。
+type Pingable interface {
+	Ping(ctx context.Context) error
+}

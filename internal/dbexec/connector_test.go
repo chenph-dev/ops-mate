@@ -1,6 +1,8 @@
 package dbexec
 
 import (
+	"context"
+	"path/filepath"
 	"testing"
 
 	"ops-mate/internal/connector"
@@ -69,5 +71,22 @@ func TestParamStringHelper(t *testing.T) {
 	}
 	if got := paramString(cfg, "missing"); got != "" {
 		t.Errorf("paramString(missing) = %q, want empty", got)
+	}
+}
+
+func TestDBAdapterImplementsPingable(t *testing.T) {
+	cap, err := connector.New("sqlite", connector.Config{
+		Params: map[string]any{"filePath": filepath.Join(t.TempDir(), "x.db")},
+	})
+	if err != nil {
+		t.Fatalf("New(sqlite): %v", err)
+	}
+	pingable, ok := cap.(connector.Pingable)
+	if !ok {
+		t.Fatalf("sqlite 能力应实现 Pingable, got %T", cap)
+	}
+	ctx := context.Background()
+	if err := pingable.Ping(ctx); err != nil {
+		t.Fatalf("Ping(sqlite): %v", err)
 	}
 }

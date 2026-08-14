@@ -27,6 +27,10 @@ func (a *connectorQueryRunner) Exec(ctx context.Context, query string) (*connect
 	return &connector.ExecResult{RowsAffected: r.RowsAffected}, nil
 }
 
+func (a *connectorQueryRunner) Ping(ctx context.Context) error {
+	return a.e.Ping(ctx)
+}
+
 // Tree 把 schema 表/列转为对象树（表 → 列）。
 func (a *connectorQueryRunner) Tree(ctx context.Context) ([]connector.ObjectNode, error) {
 	s, err := a.e.Schema(ctx)

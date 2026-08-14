@@ -223,3 +223,95 @@ func TestHostAutoApprove_Roundtrip(t *testing.T) {
 		t.Errorf("UpdateHost 后 GetAutoApprove = %q，want off", v)
 	}
 }
+
+func TestHostParams_Roundtrip(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	app, err := store.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer closeDB(app)
+
+	s := NewHostsStore(app)
+
+	// sqlite：无 host，只填 filePath
+	id, err := s.SaveHost(HostInput{
+		Name: "local.db", Protocol: "sqlite",
+		Params: map[string]any{"filePath": "C:\\data\\app.db"},
+	})
+	if err != nil {
+		t.Fatalf("SaveHost(sqlite): %v", err)
+	}
+	meta, err := s.HostMetaByID(id)
+	if err != nil {
+		t.Fatalf("HostMetaByID: %v", err)
+	}
+	if meta.Protocol != "sqlite" {
+		t.Errorf("protocol = %q, want sqlite", meta.Protocol)
+	}
+	if meta.Params == nil || meta.Params["filePath"] != "C:\\data\\app.db" {
+		t.Errorf("Params 未正确回读: %+v", meta.Params)
+	}
+
+	// mysql：params.database 往返
+	id2, err := s.SaveHost(HostInput{
+		Name: "appdb", Protocol: "mysql", Addr: "10.0.0.6", Port: 3306,
+		User: "root", AuthType: "password", Secret: "x",
+		Params: map[string]any{"database": "app"},
+	})
+	if err != nil {
+		t.Fatalf("SaveHost(mysql): %v", err)
+	}
+	meta2, _ := s.HostMetaByID(id2)
+	if meta2.Params["database"] != "app" {
+		t.Errorf("mysql Params.database = %v, want app", meta2.Params["database"])
+	}
+
+	// ListTree 也带出 Params
+	tree, _ := s.ListTree()
+	for _, n := range tree {
+		if n.ID == id2 && n.Params["database"] != "app" {
+			t.Errorf("ListTree Params.database = %v, want app", n.Params["database"])
+		}
+	}
+
+	// UpdateHost 更新 Params
+	if err := s.UpdateHost(id2, HostInput{
+		Name: "appdb", Protocol: "mysql", Addr: "10.0.0.6", Port: 3306,
+		User: "root", AuthType: "password",
+		Params: map[string]any{"database": "other"},
+	}); err != nil {
+		t.Fatalf("UpdateHost: %v", err)
+	}
+	meta2, _ = s.HostMetaByID(id2)
+	if meta2.Params["database"] != "other" {
+		t.Errorf("UpdateHost 后 Params.database = %v, want other", meta2.Params["database"])
+	}
+}
+
+func TestHostJdbcCompatibility_NormalizesToSingleProtocol(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	app, err := store.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer closeDB(app)
+
+	s := NewHostsStore(app)
+	// M6 前前端仍传 jdbc+driver+database：应归一化为 protocol=mysql + params.database
+	id, err := s.SaveHost(HostInput{
+		Name: "legacy", Protocol: "jdbc", Driver: "mysql",
+		Database: "app", Addr: "1.2.3.4", Port: 3306, User: "root",
+		AuthType: "password", Secret: "x",
+	})
+	if err != nil {
+		t.Fatalf("SaveHost(jdbc): %v", err)
+	}
+	meta, _ := s.HostMetaByID(id)
+	if meta.Protocol != "mysql" {
+		t.Errorf("jdbc 未归一化: protocol = %q, want mysql", meta.Protocol)
+	}
+	if meta.Params["database"] != "app" {
+		t.Errorf("jdbc database 未移入 Params: %+v", meta.Params)
+	}
+}
