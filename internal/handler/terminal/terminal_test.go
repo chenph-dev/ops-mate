@@ -1,4 +1,4 @@
-package handler
+package terminal
 
 import (
 	"strings"

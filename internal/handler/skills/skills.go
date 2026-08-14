@@ -1,10 +1,12 @@
-package handler
+// Package skills 提供运维技能管理的 Wails 绑定 handler。
+package skills
 
 import (
 	"os"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
+	"ops-mate/internal/handler/base"
 	"ops-mate/internal/skill"
 )
 
@@ -31,7 +33,7 @@ func NewSkillsHandler(mgr *skill.Manager, onChange func()) *SkillsHandler {
 // InstallSkill 打开文件对话框选择技能 ZIP，校验安装，返回技能名。
 // 用户取消时返回空串、nil。
 func (h *SkillsHandler) InstallSkill() (string, error) {
-	path, err := wailsruntime.OpenFileDialog(Ctx(), wailsruntime.OpenDialogOptions{
+	path, err := wailsruntime.OpenFileDialog(base.Ctx(), wailsruntime.OpenDialogOptions{
 		Title: "选择运维技能 ZIP",
 		Filters: []wailsruntime.FileFilter{
 			{DisplayName: "技能包 (*.zip)", Pattern: "*.zip"},

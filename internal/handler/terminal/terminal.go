@@ -1,4 +1,5 @@
-package handler
+// Package terminal 提供交互式 SSH 终端会话与命令补全的 Wails 绑定 handler。
+package terminal
 
 import (
 	"bytes"
@@ -10,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"ops-mate/internal/handler/base"
 	"ops-mate/internal/sshexec"
 	"ops-mate/internal/store/crypto"
 	hoststore "ops-mate/internal/store/hosts"
@@ -20,7 +22,7 @@ import (
 
 // TerminalHandler 管理交互式 SSH 终端会话，并通过 Wails 事件推送输出。
 type TerminalHandler struct {
-	resolver *ExecutorResolver
+	resolver *base.ExecutorResolver
 	sessions map[string]*sshexec.Session
 	mu       sync.Mutex
 
@@ -33,7 +35,7 @@ type TerminalHandler struct {
 // 终端上下文等不触达远程的功能不依赖）。交互式会话仅支持 SSH，WinRM 由 resolver.HostFor 拦截。
 func NewTerminalHandler(hosts *hoststore.HostsStore) *TerminalHandler {
 	return &TerminalHandler{
-		resolver: NewExecutorResolver(hosts),
+		resolver: base.NewExecutorResolver(hosts),
 		sessions: map[string]*sshexec.Session{},
 		termBufs: map[string]*termctx.RingBuffer{},
 	}
@@ -46,7 +48,7 @@ func (h *TerminalHandler) OpenTerminal(hostID string, cols, rows int) (string, e
 	if err != nil {
 		return "", err
 	}
-	sess, err := sshexec.OpenSession(Ctx(), *host, cols, rows)
+	sess, err := sshexec.OpenSession(base.Ctx(), *host, cols, rows)
 	if err != nil {
 		return "", fmt.Errorf("连接失败: %w", err)
 	}
@@ -60,14 +62,14 @@ func (h *TerminalHandler) OpenTerminal(hostID string, cols, rows int) (string, e
 	go func() {
 		for chunk := range out {
 			h.appendTermOutput(hostID, chunk)
-			wailsruntime.EventsEmit(Ctx(), "terminal:output", map[string]any{
+			wailsruntime.EventsEmit(base.Ctx(), "terminal:output", map[string]any{
 				"sessionId": id,
 				"data":      base64.StdEncoding.EncodeToString(chunk),
 			})
 		}
 		// 会话结束，通知前端断开。
 		h.CloseTerminal(id)
-		wailsruntime.EventsEmit(Ctx(), "terminal:closed", map[string]any{"sessionId": id})
+		wailsruntime.EventsEmit(base.Ctx(), "terminal:closed", map[string]any{"sessionId": id})
 	}()
 	return id, nil
 }
@@ -167,7 +169,7 @@ func (h *TerminalHandler) ListHostCommands(hostID string) ([]CommandInfo, error)
 		return nil, fmt.Errorf("无法解析主机执行器，请确认主机凭据已录入")
 	}
 
-	ctx, cancel := context.WithTimeout(Ctx(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(base.Ctx(), 10*time.Second)
 	defer cancel()
 
 	out, err := ex.Exec(ctx, "compgen -c | sort -u")

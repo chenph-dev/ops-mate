@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { Button, Input, message, Spin, Tooltip, Typography } from 'antd';
 import { RobotOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
-import { ExecuteCommand } from '@wailsjs/go/handler/HostsHandler';
-import { OpenRdp } from '@wailsjs/go/handler/RdpHandler';
+import { ExecuteCommand } from '@wailsjs/go/hosts/HostsHandler';
+import { OpenRdp } from '@wailsjs/go/rdp/RdpHandler';
 import type { hoststore } from '@wailsjs/go/models';
 
 type TreeNode = hoststore.TreeNode;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ListLogs, TokenSummary } from '@wailsjs/go/handler/LogsHandler';
+import { ListLogs, TokenSummary } from '@wailsjs/go/logs/LogsHandler';
 import type { logsstore } from '@wailsjs/go/models';
 
 type CallLog = logsstore.CallLog;

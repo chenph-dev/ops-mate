@@ -11,7 +11,7 @@ import {
   CancelTask,
   RemoveTask,
   ListTasks,
-} from '@wailsjs/go/handler/SftpHandler';
+} from '@wailsjs/go/sftp/SftpHandler';
 import { EventsOn } from '@wailsjs/runtime/runtime';
 import i18n from '@/i18n';
 import type { sftp } from '@wailsjs/go/models';

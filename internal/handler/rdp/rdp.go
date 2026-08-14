@@ -1,4 +1,5 @@
-package handler
+// Package rdp 提供 Windows 主机 RDP 拉起的 Wails 绑定 handler。
+package rdp
 
 import (
 	"fmt"
@@ -56,10 +57,10 @@ func (h *RdpHandler) OpenRdp(hostID string) error {
 // 密码（可为空，为空时强制提示凭据）。
 func rdpContent(addr string, port int, user, passwordHex string) string {
 	var b strings.Builder
-	b.WriteString(fmt.Sprintf("full address:s:%s:%d\n", sanitizeRdp(addr), port))
-	b.WriteString(fmt.Sprintf("username:s:%s\n", sanitizeRdp(user)))
+	fmt.Fprintf(&b, "full address:s:%s:%d\n", sanitizeRdp(addr), port)
+	fmt.Fprintf(&b, "username:s:%s\n", sanitizeRdp(user))
 	if passwordHex != "" {
-		b.WriteString(fmt.Sprintf("password 51:b:%s\n", passwordHex))
+		fmt.Fprintf(&b, "password 51:b:%s\n", passwordHex)
 		b.WriteString("prompt for credentials:i:0\n")
 	} else {
 		b.WriteString("prompt for credentials:i:1\n")

@@ -1,4 +1,5 @@
-package handler
+// Package aiconfig 提供 AI 配置的 Wails 绑定 handler。
+package aiconfig
 
 import configstore "ops-mate/internal/store/config"
 

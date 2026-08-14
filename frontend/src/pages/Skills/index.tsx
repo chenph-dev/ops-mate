@@ -16,7 +16,7 @@ import {
   InstallSkill,
   ListSkills,
   ToggleSkill,
-} from '@wailsjs/go/handler/SkillsHandler';
+} from '@wailsjs/go/skills/SkillsHandler';
 
 interface SkillInfo {
   name: string;

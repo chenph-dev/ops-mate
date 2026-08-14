@@ -1,4 +1,5 @@
-package handler
+// Package hosts 提供主机管理与远程命令执行的 Wails 绑定 handler。
+package hosts
 
 import (
 	"context"
@@ -6,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"ops-mate/internal/handler/base"
 	hoststore "ops-mate/internal/store/hosts"
 )
 
@@ -13,12 +15,12 @@ import (
 type HostsHandler struct {
 	hosts    *hoststore.HostsStore
 	onChange func() // 主机变更后回调（通知 SessionManager 策略失效，主机覆盖即时生效）
-	resolver *ExecutorResolver
+	resolver *base.ExecutorResolver
 }
 
 // NewHostsHandler 构造 HostsHandler。onChange 可为 nil。
 func NewHostsHandler(hosts *hoststore.HostsStore, onChange func()) *HostsHandler {
-	return &HostsHandler{hosts: hosts, onChange: onChange, resolver: NewExecutorResolver(hosts)}
+	return &HostsHandler{hosts: hosts, onChange: onChange, resolver: base.NewExecutorResolver(hosts)}
 }
 
 func (h *HostsHandler) ListHosts() ([]hoststore.HostMeta, error) {
@@ -71,8 +73,8 @@ func (h *HostsHandler) DeleteNode(nodeID string) error {
 // 1~2 个返回值，返回 3 个值（如 bool+string+error）时前端恒得到空值，
 // 导致连接成功也显示"失败"。失败原因走 error 供前端 catch 展示。
 func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, error) {
-	ex := executorForHost(in.Protocol, in.Addr, in.Port, in.User, in.AuthType, in.Secret)
-	ctx, cancel := context.WithTimeout(Ctx(), 15*time.Second)
+	ex := base.ExecutorForHost(in.Protocol, in.Addr, in.Port, in.User, in.AuthType, in.Secret)
+	ctx, cancel := context.WithTimeout(base.Ctx(), 15*time.Second)
 	defer cancel()
 	ch, err := ex.Exec(ctx, "echo ok")
 	if err != nil {
@@ -96,7 +98,7 @@ func (h *HostsHandler) ExecuteCommand(hostID, command string) (string, error) {
 	if ex == nil {
 		return "", fmt.Errorf("获取主机执行器失败，请确认主机凭据已录入")
 	}
-	ctx, cancel := context.WithTimeout(Ctx(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(base.Ctx(), 30*time.Second)
 	defer cancel()
 	ch, err := ex.Exec(ctx, command)
 	if err != nil {

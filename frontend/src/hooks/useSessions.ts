@@ -13,7 +13,7 @@ import {
   ListConversations,
   DeleteConversation,
   RenameConversation,
-} from '@wailsjs/go/handler/SessionsHandler';
+} from '@wailsjs/go/sessions/SessionsHandler';
 import { EventsOn } from '@wailsjs/runtime/runtime';
 import i18n from '@/i18n';
 import type { convstore } from '@wailsjs/go/models';

@@ -1,4 +1,5 @@
-package handler
+// Package sessions 提供 AI 会话与审批的 Wails 绑定 handler。
+package sessions
 
 import (
 	"ops-mate/internal/einoagent/session"

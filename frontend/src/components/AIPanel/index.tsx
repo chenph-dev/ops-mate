@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { InputRef } from 'antd';
 import { useTranslation } from 'react-i18next';
-import { GetAIConfig } from '@wailsjs/go/handler/AIConfigHandler';
+import { GetAIConfig } from '@wailsjs/go/aiconfig/AIConfigHandler';
 import type { configstore, convstore } from '@wailsjs/go/models';
 import type {
   ApprovalStatus,

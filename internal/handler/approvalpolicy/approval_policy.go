@@ -1,4 +1,5 @@
-package handler
+// Package approvalpolicy 提供审批策略的 Wails 绑定 handler。
+package approvalpolicy
 
 import configstore "ops-mate/internal/store/config"
 

@@ -1,4 +1,5 @@
-package handler
+// Package logs 提供 AI 审计日志的 Wails 绑定 handler。
+package logs
 
 import logsstore "ops-mate/internal/store/logs"
 

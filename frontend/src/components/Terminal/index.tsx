@@ -10,7 +10,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import { WebglAddon } from '@xterm/addon-webgl';
 import '@xterm/xterm/css/xterm.css';
 import { ClipboardGetText, ClipboardSetText } from '@wailsjs/runtime/runtime';
-import { ListHostCommands } from '@wailsjs/go/handler/TerminalHandler';
+import { ListHostCommands } from '@wailsjs/go/terminal/TerminalHandler';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { terminalTheme } from '@/theme';

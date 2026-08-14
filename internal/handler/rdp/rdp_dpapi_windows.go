@@ -1,6 +1,6 @@
 //go:build windows
 
-package handler
+package rdp
 
 import (
 	"encoding/hex"

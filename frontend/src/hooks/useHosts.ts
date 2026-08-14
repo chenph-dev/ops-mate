@@ -8,7 +8,7 @@ import {
   ListTree,
   MoveNode,
   DeleteNode,
-} from '@wailsjs/go/handler/HostsHandler';
+} from '@wailsjs/go/hosts/HostsHandler';
 import type { hoststore } from '@wailsjs/go/models';
 
 type HostInput = hoststore.HostInput;

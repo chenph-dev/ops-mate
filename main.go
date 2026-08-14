@@ -13,7 +13,16 @@ import (
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"ops-mate/internal/einoagent/session"
-	"ops-mate/internal/handler"
+	"ops-mate/internal/handler/aiconfig"
+	"ops-mate/internal/handler/approvalpolicy"
+	"ops-mate/internal/handler/base"
+	"ops-mate/internal/handler/hosts"
+	"ops-mate/internal/handler/logs"
+	"ops-mate/internal/handler/rdp"
+	"ops-mate/internal/handler/sessions"
+	"ops-mate/internal/handler/sftp"
+	"ops-mate/internal/handler/skills"
+	"ops-mate/internal/handler/terminal"
 	sftppkg "ops-mate/internal/sftp"
 	"ops-mate/internal/skill"
 	"ops-mate/internal/store"
@@ -54,10 +63,10 @@ func main() {
 	skillManager := skill.NewManager(skillStore, skillRoot)
 	// 主机连接解析器：收敛凭据读取 + 协议分流（ssh/winrm），
 	// AI 会话、命令执行、连接测试、SFTP、终端共用一个解析入口。
-	resolver := handler.NewExecutorResolver(hostsStore)
+	resolver := base.NewExecutorResolver(hostsStore)
 
 	// 终端会话管理：按 hostID 记录最近输出，供 AI 上下文注入。
-	terminalHandler := handler.NewTerminalHandler(hostsStore)
+	terminalHandler := terminal.NewTerminalHandler(hostsStore)
 
 	// AI 模型不在启动时构建（配置可能为空/变更）——
 	// SessionManager 在每轮对话开始时按最新配置懒构建（热更新）。
@@ -108,14 +117,14 @@ func main() {
 		resolver.HostFor,
 		// 传输进度事件：推送前端实时更新任务进度
 		func(t *sftppkg.Task) {
-			wailsruntime.EventsEmit(handler.Ctx(), "sftp:progress", map[string]any{
+			wailsruntime.EventsEmit(base.Ctx(), "sftp:progress", map[string]any{
 				"taskID": t.ID, "done": t.Done, "total": t.Total,
 				"status": string(t.Status),
 			})
 		},
 		// 任务开始事件：前端自动打开传输任务弹窗
 		func(t *sftppkg.Task) {
-			wailsruntime.EventsEmit(handler.Ctx(), "sftp:task-start", map[string]any{
+			wailsruntime.EventsEmit(base.Ctx(), "sftp:task-start", map[string]any{
 				"taskID": t.ID, "direction": t.Direction,
 				"localPath": t.LocalPath, "remotePath": t.RemotePath,
 				"total": t.Total,
@@ -136,22 +145,22 @@ func main() {
 		},
 		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
 		OnStartup: func(ctx context.Context) {
-			handler.SetCtx(ctx)
+			base.SetCtx(ctx)
 		},
 		OnShutdown: func(ctx context.Context) {
 			sftpManager.Close()
 		},
-		// 每个 handler 是独立模块，前端通过 wailsjs/go/main/<TypeName> 访问。
+		// 每个 handler 是独立子包，前端通过 wailsjs/go/<子包>/<TypeName> 访问。
 		Bind: []any{
-			handler.NewHostsHandler(hostsStore, sessionManager.InvalidateConfig),
-			handler.NewAIConfigHandler(cfgStore, sessionManager.InvalidateConfig),
-			handler.NewApprovalPolicyHandler(policyStore, sessionManager.InvalidateConfig),
-			handler.NewSessionsHandler(convStore, sessionManager),
+			hosts.NewHostsHandler(hostsStore, sessionManager.InvalidateConfig),
+			aiconfig.NewAIConfigHandler(cfgStore, sessionManager.InvalidateConfig),
+			approvalpolicy.NewApprovalPolicyHandler(policyStore, sessionManager.InvalidateConfig),
+			sessions.NewSessionsHandler(convStore, sessionManager),
 			terminalHandler,
-			handler.NewSkillsHandler(skillManager, sessionManager.InvalidateConfig),
-			handler.NewSftpHandler(sftpManager),
-			handler.NewLogsHandler(logsStore),
-			handler.NewRdpHandler(hostsStore),
+			skills.NewSkillsHandler(skillManager, sessionManager.InvalidateConfig),
+			sftp.NewSftpHandler(sftpManager),
+			logs.NewLogsHandler(logsStore),
+			rdp.NewRdpHandler(hostsStore),
 		},
 	})
 
@@ -162,7 +171,7 @@ func main() {
 
 // emitEvent 统一的 Wails 事件推送（载荷 {sessionId, data}）。
 func emitEvent(sessionID, event string, data any) {
-	wailsruntime.EventsEmit(handler.Ctx(), event, map[string]any{
+	wailsruntime.EventsEmit(base.Ctx(), event, map[string]any{
 		"sessionId": sessionID, "data": data,
 	})
 }

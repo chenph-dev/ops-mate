@@ -1,4 +1,4 @@
-package handler
+package base
 
 import (
 	"fmt"
@@ -9,10 +9,10 @@ import (
 	"ops-mate/internal/winrmexec"
 )
 
-// executorForHost 按协议构造执行器。protocol 为空或非 winrm 视作 ssh。
+// ExecutorForHost 按协议构造执行器。protocol 为空或非 winrm 视作 ssh。
 // 接收裸字段（保存前的 HostInput 或已解析的 meta），供 TestConnection 等
 // 尚未落库的场景使用。
-func executorForHost(protocol string, addr string, port int, user, authType, secret string) sshexec.Exec {
+func ExecutorForHost(protocol string, addr string, port int, user, authType, secret string) sshexec.Exec {
 	if strings.EqualFold(protocol, "winrm") {
 		return winrmexec.NewExecutor(winrmexec.Host{Addr: addr, Port: port, User: user, Secret: secret})
 	}
@@ -45,7 +45,7 @@ func (r *ExecutorResolver) ExecFor(hostID string) sshexec.Exec {
 	if err != nil || meta == nil {
 		return nil
 	}
-	return executorForHost(meta.Protocol, meta.Addr, meta.Port, meta.User, authType, secret)
+	return ExecutorForHost(meta.Protocol, meta.Addr, meta.Port, meta.User, authType, secret)
 }
 
 // HostFor 按 hostID 构造 SSH 目标（交互式终端 / SFTP 用）。

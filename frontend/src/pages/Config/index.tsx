@@ -11,11 +11,11 @@ import {
   Typography,
 } from 'antd';
 import { useTranslation } from 'react-i18next';
-import { GetAIConfig, SaveAIConfig } from '@wailsjs/go/handler/AIConfigHandler';
+import { GetAIConfig, SaveAIConfig } from '@wailsjs/go/aiconfig/AIConfigHandler';
 import {
   GetApprovalPolicy,
   SaveApprovalPolicy,
-} from '@wailsjs/go/handler/ApprovalPolicyHandler';
+} from '@wailsjs/go/approvalpolicy/ApprovalPolicyHandler';
 import type { configstore } from '@wailsjs/go/models';
 
 type AIConfig = configstore.AIConfig;
