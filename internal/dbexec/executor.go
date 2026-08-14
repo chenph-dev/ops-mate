@@ -51,8 +51,10 @@ func driverName(driver string) (string, error) {
 		return "mysql", nil
 	case "postgres", "postgresql", "pq":
 		return "postgres", nil
+	case "sqlite":
+		return "sqlite", nil
 	}
-	return "", fmt.Errorf("不支持的数据库驱动: %q（仅支持 mysql/postgres）", driver)
+	return "", fmt.Errorf("不支持的数据库驱动: %q（仅支持 mysql/postgres/sqlite）", driver)
 }
 
 // dsn 构造连接串。
@@ -61,6 +63,8 @@ func (e *Executor) dsn(driver string) string {
 	case "postgres":
 		return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 			e.host.User, url.QueryEscape(e.host.Password), e.host.Addr, e.host.Port, e.host.Database)
+	case "sqlite":
+		return e.host.Database // 本地文件路径
 	default: // mysql
 		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true",
 			e.host.User, e.host.Password, e.host.Addr, e.host.Port, e.host.Database)
@@ -189,6 +193,14 @@ func (e *Executor) schemaQuery() string {
 	drv, err := driverName(e.host.Driver)
 	if err != nil {
 		drv = "mysql"
+	}
+	if drv == "sqlite" {
+		return `SELECT m.name AS table_name, p.name AS column_name, p.type AS data_type,
+       CASE WHEN p."notnull" THEN 'NO' ELSE 'YES' END AS is_nullable, '' AS key
+FROM sqlite_master m
+JOIN pragma_table_info(m.name) p
+WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
+ORDER BY m.name, p.cid`
 	}
 	if drv == "postgres" {
 		return `SELECT t.table_name, c.column_name, c.data_type, c.is_nullable, '' AS key

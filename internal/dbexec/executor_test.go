@@ -13,6 +13,7 @@ func TestDriverName(t *testing.T) {
 		{"postgres", "postgres"},
 		{"postgresql", "postgres"},
 		{"pq", "postgres"},
+		{"sqlite", "sqlite"},
 	}
 	for _, c := range cases {
 		got, err := driverName(c.in)
@@ -111,5 +112,23 @@ func TestParseSchema(t *testing.T) {
 	}
 	if _, err := parseSchema(nil); err == nil {
 		t.Error("parseSchema(nil) 应报错")
+	}
+}
+
+func TestSQLiteDSN(t *testing.T) {
+	e := NewExecutor(Host{Driver: "sqlite", Database: `C:\data\app.db`})
+	if got, want := e.dsn("sqlite"), `C:\data\app.db`; got != want {
+		t.Errorf("sqlite dsn = %q, want %q", got, want)
+	}
+}
+
+func TestSQLiteSchemaQuery(t *testing.T) {
+	e := NewExecutor(Host{Driver: "sqlite"})
+	q := e.schemaQuery()
+	if !strings.Contains(q, "sqlite_master") {
+		t.Errorf("sqlite 应查 sqlite_master：%q", q)
+	}
+	if !strings.Contains(q, "pragma_table_info") {
+		t.Errorf("sqlite 应用 pragma_table_info：%q", q)
 	}
 }
