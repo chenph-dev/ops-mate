@@ -1,6 +1,6 @@
 # ops-mate
 
-**ops-mate** 是一款基于 [Wails v2](https://wails.io/)（Go 后端 + React/TypeScript 前端）的 SSH 运维管理桌面应用。它把经典的 SSH/SFTP 客户端与 **AI 运维智能体** 结合，智能体可以规划并执行服务器上的诊断/修复任务——每一步都需要你审批确认。
+**ops-mate** 是一款基于 [Wails v2](https://wails.io/)（Go 后端 + React/TypeScript 前端）的 **SSH / WinRM** 运维管理桌面应用。它把经典的 SSH/SFTP/WinRM 客户端与 **AI 运维智能体** 结合，智能体可以规划并执行服务器上的诊断/修复任务——每一步都需要你审批确认。
 
 ![ops-mate 主界面](images/home.png)
 
@@ -8,25 +8,33 @@
 
 ### 🖥️ 主机管理
 - 文件夹**树状**组织主机（新建 / 重命名 / 移动 / 删除节点）
-- 管理 SSH 连接信息（主机、端口、用户、认证方式）
+- 管理 **SSH 与 WinRM** 主机连接信息（主机、端口、用户、认证方式）
 - 保存前可**测试连接**；支持临时执行命令
 - 密码等敏感信息**加密落盘**
 
+### 🪟 Windows 主机（WinRM）
+- 通过 **WinRM** 连接 Windows 主机（HTTP 5985 / HTTPS 5986，密码认证）
+- 在命令面板中执行 **PowerShell** 命令
+- **一键拉起远程桌面（RDP）**，密码经 Windows DPAPI 预填
+- AI 智能体在 Windows 主机上以 **PowerShell** 运维，含协议感知的安全护栏
+
+![Windows 主机界面](images/home_win.png)
+
 ### 💻 SSH 终端
-- 完整交互式终端（xterm.js，WebGL/Canvas 渲染）
+- 完整交互式终端（xterm.js，WebGL/Canvas 渲染）—— **仅 SSH 主机**
 - 动态**调整大小**、搜索、复制粘贴、命令历史
 - 支持多台主机并发会话
 
 ### 📁 SFTP 文件传输
-- 浏览远程目录，新建 / 删除 / 重命名
+- 浏览远程目录，新建 / 删除 / 重命名 —— **仅 SSH 主机**
 - **上传 / 下载** 并发队列
 - 每个任务独立**进度**，支持暂停 / 继续 / 取消
 
 ### 🤖 AI 运维智能体
 - 与能"看到"当前选中主机的 LLM 智能体对话
-- **`execute_command` 工具**：智能体提出具体 Shell 命令，**每条命令都必须经你批准后才执行**
+- **`execute_command` 工具**：智能体提出具体的 **Shell（SSH）/ PowerShell（WinRM）** 命令，**每条命令都必须经你批准后才执行**
 - **计划模式（`create_plan`）**：面对复杂多步任务，智能体先提交执行计划（目标 + 步骤列表）供你审批，批准后按计划逐步执行
-- **安全护栏**：危险操作（删除、重启、关机、格式化等）会明确提示风险，且始终要求显式审批
+- **安全护栏**：危险操作会明确提示风险，且始终要求显式审批；包含协议感知的 **Linux**（`rm -rf /`、`dd`、`reboot`…）与 **Windows**（`format`、`del /s`、`rd /s`、`diskpart clean`、`shutdown /s`…）危险模式
 - 每台主机独立对话历史，支持重命名 / 删除
 
 ### ⚙️ 模型配置
@@ -38,22 +46,23 @@
 | 层 | 技术 |
 |----|------|
 | 外壳 | Wails v2（Go + WebView2） |
-| 后端 | Go、[eino](https://github.com/cloudwego/eino) 智能体框架、eino-ext 模型适配器 |
+| 后端 | Go、[eino](https://github.com/cloudwego/eino) 智能体框架、eino-ext 模型适配器、[masterzen/winrm](https://github.com/masterzen/winrm)（WinRM 客户端） |
 | 存储 | `modernc.org/sqlite`（纯 Go，无需 CGO）+ GORM + golang-migrate |
 | 前端 | React 19、TypeScript、Vite、Ant Design 6、react-router-dom 7、xterm.js |
 
 ## 架构
 
 ```
-┌─────────────────────────── 前端（React）───────────────────────────┐
-│  HostsPage ──► HostTree / Terminal / SFTP 面板 / AIPanel / PlanCard │
-└───────────────────────────────┬────────────────────────────────────┘
-                                │  Wails 绑定（window.go）
-┌───────────────────────────────▼────────────────────────────────────┐
-│                         Go 后端（Wails）                             │
-│  handlers: Hosts · Terminal · Sftp · Sessions · AIConfig             │
+┌───────────────────────────── 前端（React） ─────────────────────────────┐
+│  HostsPage ► HostTree / Terminal / SFTP 面板 / WinRmPanel / AIPanel   │
+└──────────────────────────────────┬──────────────────────────────────┘
+                                   │  Wails 绑定（window.go）
+┌──────────────────────────────────▼──────────────────────────────────┐
+│  Go 后端（Wails）                                                       │
+│  handlers: Hosts · Terminal · Sftp · Sessions · Rdp · AIConfig      │
 │  internal/einoagent: model(provider) · tools · session · guardrail  │
-│  internal/store:     hosts · conversations · config · memory(SQLite)│
+│  internal executors: sshexec · winrmexec（统一 Exec 接口）                │
+│  internal/store:     hosts · conversations · config · memory        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -90,10 +99,14 @@ wails build -platform darwin/universal
 ```
 ├── main.go                  # Wails 应用入口、绑定
 ├── internal/
-│   ├── handler/             # Wails 绑定的 API handler（主机、终端、SFTP、会话、AI 配置）
-│   ├── einoagent/           # AI 智能体（model/provider、tools、session、guardrail、history）
+│   ├── handler/             # Wails 绑定的 API handler（主机、终端、SFTP、会话、技能、日志、RDP、AI 配置、审批策略）
+│   ├── einoagent/           # AI 智能体（model/provider、tools、session、guardrail、prompt）
+│   ├── sshexec/             # SSH 命令执行器（统一 Exec 接口）
+│   ├── winrmexec/           # WinRM 命令执行器（同一 Exec 接口）
 │   ├── sftp/                # SFTP 传输引擎（并发队列）
-│   └── store/               # SQLite 持久化（主机、会话、配置、记忆）
+│   ├── skill/               # 运维技能管理与远程脚本执行
+│   ├── termctx/             # 终端上下文环形缓冲（AI 上下文注入）
+│   └── store/               # SQLite 持久化（主机、会话、配置、记忆、日志、技能）
 ├── frontend/
 │   ├── src/                 # React 应用（页面、组件、hooks）
 │   └── wailsjs/             # 自动生成的 Wails 绑定（勿手改）
