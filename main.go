@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -17,14 +16,12 @@ import (
 	"ops-mate/internal/handler"
 	sftppkg "ops-mate/internal/sftp"
 	"ops-mate/internal/skill"
-	"ops-mate/internal/sshexec"
 	"ops-mate/internal/store"
 	cfgstore "ops-mate/internal/store/config"
 	convstore "ops-mate/internal/store/conversations"
 	hoststore "ops-mate/internal/store/hosts"
 	logsstore "ops-mate/internal/store/logs"
 	skillsstore "ops-mate/internal/store/skills"
-	"ops-mate/internal/winrmexec"
 )
 
 //go:embed all:frontend/dist
@@ -55,13 +52,17 @@ func main() {
 	}
 	skillStore := skillsstore.NewSkillStore(app)
 	skillManager := skill.NewManager(skillStore, skillRoot)
+	// 主机连接解析器：收敛凭据读取 + 协议分流（ssh/winrm），
+	// AI 会话、命令执行、连接测试、SFTP、终端共用一个解析入口。
+	resolver := handler.NewExecutorResolver(hostsStore)
+
 	// 终端会话管理：按 hostID 记录最近输出，供 AI 上下文注入。
 	terminalHandler := handler.NewTerminalHandler(hostsStore)
 
 	// AI 模型不在启动时构建（配置可能为空/变更）——
 	// SessionManager 在每轮对话开始时按最新配置懒构建（热更新）。
 	sessionManager := session.NewSessionManager(app, cfgStore,
-		executorFor(hostsStore),
+		resolver.ExecFor,
 		// 解析主机名，注入系统提示词模板
 		func(hostID string) (string, error) {
 			meta, err := hostsStore.HostMetaByID(hostID)
@@ -102,21 +103,9 @@ func main() {
 	})
 
 	// SFTP 管理器：按 hostID 懒建立/复用连接，应用退出时关闭。
+	// hostFor 由 resolver.HostFor 提供（仅 SSH，WinRM 返回错误）。
 	sftpManager := sftppkg.NewManager(
-		func(hostID string) (*sshexec.Host, error) {
-			secret, authType, err := hostsStore.GetHostSecret(hostID)
-			if err != nil {
-				return nil, err
-			}
-			meta, err := hostsStore.HostMetaByID(hostID)
-			if err != nil {
-				return nil, err
-			}
-			return &sshexec.Host{
-				Addr: meta.Addr, Port: meta.Port, User: meta.User,
-				AuthType: authType, Secret: secret,
-			}, nil
-		},
+		resolver.HostFor,
 		// 传输进度事件：推送前端实时更新任务进度
 		func(t *sftppkg.Task) {
 			wailsruntime.EventsEmit(handler.Ctx(), "sftp:progress", map[string]any{
@@ -153,7 +142,7 @@ func main() {
 			sftpManager.Close()
 		},
 		// 每个 handler 是独立模块，前端通过 wailsjs/go/main/<TypeName> 访问。
-		Bind: []interface{}{
+		Bind: []any{
 			handler.NewHostsHandler(hostsStore, sessionManager.InvalidateConfig),
 			handler.NewAIConfigHandler(cfgStore, sessionManager.InvalidateConfig),
 			handler.NewApprovalPolicyHandler(policyStore, sessionManager.InvalidateConfig),
@@ -168,30 +157,6 @@ func main() {
 
 	if err != nil {
 		println("Error:", err.Error())
-	}
-}
-
-// executorFor 返回按 hostID 解析凭据并构造 SSH 执行器的工厂。
-// 凭据解析失败返回 nil（SessionManager 会给出"凭据不可用"错误事件）。
-func executorFor(hosts *hoststore.HostsStore) func(hostID string) sshexec.Exec {
-	return func(hostID string) sshexec.Exec {
-		secret, authType, err := hosts.GetHostSecret(hostID)
-		if err != nil {
-			return nil
-		}
-		meta, err := hosts.HostMetaByID(hostID)
-		if err != nil || meta == nil {
-			return nil
-		}
-		if strings.EqualFold(meta.Protocol, "winrm") {
-			return winrmexec.NewExecutor(winrmexec.Host{
-				Addr: meta.Addr, Port: meta.Port, User: meta.User, Secret: secret,
-			})
-		}
-		return sshexec.NewExecutor(sshexec.Host{
-			Addr: meta.Addr, Port: meta.Port, User: meta.User,
-			AuthType: authType, Secret: secret,
-		})
 	}
 }
 

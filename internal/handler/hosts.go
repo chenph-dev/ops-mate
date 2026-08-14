@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	hoststore "ops-mate/internal/store/hosts"
@@ -12,11 +13,12 @@ import (
 type HostsHandler struct {
 	hosts    *hoststore.HostsStore
 	onChange func() // 主机变更后回调（通知 SessionManager 策略失效，主机覆盖即时生效）
+	resolver *ExecutorResolver
 }
 
 // NewHostsHandler 构造 HostsHandler。onChange 可为 nil。
 func NewHostsHandler(hosts *hoststore.HostsStore, onChange func()) *HostsHandler {
-	return &HostsHandler{hosts: hosts, onChange: onChange}
+	return &HostsHandler{hosts: hosts, onChange: onChange, resolver: NewExecutorResolver(hosts)}
 }
 
 func (h *HostsHandler) ListHosts() ([]hoststore.HostMeta, error) {
@@ -88,34 +90,32 @@ func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, error) {
 }
 
 // ExecuteCommand 在指定主机上执行单条命令，返回输出。
+// 按主机协议分流（ssh/winrm），协议分支收敛在 ExecutorResolver。
 func (h *HostsHandler) ExecuteCommand(hostID, command string) (string, error) {
-	secret, authType, err := h.hosts.GetHostSecret(hostID)
-	if err != nil {
-		return "", fmt.Errorf("获取主机凭据失败: %w", err)
+	ex := h.resolver.ExecFor(hostID)
+	if ex == nil {
+		return "", fmt.Errorf("获取主机执行器失败，请确认主机凭据已录入")
 	}
-	meta, err := h.hosts.HostMetaByID(hostID)
-	if err != nil {
-		return "", fmt.Errorf("获取主机信息失败: %w", err)
-	}
-	ex := executorForHost(meta.Protocol, meta.Addr, meta.Port, meta.User, authType, secret)
 	ctx, cancel := context.WithTimeout(Ctx(), 30*time.Second)
 	defer cancel()
 	ch, err := ex.Exec(ctx, command)
 	if err != nil {
 		return "", err
 	}
-	var output string
+	var sb strings.Builder
 	for line := range ch {
 		switch line.Stream {
 		case "stdout":
-			output += line.Text + "\n"
+			sb.WriteString(line.Text)
+			sb.WriteString("\n")
 		case "stderr":
-			output += line.Text + "\n"
+			sb.WriteString(line.Text)
+			sb.WriteString("\n")
 		case "error":
 			return "", fmt.Errorf("%s", line.Text)
 		case "exit":
 			return "", fmt.Errorf("命令执行失败：%s", line.Text)
 		}
 	}
-	return output, nil
+	return sb.String(), nil
 }
