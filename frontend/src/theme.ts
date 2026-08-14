@@ -30,7 +30,7 @@ export function buildTheme(isDark: boolean): ThemeConfig {
       Modal: {
         borderRadiusLG: 8,
       },
-      // 主机树
+      // 资产树
       Tree: {
         nodeHoverBg: 'rgba(22, 119, 255, 0.08)',
         indentSize: 8,

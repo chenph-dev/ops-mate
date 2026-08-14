@@ -59,7 +59,7 @@ func newSessionFixture(t *testing.T, responses []*schema.Message) *sessionFixtur
 	}
 	f.mgr = NewSessionManager(app, cfg,
 		func(hid string) sshexec.Exec { return f.ex },
-		nil, // hostNameFor（测试不注入主机名）
+		nil, // hostNameFor（测试不注入资产名）
 		rec.Emit,
 	)
 	f.mgr.modelFactory = func(ctx context.Context, c configstore.AIConfig) (einomodel.ToolCallingChatModel, error) {
@@ -82,7 +82,7 @@ func TestSessionManager_EnsureSessionLazyCreate(t *testing.T) {
 	}
 	sid2, _ := f.mgr.EnsureSession(f.hostID)
 	if sid1 != sid2 {
-		t.Error("同一主机重复 EnsureSession 应返回同一会话")
+		t.Error("同一资产重复 EnsureSession 应返回同一会话")
 	}
 }
 
@@ -349,12 +349,12 @@ func TestBuildInput_OSInjected(t *testing.T) {
 	if err != nil { t.Fatalf("buildInput: %v", err) }
 	found := false
 	for _, msg := range input {
-		if msg.Role == schema.System && strings.Contains(msg.Content, "Windows 主机") {
+		if msg.Role == schema.System && strings.Contains(msg.Content, "Windows 资产") {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("winrm 协议下 system 消息应含 Windows 主机描述")
+		t.Error("winrm 协议下 system 消息应含 Windows 资产描述")
 	}
 }
 

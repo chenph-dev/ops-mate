@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
+	"ops-mate/internal/dbexec"
 	"ops-mate/internal/einoagent/callback"
 	"ops-mate/internal/einoagent/graph"
 	"ops-mate/internal/einoagent/history"
@@ -99,22 +101,39 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 		return fmt.Errorf("构建模型失败: %w", err)
 	}
 
-	sshTool := agenttools.NewSSHTool(s.id, s.holder, m.emit, m.convs, s.toolCalls)
 	protocol := "ssh"
 	if protocolFor != nil {
 		protocol = protocolFor(s.hostID)
 	}
-	sshTool.SetProtocol(protocol)
-	if policyFor != nil {
-		auto, wl := policyFor(s.hostID)
-		sshTool.SetApprovalPolicy(auto, wl)
+
+	// 命令工具按协议注册：jdbc → execute_sql（数据库执行器），否则 execute_command（sshexec 执行器）。
+	var commandTool einotool.BaseTool
+	if strings.EqualFold(protocol, "jdbc") {
+		var dbe *dbexec.Executor
+		if m.dbExecutorFor != nil {
+			dbe = m.dbExecutorFor(s.hostID)
+		}
+		sqlTool := agenttools.NewSQLTool(s.id, dbe, m.emit, m.convs, s.toolCalls)
+		if policyFor != nil {
+			auto, _ := policyFor(s.hostID)
+			sqlTool.SetApprovalPolicy(auto)
+		}
+		commandTool = sqlTool
+	} else {
+		sshTool := agenttools.NewSSHTool(s.id, s.holder, m.emit, m.convs, s.toolCalls)
+		sshTool.SetProtocol(protocol)
+		if policyFor != nil {
+			auto, wl := policyFor(s.hostID)
+			sshTool.SetApprovalPolicy(auto, wl)
+		}
+		commandTool = sshTool
 	}
 	planTool := agenttools.NewPlanTool(s.id, m.emit, m.convs, s.toolCalls)
 
-	// 工具集合：execute_command + create_plan，注入技能解析器时追加 load_skill / run_skill_script。
-	baseTools := []einotool.BaseTool{sshTool, planTool}
+	// 工具集合：命令工具 + create_plan，注入技能解析器时追加 load_skill / run_skill_script。
+	baseTools := []einotool.BaseTool{commandTool, planTool}
 	baseInfos := []*schema.ToolInfo{}
-	info, err := sshTool.Info(ctx)
+	info, err := commandTool.Info(ctx)
 	if err != nil {
 		return fmt.Errorf("tool info: %w", err)
 	}

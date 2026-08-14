@@ -241,7 +241,7 @@ export default function AIPanel({
         onNewConversation={onNewConversation}
         onToggleCollapse={onToggleCollapse}
       />
-      {/* SSH 断开警告：AI 命令依赖主机连接 */}
+      {/* SSH 断开警告：AI 命令依赖资产连接 */}
       {!sshConnected && (
         <div
           style={{

@@ -7,7 +7,7 @@ import (
 	agenttools "ops-mate/internal/einoagent/tools"
 )
 
-// EnsureSession 返回主机当前会话（最近更新的 conversation），没有则懒创建。
+// EnsureSession 返回资产当前会话（最近更新的 conversation），没有则懒创建。
 func (m *SessionManager) EnsureSession(hostID string) (string, error) {
 	convs, err := m.convs.ListConversations(hostID)
 	if err != nil {

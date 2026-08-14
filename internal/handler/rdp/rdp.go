@@ -1,4 +1,4 @@
-// Package rdp 提供 Windows 主机 RDP 拉起的 Wails 绑定 handler。
+// Package rdp 提供 Windows 资产 RDP 拉起的 Wails 绑定 handler。
 package rdp
 
 import (
@@ -12,7 +12,7 @@ import (
 	hoststore "ops-mate/internal/store/hosts"
 )
 
-// RdpHandler 处理 Windows 主机 RDP 拉起。
+// RdpHandler 处理 Windows 资产 RDP 拉起。
 type RdpHandler struct {
 	hosts *hoststore.HostsStore
 }
@@ -29,7 +29,7 @@ func (h *RdpHandler) OpenRdp(hostID string) error {
 	}
 	meta, err := h.hosts.HostMetaByID(hostID)
 	if err != nil {
-		return fmt.Errorf("获取主机信息失败: %w", err)
+		return fmt.Errorf("获取资产信息失败: %w", err)
 	}
 	secret, authType, err := h.hosts.GetHostSecret(hostID)
 	if err != nil {

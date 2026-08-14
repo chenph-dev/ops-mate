@@ -1,4 +1,4 @@
-// Package hosts 提供主机管理与远程命令执行的 Wails 绑定 handler。
+// Package hosts 提供资产管理与远程命令执行的 Wails 绑定 handler。
 package hosts
 
 import (
@@ -7,14 +7,15 @@ import (
 	"strings"
 	"time"
 
+	"ops-mate/internal/dbexec"
 	"ops-mate/internal/handler/base"
 	hoststore "ops-mate/internal/store/hosts"
 )
 
-// HostsHandler 处理主机管理相关的前端调用。
+// HostsHandler 处理资产管理相关的前端调用。
 type HostsHandler struct {
 	hosts    *hoststore.HostsStore
-	onChange func() // 主机变更后回调（通知 SessionManager 策略失效，主机覆盖即时生效）
+	onChange func() // 资产变更后回调（通知 SessionManager 策略失效，资产覆盖即时生效）
 	resolver *base.ExecutorResolver
 }
 
@@ -31,7 +32,7 @@ func (h *HostsHandler) SaveHost(in hoststore.HostInput) (string, error) {
 	return h.hosts.SaveHost(in)
 }
 
-// UpdateHost 更新主机信息（节点编辑）。
+// UpdateHost 更新资产信息（节点编辑）。
 func (h *HostsHandler) UpdateHost(id string, in hoststore.HostInput) error {
 	if err := h.hosts.UpdateHost(id, in); err != nil {
 		return err
@@ -42,7 +43,7 @@ func (h *HostsHandler) UpdateHost(id string, in hoststore.HostInput) error {
 	return nil
 }
 
-// GetHostSecret 返回主机解密后的凭据（编辑表单回填密码/私钥）。
+// GetHostSecret 返回资产解密后的凭据（编辑表单回填密码/私钥）。
 func (h *HostsHandler) GetHostSecret(hostID string) (string, error) {
 	secret, _, err := h.hosts.GetHostSecret(hostID)
 	return secret, err
@@ -73,6 +74,19 @@ func (h *HostsHandler) DeleteNode(nodeID string) error {
 // 1~2 个返回值，返回 3 个值（如 bool+string+error）时前端恒得到空值，
 // 导致连接成功也显示"失败"。失败原因走 error 供前端 catch 展示。
 func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, error) {
+	// jdbc 协议：走数据库 Ping，不走 sshexec.Exec（不实现该接口）。
+	if strings.EqualFold(in.Protocol, "jdbc") {
+		dbe := dbexec.NewExecutor(dbexec.Host{
+			Driver: in.Driver, Addr: in.Addr, Port: in.Port,
+			User: in.User, Password: in.Secret, Database: in.Database,
+		})
+		ctx, cancel := context.WithTimeout(base.Ctx(), 15*time.Second)
+		defer cancel()
+		if err := dbe.Ping(ctx); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
 	ex := base.ExecutorForHost(in.Protocol, in.Addr, in.Port, in.User, in.AuthType, in.Secret)
 	ctx, cancel := context.WithTimeout(base.Ctx(), 15*time.Second)
 	defer cancel()
@@ -91,12 +105,12 @@ func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, error) {
 	return true, nil
 }
 
-// ExecuteCommand 在指定主机上执行单条命令，返回输出。
-// 按主机协议分流（ssh/winrm），协议分支收敛在 ExecutorResolver。
+// ExecuteCommand 在指定资产上执行单条命令，返回输出。
+// 按资产协议分流（ssh/winrm），协议分支收敛在 ExecutorResolver。
 func (h *HostsHandler) ExecuteCommand(hostID, command string) (string, error) {
 	ex := h.resolver.ExecFor(hostID)
 	if ex == nil {
-		return "", fmt.Errorf("获取主机执行器失败，请确认主机凭据已录入")
+		return "", fmt.Errorf("获取资产执行器失败，请确认资产凭据已录入")
 	}
 	ctx, cancel := context.WithTimeout(base.Ctx(), 30*time.Second)
 	defer cancel()

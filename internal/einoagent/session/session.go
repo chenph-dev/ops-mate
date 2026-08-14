@@ -18,6 +18,7 @@ import (
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
+	"ops-mate/internal/dbexec"
 	"ops-mate/internal/einoagent/checkpoint"
 	agentmodel "ops-mate/internal/einoagent/model"
 	agenttools "ops-mate/internal/einoagent/tools"
@@ -114,7 +115,7 @@ type SessionManager struct {
 	mem         *memorystore.MemoryStore
 	cfg         *configstore.ConfigStore
 	executorFor func(hostID string) sshexec.Exec
-	hostNameFor func(hostID string) (string, error) // 解析主机名（注入系统提示词）
+	hostNameFor func(hostID string) (string, error) // 解析资产名（注入系统提示词）
 	emit        func(sessionID, event string, data any)
 	logs        *logsstore.LogsStore // AI 调用审计日志
 
@@ -122,25 +123,28 @@ type SessionManager struct {
 	// 默认走 einoagent.agentmodel.NewChatModel（eino-ext provider）。
 	modelFactory func(ctx context.Context, cfg configstore.AIConfig) (einomodel.ToolCallingChatModel, error)
 
-	// policyFor 按主机解析审批策略（enableAuto + 只读白名单）；nil 表示全量审批。
+	// policyFor 按资产解析审批策略（enableAuto + 只读白名单）；nil 表示全量审批。
 	policyFor func(hostID string) (enableAuto bool, readOnlyWhitelist []string)
 
-	// terminalContextFor 按主机解析终端最近输出清洗文本（AI 上下文）；nil 表示不注入。
+	// terminalContextFor 按资产解析终端最近输出清洗文本（AI 上下文）；nil 表示不注入。
 	terminalContextFor func(hostID string) string
 
 	// skillCatalogFor 返回已启用技能的目录文本（无则空串）；skillFor 按名解析技能（供工具用）。nil 表示不启用技能。
 	skillCatalogFor func() string
 	skillFor        func(name string) (*skill.Skill, error)
 
-	// protocolFor 按主机解析协议（"ssh"/"winrm"）；nil 表示默认 ssh。
+	// protocolFor 按资产解析协议（"ssh"/"winrm"/"jdbc"）；nil 表示默认 ssh。
 	protocolFor func(hostID string) string
+
+	// dbExecutorFor 按资产解析数据库执行器（jdbc 协议，供 execute_sql 工具）；nil 表示不启用。
+	dbExecutorFor func(hostID string) *dbexec.Executor
 
 	mu            sync.Mutex
 	sessions      map[string]*agentSession
 	configVersion int
 }
 
-// NewSessionManager 构造会话管理器。hostNameFor 可为 nil（此时系统提示词不含主机名）。
+// NewSessionManager 构造会话管理器。hostNameFor 可为 nil（此时系统提示词不含资产名）。
 func NewSessionManager(
 	app *store.DB,
 	cfg *configstore.ConfigStore,
@@ -199,11 +203,20 @@ func (m *SessionManager) SetSkillResolver(catalog func() string, lookup func(nam
 	m.configVersion++
 }
 
-// SetProtocolResolver 注入协议解析器（hostID → "ssh"/"winrm"）。
+// SetProtocolResolver 注入协议解析器（hostID → "ssh"/"winrm"/"jdbc"）。
 // 注入同时使已构建 Graph 失效（下一轮按新协议重建工具语义）。
 func (m *SessionManager) SetProtocolResolver(fn func(hostID string) string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.protocolFor = fn
+	m.configVersion++
+}
+
+// SetDbExecutorResolver 注入数据库执行器解析器（hostID → dbexec.Executor）。
+// 不注入则 jdbc 资产无 execute_sql 工具。注入同时使已构建 Graph 失效。
+func (m *SessionManager) SetDbExecutorResolver(fn func(hostID string) *dbexec.Executor) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.dbExecutorFor = fn
 	m.configVersion++
 }

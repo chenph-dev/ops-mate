@@ -15,10 +15,10 @@ export default {
     selectAll: 'Select all',
     clear: 'Clear',
   },
-  disconnectNotice: '[Session closed] Double-click host to reconnect',
+  disconnectNotice: '[Session closed] Double-click asset to reconnect',
   header: {
     title: 'Terminal',
-    noHost: 'No host selected',
+    noHost: 'No asset selected',
     sftp: 'Open SFTP browser',
     aiOpen: 'Collapse agent panel',
     aiClose: 'Open agent panel',

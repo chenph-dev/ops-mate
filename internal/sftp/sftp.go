@@ -73,7 +73,7 @@ type TaskInfo struct {
 // progressEmit 传输进度回调（handler 注入，发 Wails 事件）。
 type progressEmit func(t *Task)
 
-// Manager 管理每主机的 SFTP 连接（懒建立、复用、随应用退出释放）与传输任务。
+// Manager 管理每资产的 SFTP 连接（懒建立、复用、随应用退出释放）与传输任务。
 type Manager struct {
 	mu       sync.Mutex
 	clients  map[string]*sftp.Client
@@ -87,7 +87,7 @@ type Manager struct {
 	pending []*Task       // 排队等待启动的任务
 }
 
-// NewManager 构造 Manager。hostFor 按 hostID 解析主机凭据；progress/start 回调（可为 nil）。
+// NewManager 构造 Manager。hostFor 按 hostID 解析资产凭据；progress/start 回调（可为 nil）。
 func NewManager(
 	hostFor func(hostID string) (*sshexec.Host, error),
 	progress progressEmit,
@@ -100,7 +100,7 @@ func NewManager(
 	}
 }
 
-// clientFor 获取（懒建立）主机的 SFTP 连接。
+// clientFor 获取（懒建立）资产的 SFTP 连接。
 func (m *Manager) clientFor(ctx context.Context, hostID string) (*sftp.Client, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -109,7 +109,7 @@ func (m *Manager) clientFor(ctx context.Context, hostID string) (*sftp.Client, e
 	}
 	host, err := m.hostFor(hostID)
 	if err != nil {
-		return nil, fmt.Errorf("获取主机凭据: %w", err)
+		return nil, fmt.Errorf("获取资产凭据: %w", err)
 	}
 	conn, err := sshexec.Dial(ctx, *host)
 	if err != nil {

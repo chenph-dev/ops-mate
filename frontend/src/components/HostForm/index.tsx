@@ -25,6 +25,8 @@ const defaultValues: HostInput = {
   autoApprove: 'inherit',
   protocol: 'ssh',
   rdpPort: 3389,
+  driver: 'mysql',
+  database: '',
 };
 
 export default function HostForm({
@@ -45,7 +47,7 @@ export default function HostForm({
 
   const handleSubmit = async (): Promise<void> => {
     const values = await form.validateFields();
-    if (values.protocol === 'winrm') {
+    if (values.protocol === 'winrm' || values.protocol === 'jdbc') {
       values.authType = 'password';
     }
     setSubmitting(true);
@@ -115,6 +117,7 @@ export default function HostForm({
                 options={[
                   { label: t('form.protocolSsh'), value: 'ssh' },
                   { label: t('form.protocolWinrm'), value: 'winrm' },
+                  { label: t('form.protocolJdbc'), value: 'jdbc' },
                 ]}
                 onChange={(value) => {
                   if (value === 'winrm') {
@@ -122,6 +125,9 @@ export default function HostForm({
                       port: 5985,
                       rdpPort: form.getFieldValue('rdpPort') || 3389,
                     });
+                  } else if (value === 'jdbc') {
+                    const drv = form.getFieldValue('driver') || 'mysql';
+                    form.setFieldsValue({ port: drv === 'postgres' ? 5432 : 3306 });
                   } else {
                     form.setFieldsValue({ port: 22 });
                   }
@@ -216,6 +222,38 @@ export default function HostForm({
                 style={itemStyle}
               >
                 <InputNumber min={1} max={65535} placeholder="3389" style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+          )}
+          {protocol === 'jdbc' && (
+            <Col span={12}>
+              <Form.Item
+                name="driver"
+                label={t('form.driver')}
+                rules={[{ required: true, message: t('form.driverRequired') }]}
+                style={itemStyle}
+              >
+                <Select
+                  options={[
+                    { label: 'MySQL', value: 'mysql' },
+                    { label: 'PostgreSQL', value: 'postgres' },
+                  ]}
+                  onChange={(value) => {
+                    form.setFieldsValue({ port: value === 'postgres' ? 5432 : 3306 });
+                  }}
+                />
+              </Form.Item>
+            </Col>
+          )}
+          {protocol === 'jdbc' && (
+            <Col span={12}>
+              <Form.Item
+                name="database"
+                label={t('form.database')}
+                rules={[{ required: true, message: t('form.databaseRequired') }]}
+                style={itemStyle}
+              >
+                <Input placeholder="app_db" />
               </Form.Item>
             </Col>
           )}

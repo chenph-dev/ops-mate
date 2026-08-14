@@ -19,7 +19,7 @@ func NewSessionsHandler(convs *convstore.ConvStore, sm *session.SessionManager) 
 	return &SessionsHandler{convs: convs, sessionManager: sm}
 }
 
-// EnsureSession 获取（必要时懒创建）主机当前会话。
+// EnsureSession 获取（必要时懒创建）资产当前会话。
 func (h *SessionsHandler) EnsureSession(hostID string) (string, error) {
 	return h.sessionManager.EnsureSession(hostID)
 }

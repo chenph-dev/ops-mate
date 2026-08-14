@@ -41,8 +41,8 @@ func NewTerminalHandler(hosts *hoststore.HostsStore) *TerminalHandler {
 	}
 }
 
-// OpenTerminal 双击主机时建立交互式 SSH 会话，返回 sessionID。
-// WinRM 主机由 HostFor 拦截（不支持交互式会话）。
+// OpenTerminal 双击资产时建立交互式 SSH 会话，返回 sessionID。
+// WinRM 资产由 HostFor 拦截（不支持交互式会话）。
 func (h *TerminalHandler) OpenTerminal(hostID string, cols, rows int) (string, error) {
 	host, err := h.resolver.HostFor(hostID)
 	if err != nil {
@@ -109,7 +109,7 @@ func (h *TerminalHandler) CloseTerminal(sessionID string) {
 	}
 }
 
-// appendTermOutput 把终端输出 chunk 写入该主机的环形缓冲。
+// appendTermOutput 把终端输出 chunk 写入该资产的环形缓冲。
 // 检测到清屏转义（\x1b[2J）时清空缓冲，尊重用户清屏意图。
 func (h *TerminalHandler) appendTermOutput(hostID string, chunk []byte) {
 	h.termMu.Lock()
@@ -132,7 +132,7 @@ func containsClearScreen(chunk []byte) bool {
 	return bytes.Contains(chunk, []byte("\x1b[2J"))
 }
 
-// TerminalContext 返回指定主机最近终端输出的清洗文本（用于 AI 上下文）。
+// TerminalContext 返回指定资产最近终端输出的清洗文本（用于 AI 上下文）。
 // 无记录或清洗为空返回空串。
 // 注：本方法供后端 AI 会话内部调用；作为绑定方法也会暴露给前端，前端不使用即可。
 func (h *TerminalHandler) TerminalContext(hostID string) string {
@@ -161,12 +161,12 @@ type CommandInfo struct {
 	Desc string `json:"desc"`
 }
 
-// ListHostCommands 抓取指定主机上可用的命令列表（compgen -c），并尝试用 whatis 获取简介。
-// 结果按名称去重排序；whatis 失败或不存在时 Desc 为空。仅支持 SSH 主机（WinRM 无交互式补全场景）。
+// ListHostCommands 抓取指定资产上可用的命令列表（compgen -c），并尝试用 whatis 获取简介。
+// 结果按名称去重排序；whatis 失败或不存在时 Desc 为空。仅支持 SSH 资产（WinRM 无交互式补全场景）。
 func (h *TerminalHandler) ListHostCommands(hostID string) ([]CommandInfo, error) {
 	ex := h.resolver.ExecFor(hostID)
 	if ex == nil {
-		return nil, fmt.Errorf("无法解析主机执行器，请确认主机凭据已录入")
+		return nil, fmt.Errorf("无法解析资产执行器，请确认资产凭据已录入")
 	}
 
 	ctx, cancel := context.WithTimeout(base.Ctx(), 10*time.Second)

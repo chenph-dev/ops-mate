@@ -47,7 +47,7 @@ func (m *SessionManager) buildInput(s *agentSession, userText string) ([]*schema
 		return nil, err
 	}
 
-	// 模板参数：主机名 + 记忆 + 终端上下文 + 技能目录（失败不阻断主流程）
+	// 模板参数：资产名 + 记忆 + 终端上下文 + 技能目录（失败不阻断主流程）
 	params := map[string]any{"HostName": "", "Memory": "", "TerminalContext": "", "SkillsCatalog": "", "OS": "linux"}
 	if m.hostNameFor != nil {
 		if name, err := m.hostNameFor(s.hostID); err == nil {
@@ -74,8 +74,11 @@ func (m *SessionManager) buildInput(s *agentSession, userText string) ([]*schema
 		}
 	}
 	if m.protocolFor != nil {
-		if p := m.protocolFor(s.hostID); strings.EqualFold(p, "winrm") {
+		switch p := m.protocolFor(s.hostID); {
+		case strings.EqualFold(p, "winrm"):
 			params["OS"] = "windows"
+		case strings.EqualFold(p, "jdbc"):
+			params["OS"] = "db"
 		}
 	}
 	sysMsgs, err := prompt.BuildSystemMessages(context.Background(), params)

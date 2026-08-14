@@ -1,4 +1,4 @@
-// Package hoststore 管理 SSH 主机与目录的树形结构。
+// Package hoststore 管理 SSH 资产与目录的树形结构。
 package hoststore
 
 import (
@@ -10,7 +10,7 @@ import (
 )
 
 // Host GORM 模型，对应 hosts 表。
-// node_type='folder' 时 addr/port/user 为空；node_type='host' 时为实际主机。
+// node_type='folder' 时 addr/port/user 为空；node_type='host' 时为实际资产。
 type Host struct {
 	ID            string  `gorm:"column:id;primaryKey"`
 	Name          string  `gorm:"column:name"`
@@ -24,12 +24,14 @@ type Host struct {
 	AutoApprove   string  `gorm:"column:auto_approve"`
 	Protocol      string  `gorm:"column:protocol"`
 	RdpPort       int     `gorm:"column:rdp_port"`
+	Driver        string  `gorm:"column:driver"`
+	Database      string  `gorm:"column:database"`
 	CreatedAt     int64   `gorm:"column:created_at"`
 }
 
 func (Host) TableName() string { return "hosts" }
 
-// HostInput 主机录入数据。Secret 为密码或私钥 PEM 明文。
+// HostInput 资产录入数据。Secret 为密码或私钥 PEM 明文。
 type HostInput struct {
 	Name        string `json:"name"`
 	ParentID    string `json:"parentId"` // 父目录 ID，空串表示根级
@@ -41,9 +43,11 @@ type HostInput struct {
 	AutoApprove string `json:"autoApprove"` // inherit | on | off
 	Protocol    string `json:"protocol"`
 	RdpPort     int    `json:"rdpPort"`
+	Driver      string `json:"driver"`   // jdbc: mysql | postgres
+	Database    string `json:"database"` // jdbc: 目标库名
 }
 
-// HostMeta 主机列表项（不含凭据）。
+// HostMeta 资产列表项（不含凭据）。
 type HostMeta struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
@@ -56,6 +60,8 @@ type HostMeta struct {
 	AutoApprove string `json:"autoApprove"`
 	Protocol    string `json:"protocol"`
 	RdpPort     int    `json:"rdpPort"`
+	Driver      string `json:"driver"`
+	Database    string `json:"database"`
 }
 
 // TreeNode 树形节点返回结构。
@@ -74,9 +80,11 @@ type TreeNode struct {
 	AutoApprove string `json:"autoApprove,omitempty"`
 	Protocol    string `json:"protocol,omitempty"`
 	RdpPort     int    `json:"rdpPort,omitempty"`
+	Driver      string `json:"driver,omitempty"`
+	Database    string `json:"database,omitempty"`
 }
 
-// HostsStore 提供主机/目录管理操作。
+// HostsStore 提供资产/目录管理操作。
 type HostsStore struct {
 	app *store.DB
 }
@@ -86,7 +94,7 @@ func NewHostsStore(app *store.DB) *HostsStore {
 	return &HostsStore{app: app}
 }
 
-// SaveHost 保存主机（node_type='host'）。
+// SaveHost 保存资产（node_type='host'）。
 func (s *HostsStore) SaveHost(in HostInput) (string, error) {
 	id := crypto.NewID()
 	enc, err := s.app.Encrypt([]byte(in.Secret))
@@ -105,6 +113,8 @@ func (s *HostsStore) SaveHost(in HostInput) (string, error) {
 		AutoApprove: autoApproveOrDefault(in.AutoApprove),
 		Protocol:    protocolOrDefault(in.Protocol),
 		RdpPort:     rdpPortOrDefault(in.RdpPort),
+		Driver:      driverOrDefault(in.Driver),
+		Database:    in.Database,
 		CreatedAt:   time.Now().Unix(),
 	}).Error
 	if err != nil {
@@ -113,7 +123,7 @@ func (s *HostsStore) SaveHost(in HostInput) (string, error) {
 	return id, nil
 }
 
-// UpdateHost 更新主机信息（节点编辑）。secret 为空则保留原凭据，非空则重新加密。
+// UpdateHost 更新资产信息（节点编辑）。secret 为空则保留原凭据，非空则重新加密。
 func (s *HostsStore) UpdateHost(id string, in HostInput) error {
 	updates := map[string]any{
 		"name": in.Name, "addr": in.Addr, "port": in.Port,
@@ -121,6 +131,8 @@ func (s *HostsStore) UpdateHost(id string, in HostInput) error {
 		"auto_approve": autoApproveOrDefault(in.AutoApprove),
 		"protocol":     protocolOrDefault(in.Protocol),
 		"rdp_port":     rdpPortOrDefault(in.RdpPort),
+		"driver":       driverOrDefault(in.Driver),
+		"database":     in.Database,
 	}
 	if in.Secret != "" {
 		enc, err := s.app.Encrypt([]byte(in.Secret))
@@ -150,7 +162,7 @@ func (s *HostsStore) CreateFolder(name, parentID string) (string, error) {
 	return id, nil
 }
 
-// ListHosts 返回所有主机的扁平列表（兼容旧接口）。
+// ListHosts 返回所有资产的扁平列表（兼容旧接口）。
 func (s *HostsStore) ListHosts() ([]HostMeta, error) {
 	var hosts []Host
 	if err := s.app.GORM().Where("node_type = 'host'").Order("name").Find(&hosts).Error; err != nil {
@@ -164,6 +176,7 @@ func (s *HostsStore) ListHosts() ([]HostMeta, error) {
 			Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
 			AutoApprove: h.AutoApprove,
 			Protocol:    h.Protocol, RdpPort: h.RdpPort,
+			Driver:      h.Driver, Database: h.Database,
 		})
 	}
 	return out, nil
@@ -186,6 +199,7 @@ func (s *HostsStore) ListTree() ([]TreeNode, error) {
 			Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
 			AutoApprove: h.AutoApprove,
 			Protocol:    h.Protocol, RdpPort: h.RdpPort,
+			Driver:      h.Driver, Database: h.Database,
 		}
 	}
 
@@ -250,7 +264,7 @@ func (s *HostsStore) GetHostSecret(id string) (secret, authType string, err erro
 	return string(pt), h.AuthType, nil
 }
 
-// HostMetaByID 取单主机元数据。
+// HostMetaByID 取单资产元数据。
 func (s *HostsStore) HostMetaByID(id string) (*HostMeta, error) {
 	var h Host
 	if err := s.app.GORM().First(&h, "id = ?", id).Error; err != nil {
@@ -262,10 +276,11 @@ func (s *HostsStore) HostMetaByID(id string) (*HostMeta, error) {
 		Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
 		AutoApprove: h.AutoApprove,
 		Protocol:    h.Protocol, RdpPort: h.RdpPort,
+		Driver:      h.Driver, Database: h.Database,
 	}, nil
 }
 
-// GetAutoApprove 返回主机自动放行覆盖（"inherit"/"on"/"off"）。
+// GetAutoApprove 返回资产自动放行覆盖（"inherit"/"on"/"off"）。
 func (s *HostsStore) GetAutoApprove(id string) (string, error) {
 	var h Host
 	if err := s.app.GORM().First(&h, "id = ?", id).Error; err != nil {
@@ -301,6 +316,14 @@ func protocolOrDefault(v string) string {
 func rdpPortOrDefault(v int) int {
 	if v == 0 {
 		return 3389
+	}
+	return v
+}
+
+// driverOrDefault normalizes empty driver to "mysql".
+func driverOrDefault(v string) string {
+	if v == "" {
+		return "mysql"
 	}
 	return v
 }

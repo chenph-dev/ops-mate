@@ -53,7 +53,7 @@ func TestHostCRUD_AuthEncrypted(t *testing.T) {
 	}
 	list, _ = s.ListHosts()
 	if len(list) != 0 {
-		t.Fatal("删除后应无主机")
+		t.Fatal("删除后应无资产")
 	}
 }
 
@@ -73,7 +73,7 @@ func TestHostTree_FolderAndMove(t *testing.T) {
 		t.Fatalf("CreateFolder: %v", err)
 	}
 
-	// 在目录下创建主机
+	// 在目录下创建资产
 	hostID, err := s.SaveHost(HostInput{
 		Name: "web-01", ParentID: folderID, Addr: "10.0.0.5",
 		Port: 22, User: "ops", AuthType: "password", Secret: "p@ss",
@@ -91,10 +91,10 @@ func TestHostTree_FolderAndMove(t *testing.T) {
 		t.Fatalf("根级应有 1 个目录，得到 %+v", tree)
 	}
 	if len(tree[0].Children) != 1 || tree[0].Children[0].Name != "web-01" {
-		t.Fatalf("目录下应有 1 个主机，得到 %+v", tree[0].Children)
+		t.Fatalf("目录下应有 1 个资产，得到 %+v", tree[0].Children)
 	}
 
-	// 创建第二个目录，移动主机过去
+	// 创建第二个目录，移动资产过去
 	folder2ID, err := s.CreateFolder("测试环境", "")
 	if err != nil {
 		t.Fatalf("CreateFolder2: %v", err)
@@ -108,13 +108,13 @@ func TestHostTree_FolderAndMove(t *testing.T) {
 		t.Fatalf("应有 2 个根级目录，得到 %d", len(tree))
 	}
 
-	// 删除目录（级联删除子主机）
+	// 删除目录（级联删除子资产）
 	if err := s.DeleteNode(folder2ID); err != nil {
 		t.Fatalf("DeleteNode: %v", err)
 	}
 	list, _ := s.ListHosts()
 	if len(list) != 0 {
-		t.Fatal("级联删除后应无主机")
+		t.Fatal("级联删除后应无资产")
 	}
 }
 

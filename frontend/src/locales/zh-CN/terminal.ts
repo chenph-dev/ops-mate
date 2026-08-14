@@ -15,10 +15,10 @@ export default {
     selectAll: '全选',
     clear: '清空',
   },
-  disconnectNotice: '[会话已断开] 双击主机重新连接',
+  disconnectNotice: '[会话已断开] 双击资产重新连接',
   header: {
     title: '终端',
-    noHost: '未选择主机',
+    noHost: '未选择资产',
     sftp: '打开 SFTP 文件浏览',
     aiOpen: '收起智能体面板',
     aiClose: '打开智能体面板',

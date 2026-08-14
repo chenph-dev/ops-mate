@@ -1,7 +1,7 @@
 export default {
   title: '运维技能',
   subtitle:
-    '按 Anthropic Agent Skills 规范打包（SKILL.md + scripts/），ZIP 上传后 Agent 可按需加载指南并在目标主机远程执行脚本。',
+    '按 Anthropic Agent Skills 规范打包（SKILL.md + scripts/），ZIP 上传后 Agent 可按需加载指南并在目标资产远程执行脚本。',
   upload: '上传技能 ZIP',
   empty: '暂无技能，点击上方按钮上传 ZIP。',
   name: '名称',

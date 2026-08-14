@@ -1,5 +1,5 @@
 export default {
-  hosts: 'Hosts',
+  assets: 'Assets',
   system: 'System',
   config: 'LLM Config',
   audit: 'Audit Logs',

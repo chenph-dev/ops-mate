@@ -1,10 +1,10 @@
 export default {
   title: 'About ops-mate',
   tagline:
-    'An AI ops agent built on Wails + React that manages Linux hosts through AI conversations.',
+    'An AI ops agent built on Wails + React that manages Linux assets through AI conversations.',
   feat: {
-    hostsTitle: 'Host management',
-    hostsDesc: 'Folder-tree host organization, connection tests, command execution',
+    hostsTitle: 'Asset management',
+    hostsDesc: 'Folder-tree asset organization, connection tests, command execution',
     terminalTitle: 'SSH terminal',
     terminalDesc: 'Interactive terminal with resizing, search, command history',
     sftpTitle: 'SFTP transfer',

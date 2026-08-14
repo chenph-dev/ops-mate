@@ -186,7 +186,7 @@ type SSHTool struct {
 	enableAuto        bool
 	readOnlyWhitelist []string
 
-	// protocol 目标主机协议："ssh"（默认）/ "winrm"，影响工具描述与风险判定语义。
+	// protocol 目标资产协议："ssh"（默认）/ "winrm"，影响工具描述与风险判定语义。
 	protocol string
 }
 
@@ -217,10 +217,10 @@ func (t *SSHTool) SetProtocol(protocol string) {
 
 // Info 返回工具元信息，供 ChatModel 生成 tool call。
 func (t *SSHTool) Info(ctx context.Context) (*schema.ToolInfo, error) {
-	desc := "在目标 Linux 主机上执行一条 Shell 命令。命令会先展示给用户审批，批准后才执行。"
+	desc := "在目标 Linux 资产上执行一条 Shell 命令。命令会先展示给用户审批，批准后才执行。"
 	cmdDesc := "要执行的 Shell 命令"
 	if strings.EqualFold(t.protocol, "winrm") {
-		desc = "在目标 Windows 主机上执行一条 PowerShell 命令。命令会先展示给用户审批，批准后才执行。"
+		desc = "在目标 Windows 资产上执行一条 PowerShell 命令。命令会先展示给用户审批，批准后才执行。"
 		cmdDesc = "要执行的 PowerShell 命令"
 	}
 	return &schema.ToolInfo{
