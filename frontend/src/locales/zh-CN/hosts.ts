@@ -81,10 +81,13 @@ export default {
     failed: '执行失败：{{err}}',
   },
   db: {
-    placeholder: '输入 SQL，回车执行（Shift+回车换行）',
+    placeholder: '输入 SQL，Ctrl+Enter 执行（Shift+Enter 换行）',
     run: '执行',
     rowsAffected: '已影响 {{count}} 行',
-    noResult: '输入 SQL 后回车执行，结果将显示在此',
+    noResult: '输入 SQL 后执行，结果将显示在此',
     failed: '执行失败：{{err}}',
+    schema: '表结构',
+    refreshSchema: '刷新结构',
+    clickTableHint: '点击表名生成查询',
   },
 };

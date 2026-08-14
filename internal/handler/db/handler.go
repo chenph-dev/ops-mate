@@ -34,3 +34,14 @@ func (h *DbHandler) ExecuteSQL(hostID, sqlText string) (*dbexec.Result, error) {
 	}
 	return ex.Exec(ctx, sqlText)
 }
+
+// ListSchema 返回指定数据库资产的表/列结构（供前端左侧 schema 树）。
+func (h *DbHandler) ListSchema(hostID string) (*dbexec.Schema, error) {
+	ex := h.resolver.DbFor(hostID)
+	if ex == nil {
+		return nil, fmt.Errorf("无法解析数据库资产，请确认资产为 JDBC 协议且凭据已录入")
+	}
+	ctx, cancel := context.WithTimeout(base.Ctx(), 30*time.Second)
+	defer cancel()
+	return ex.Schema(ctx)
+}

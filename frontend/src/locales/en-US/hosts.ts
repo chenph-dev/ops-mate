@@ -81,10 +81,13 @@ export default {
     failed: 'Execution failed: {{err}}',
   },
   db: {
-    placeholder: 'Enter SQL, press Enter to run (Shift+Enter for newline)',
+    placeholder: 'Enter SQL, Ctrl+Enter to run (Shift+Enter for newline)',
     run: 'Run',
     rowsAffected: '{{count}} row(s) affected',
-    noResult: 'Enter SQL and press Enter to run; results appear here',
+    noResult: 'Enter SQL and run; results appear here',
     failed: 'Execution failed: {{err}}',
+    schema: 'Schema',
+    refreshSchema: 'Refresh',
+    clickTableHint: 'Click a table to generate a query',
   },
 };

@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
@@ -155,6 +156,84 @@ func (e *Executor) Exec(ctx context.Context, sqlText string) (*Result, error) {
 	return &Result{RowsAffected: affected}, nil
 }
 
+// Column 数据库表列元数据。
+type Column struct {
+	Name       string `json:"name"`
+	DataType   string `json:"dataType"`
+	IsNullable bool   `json:"isNullable"`
+	Key        string `json:"key,omitempty"` // MySQL COLUMN_KEY（PRI/MUL/""），PG 留空
+}
+
+// Table 表元数据。
+type Table struct {
+	Name    string   `json:"name"`
+	Columns []Column `json:"columns"`
+}
+
+// Schema 数据库结构（表 + 列）。
+type Schema struct {
+	Tables []Table `json:"tables"`
+}
+
+// Schema 查询目标库的表/列结构（information_schema）。
+func (e *Executor) Schema(ctx context.Context) (*Schema, error) {
+	res, err := e.Query(ctx, e.schemaQuery())
+	if err != nil {
+		return nil, err
+	}
+	return parseSchema(res)
+}
+
+// schemaQuery 按驱动返回 information_schema 查询 SQL（表 + 列 + 类型 + 可空 + key）。
+func (e *Executor) schemaQuery() string {
+	drv, err := driverName(e.host.Driver)
+	if err != nil {
+		drv = "mysql"
+	}
+	if drv == "postgres" {
+		return `SELECT t.table_name, c.column_name, c.data_type, c.is_nullable, '' AS key
+FROM information_schema.tables t
+JOIN information_schema.columns c
+  ON c.table_schema = t.table_schema AND c.table_name = t.table_name
+WHERE t.table_schema = current_schema() AND t.table_type = 'BASE TABLE'
+ORDER BY t.table_name, c.ordinal_position`
+	}
+	return `SELECT t.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, c.IS_NULLABLE, c.COLUMN_KEY
+FROM information_schema.TABLES t
+JOIN information_schema.COLUMNS c
+  ON c.TABLE_SCHEMA = t.TABLE_SCHEMA AND c.TABLE_NAME = t.TABLE_NAME
+WHERE t.TABLE_SCHEMA = DATABASE() AND t.TABLE_TYPE = 'BASE TABLE'
+ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION`
+}
+
+// parseSchema 把 Query 结果解析为 Schema（按表名分组，保持列顺序）。
+func parseSchema(res *Result) (*Schema, error) {
+	if res == nil {
+		return nil, fmt.Errorf("schema 结果为空")
+	}
+	var schema Schema
+	idx := make(map[string]int)
+	for _, row := range res.Rows {
+		if len(row) < 5 {
+			continue
+		}
+		table := fmt.Sprintf("%v", row[0])
+		ti, ok := idx[table]
+		if !ok {
+			schema.Tables = append(schema.Tables, Table{Name: table})
+			idx[table] = len(schema.Tables) - 1
+			ti = idx[table]
+		}
+		schema.Tables[ti].Columns = append(schema.Tables[ti].Columns, Column{
+			Name:       fmt.Sprintf("%v", row[1]),
+			DataType:   fmt.Sprintf("%v", row[2]),
+			IsNullable: fmt.Sprintf("%v", row[3]) == "YES",
+			Key:        fmt.Sprintf("%v", row[4]),
+		})
+	}
+	return &schema, nil
+}
+
 // IsQuery 判断 SQL 首关键字是否为查询类（走 Query 返回行集）。
 // 仅按首关键字粗分；WITH 开头的写语句（如 CTE + UPDATE）会保守走 Query，
 // 但 Query 对无行结果返回空 Rows，不影响正确性。
@@ -181,7 +260,11 @@ func normalizeValue(v any) any {
 	case nil:
 		return nil
 	case []byte:
-		// 二进制（BLOB）转 base64，避免 JSON 序列化失败。
+		// 文本列（合法 UTF-8）转 string；二进制（BLOB/非 UTF-8）转 base64 避免 JSON 失败。
+		// MySQL 驱动对 VARCHAR/TEXT 默认返回 []byte，直接 base64 会把表名/文本列变乱码。
+		if utf8.Valid(t) {
+			return string(t)
+		}
 		return base64.StdEncoding.EncodeToString(t)
 	case time.Time:
 		return t.Format("2006-01-02 15:04:05")
