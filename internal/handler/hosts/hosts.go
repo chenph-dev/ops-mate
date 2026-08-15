@@ -107,6 +107,9 @@ func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, error) {
 		return true, nil
 	}
 	ex := base.ExecutorForHost(in.Protocol, in.Addr, in.Port, in.User, in.AuthType, in.Secret)
+	if ex == nil {
+		return false, fmt.Errorf("无法解析资产连接，请确认协议与凭据")
+	}
 	ctx, cancel := context.WithTimeout(base.Ctx(), 15*time.Second)
 	defer cancel()
 	ch, err := ex.Exec(ctx, "echo ok")

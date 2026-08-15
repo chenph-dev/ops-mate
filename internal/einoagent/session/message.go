@@ -41,12 +41,12 @@ func (m *SessionManager) SendMessage(sid, text string) error {
 		protocol = m.protocolFor(s.hostID)
 	}
 	if connector.Get(protocol) != nil {
-		if m.capabilityFor == nil || m.capabilityFor(s.hostID) == nil {
+		if m.capabilityFor == nil {
 			s.mu.Lock()
 			s.state = stIdle
 			s.mu.Unlock()
 			m.emitError(sid, "数据库凭据不可用，请在资产页重新录入该资产的密码")
-			return fmt.Errorf("connector capability unavailable for host %s", s.hostID)
+			return fmt.Errorf("connector capability resolver unavailable for host %s", s.hostID)
 		}
 	} else {
 		ex := m.executorFor(s.hostID)

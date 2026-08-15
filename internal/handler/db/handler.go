@@ -1,4 +1,4 @@
-// Package db 提供数据库连接（JDBC）的 Wails 绑定 handler。
+// Package db 提供数据库连接的 Wails 绑定 handler。
 package db
 
 import (
@@ -25,7 +25,7 @@ func NewDbHandler(resolver *base.ExecutorResolver) *DbHandler {
 func (h *DbHandler) ExecuteSQL(hostID, sqlText string) (*dbexec.Result, error) {
 	ex := h.resolver.DbFor(hostID)
 	if ex == nil {
-		return nil, fmt.Errorf("无法解析数据库资产，请确认资产为 JDBC 协议且凭据已录入")
+		return nil, fmt.Errorf("无法解析数据库资产，请确认资产为数据库协议且凭据已录入")
 	}
 	ctx, cancel := context.WithTimeout(base.Ctx(), 30*time.Second)
 	defer cancel()
@@ -39,7 +39,7 @@ func (h *DbHandler) ExecuteSQL(hostID, sqlText string) (*dbexec.Result, error) {
 func (h *DbHandler) ListSchema(hostID string) (*dbexec.Schema, error) {
 	ex := h.resolver.DbFor(hostID)
 	if ex == nil {
-		return nil, fmt.Errorf("无法解析数据库资产，请确认资产为 JDBC 协议且凭据已录入")
+		return nil, fmt.Errorf("无法解析数据库资产，请确认资产为数据库协议且凭据已录入")
 	}
 	ctx, cancel := context.WithTimeout(base.Ctx(), 30*time.Second)
 	defer cancel()

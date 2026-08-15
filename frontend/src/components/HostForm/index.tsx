@@ -113,9 +113,12 @@ export default function HostForm({
     }
   };
 
-  // 协议切换：先清空上一协议的专属参数，避免陈旧值随提交泄漏；ssh/winrm/DB 设置或清空端口
+  // 协议切换：先清空上一协议的专属参数与凭据字段（secret/authType），避免陈旧值（如 SSH 私钥）随提交泄漏；ssh/winrm/DB 设置或清空端口
   const onProtocolChange = (value: string): void => {
-    form.resetFields(['params']);
+    form.resetFields(['params', 'secret', 'authType']);
+    if (value !== 'ssh') {
+      form.setFieldsValue({ authType: 'password' });
+    }
     if (value === 'winrm') {
       form.setFieldsValue({
         port: 5985,
@@ -141,6 +144,7 @@ export default function HostForm({
       destroyOnHidden
       afterOpenChange={(open) => {
         if (open) {
+          form.resetFields();
           form.setFieldsValue(initialValues ?? defaultValues);
         }
       }}
@@ -263,6 +267,7 @@ export default function HostForm({
                 name={['params', p.key]}
                 label={p.label || p.key}
                 rules={[{ required: !!p.required }]}
+                initialValue={p.default}
                 style={itemStyle}
               >
                 <ParamControl p={p} />

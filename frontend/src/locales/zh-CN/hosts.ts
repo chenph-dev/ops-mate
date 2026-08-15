@@ -90,4 +90,7 @@ export default {
     refreshSchema: '刷新结构',
     clickTableHint: '点击表名生成查询',
   },
+  panel: {
+    unsupported: '该连接类型暂不支持面板',
+  },
 };

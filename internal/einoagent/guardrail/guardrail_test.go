@@ -183,6 +183,13 @@ func TestClassifyForProtocol_JdbcSQL(t *testing.T) {
 		{"ALTER TABLE t ADD COLUMN c INT", "high", ActionApprove},
 		{"SELECT 1; DROP TABLE users", "write", ActionApprove},              // 多语句保守审批
 		{"WITH x AS (SELECT 1) UPDATE t SET a=1", "write", ActionApprove},  // CTE 写保守审批
+		{"SELECT * FROM t INTO OUTFILE '/tmp/x'", "write", ActionApprove},  // 只读关键字但 INTO OUTFILE 写文件
+		{"SELECT LOAD_FILE('/etc/passwd')", "write", ActionApprove},        // SELECT fn() 读服务器文件
+		{"SELECT * FROM users FOR UPDATE", "write", ActionApprove},         // 只读关键字但 FOR UPDATE 加锁
+		{"SELECT * FROM users for update", "write", ActionApprove},         // 小写 FOR UPDATE 同样降级
+		{"PRAGMA journal_mode=WAL", "write", ActionApprove},                // PRAGMA 写模式
+		{"PRAGMA writable_schema=ON", "write", ActionApprove},              // PRAGMA 危险开关
+		{"PRAGMA table_info(users)", "read", ActionAuto},                   // 普通只读 PRAGMA 不受影响
 	}
 	for _, c := range cases {
 		risk, action := ClassifyForProtocol(c.sql, nil, "jdbc")

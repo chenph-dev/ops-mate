@@ -118,6 +118,79 @@ func TestHostTree_FolderAndMove(t *testing.T) {
 	}
 }
 
+func TestHostTree_NestedFolder(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	app, err := store.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer closeDB(app)
+
+	s := NewHostsStore(app)
+
+	// 三层嵌套：根目录 -> 子目录 -> 孙目录 -> 资产
+	rootID, err := s.CreateFolder("根目录", "")
+	if err != nil {
+		t.Fatalf("CreateFolder(root): %v", err)
+	}
+	subID, err := s.CreateFolder("子目录", rootID)
+	if err != nil {
+		t.Fatalf("CreateFolder(sub): %v", err)
+	}
+	grandID, err := s.CreateFolder("孙目录", subID)
+	if err != nil {
+		t.Fatalf("CreateFolder(grand): %v", err)
+	}
+	if _, err := s.SaveHost(HostInput{
+		Name: "web-01", ParentID: grandID, Addr: "10.0.0.5",
+		Port: 22, User: "ops", AuthType: "password", Secret: "p@ss",
+	}); err != nil {
+		t.Fatalf("SaveHost: %v", err)
+	}
+
+	// 根目录下同时平铺一个资产，验证 host 平铺正确
+	if _, err := s.SaveHost(HostInput{
+		Name: "root-host", ParentID: rootID, Addr: "10.0.0.6",
+		Port: 22, User: "ops", AuthType: "password", Secret: "p@ss",
+	}); err != nil {
+		t.Fatalf("SaveHost(root-host): %v", err)
+	}
+
+	tree, err := s.ListTree()
+	if err != nil {
+		t.Fatalf("ListTree: %v", err)
+	}
+	if len(tree) != 1 {
+		t.Fatalf("根级应有 1 个目录，得到 %d", len(tree))
+	}
+	root := tree[0]
+	if root.Name != "根目录" {
+		t.Errorf("根节点名 = %q, want 根目录", root.Name)
+	}
+	// 根目录下应有 1 个子目录 + 1 个平铺 host
+	if len(root.Children) != 2 {
+		t.Fatalf("根目录下应有 2 个子节点（子目录 + 平铺 host），得到 %d: %+v", len(root.Children), root.Children)
+	}
+
+	var sub *TreeNode
+	for i := range root.Children {
+		if root.Children[i].Name == "子目录" {
+			sub = &root.Children[i]
+		}
+	}
+	if sub == nil {
+		t.Fatal("根目录下未找到子目录")
+	}
+	if len(sub.Children) != 1 || sub.Children[0].Name != "孙目录" {
+		t.Fatalf("子目录下应有 1 个孙目录，得到 %+v", sub.Children)
+	}
+	// 断言孙节点存在（修复前：值拷贝导致孙节点丢失）
+	grand := sub.Children[0]
+	if len(grand.Children) != 1 || grand.Children[0].Name != "web-01" {
+		t.Fatalf("孙目录下应有 1 个资产（孙节点丢失），得到 %+v", grand.Children)
+	}
+}
+
 func closeDB(app *store.DB) {
 	sqlDB, _ := app.GORM().DB()
 	if sqlDB != nil {

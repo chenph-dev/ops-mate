@@ -50,6 +50,9 @@ func TestBuildSystemMessages_TerminalContext(t *testing.T) {
 	if !strings.Contains(content, "终端最近输出") {
 		t.Errorf("应含终端上下文引导文案: %q", content)
 	}
+	if !strings.Contains(content, "不可信数据") {
+		t.Errorf("终端上下文应标注为不可信数据: %q", content)
+	}
 	if !strings.Contains(content, "/dev/sda1") {
 		t.Errorf("应含终端内容: %q", content)
 	}

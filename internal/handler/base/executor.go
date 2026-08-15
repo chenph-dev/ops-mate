@@ -2,6 +2,7 @@ package base
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"ops-mate/internal/connector"
@@ -121,10 +122,16 @@ func (r *ExecutorResolver) ConnFor(hostID string) connector.Capability {
 	}
 	secret, _, err := r.hosts.GetHostSecret(hostID)
 	if err != nil {
+		log.Printf("resolver: connfor host %s: %v", hostID, err)
 		return nil
 	}
 	meta, err := r.hosts.HostMetaByID(hostID)
-	if err != nil || meta == nil {
+	if err != nil {
+		log.Printf("resolver: connfor host %s: %v", hostID, err)
+		return nil
+	}
+	if meta == nil {
+		log.Printf("resolver: connfor host %s: meta not found", hostID)
 		return nil
 	}
 	if connector.Get(meta.Protocol) == nil {
@@ -135,6 +142,7 @@ func (r *ExecutorResolver) ConnFor(hostID string) connector.Capability {
 		Password: secret, Params: meta.Params,
 	})
 	if err != nil {
+		log.Printf("resolver: connfor host %s: %v", hostID, err)
 		return nil
 	}
 	return cap

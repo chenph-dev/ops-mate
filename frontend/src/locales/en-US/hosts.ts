@@ -90,4 +90,7 @@ export default {
     refreshSchema: 'Refresh',
     clickTableHint: 'Click a table to generate a query',
   },
+  panel: {
+    unsupported: 'This connection type does not support a panel yet',
+  },
 };

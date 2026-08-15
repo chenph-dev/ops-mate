@@ -350,10 +350,23 @@ export default function HostsPage(): React.JSX.Element {
                 aiCollapsed={aiCollapsed}
                 onToggleAI={() => setAiCollapsed(!aiCollapsed)}
               />
-            ) : null}
+            ) : (
+              <div
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#999',
+                  fontSize: 12,
+                }}
+              >
+                {t('panel.unsupported')}
+              </div>
+            )}
             <AIPanel
               {...aiPanelProps}
-              sshConnected={true}
+              sshConnected={panelHost.protocol === 'winrm' || isDB(panelHost.protocol)}
               hostName={panelHost.name}
               onRunInTerminal={() => {}}
             />

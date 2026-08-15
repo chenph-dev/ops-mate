@@ -69,7 +69,8 @@ func (e *Executor) dsn(driver string) string {
 		return e.host.Database // 本地文件路径
 	default: // mysql
 		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true",
-			e.host.User, e.host.Password, e.host.Addr, e.host.Port, e.host.Database)
+			e.host.User, url.QueryEscape(e.host.Password), e.host.Addr, e.host.Port,
+			url.QueryEscape(e.host.Database))
 	}
 }
 

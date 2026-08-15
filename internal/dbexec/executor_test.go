@@ -31,7 +31,7 @@ func TestDriverName(t *testing.T) {
 
 func TestDSN(t *testing.T) {
 	e := NewExecutor(Host{Driver: "mysql", Addr: "10.0.0.5", Port: 3306, User: "root", Password: "p@ss", Database: "app"})
-	if got, want := e.dsn("mysql"), "root:p@ss@tcp(10.0.0.5:3306)/app?parseTime=true"; got != want {
+	if got, want := e.dsn("mysql"), "root:p%40ss@tcp(10.0.0.5:3306)/app?parseTime=true"; got != want {
 		t.Errorf("mysql dsn = %q, want %q", got, want)
 	}
 

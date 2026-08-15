@@ -175,8 +175,23 @@ func classifySQL(sqlText string) (string, Action) {
 	if strings.Contains(sqlText, ";") {
 		return "write", ActionApprove
 	}
-	switch sqlKeyword(sqlText) {
+	kw := sqlKeyword(sqlText)
+	switch kw {
 	case "select", "show", "desc", "describe", "explain", "use", "pragma", "values":
+		// 命中只读关键字仍须降级检查：SELECT INTO OUTFILE / LOAD_FILE / FOR UPDATE
+		// 以及 PRAGMA journal_mode= / writable_schema= 是写或危险操作，不得自动放行。
+		upper := strings.ToUpper(sqlText)
+		if strings.Contains(upper, "INTO OUTFILE") ||
+			strings.Contains(upper, "LOAD_FILE") ||
+			strings.Contains(upper, "FOR UPDATE") {
+			return "write", ActionApprove
+		}
+		if kw == "pragma" &&
+			(strings.Contains(upper, "=") ||
+				strings.Contains(upper, "JOURNAL_MODE") ||
+				strings.Contains(upper, "WRITABLE_SCHEMA")) {
+			return "write", ActionApprove
+		}
 		return "read", ActionAuto
 	case "drop", "truncate", "alter":
 		return "high", ActionApprove

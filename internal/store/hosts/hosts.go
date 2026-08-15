@@ -128,13 +128,21 @@ func (s *HostsStore) SaveHost(in HostInput) (string, error) {
 
 // UpdateHost 更新资产信息（节点编辑）。secret 为空则保留原凭据，非空则重新加密。
 func (s *HostsStore) UpdateHost(id string, in HostInput) error {
+	// 兼容客户端既不传 Params 也不传 Database 时，保留已存的 params_json，避免静默清空 database/filePath。
+	paramsJSON := paramsJSON(in)
+	if len(in.Params) == 0 && in.Database == "" {
+		var existing Host
+		if err := s.app.GORM().First(&existing, "id = ?", id).Error; err == nil {
+			paramsJSON = existing.ParamsJSON
+		}
+	}
 	updates := map[string]any{
 		"name": in.Name, "addr": in.Addr, "port": in.Port,
 		"user": in.User, "auth_type": in.AuthType,
 		"auto_approve": autoApproveOrDefault(in.AutoApprove),
 		"protocol":     normalizeProtocol(in),
 		"rdp_port":     rdpPortOrDefault(in.RdpPort),
-		"params_json":  paramsJSON(in),
+		"params_json":  paramsJSON,
 	}
 	if in.Secret != "" {
 		enc, err := s.app.Encrypt([]byte(in.Secret))
@@ -202,24 +210,34 @@ func (s *HostsStore) ListTree() ([]TreeNode, error) {
 		}
 	}
 
-	// 构建树：先建立父子关系（通过指针操作 map 中的节点）
+	// 构建树：第一遍收集父 -> 子节点指针关系（不拷贝值，避免孙节点丢失）。
+	childrenOf := make(map[string][]*TreeNode)
 	rootsPtr := make([]*TreeNode, 0)
 	for i := range all {
 		h := &all[i]
 		node := nodeMap[h.ID]
 		if h.ParentID == nil || *h.ParentID == "" {
 			rootsPtr = append(rootsPtr, node)
-		} else {
-			if parent, ok := nodeMap[*h.ParentID]; ok {
-				parent.Children = append(parent.Children, *node)
-			}
+		} else if _, ok := nodeMap[*h.ParentID]; ok {
+			childrenOf[*h.ParentID] = append(childrenOf[*h.ParentID], node)
 		}
+	}
+
+	// 第二遍：递归装配子树（先填孙节点再值拷贝，保证嵌套层级完整）。
+	var assemble func(n *TreeNode) TreeNode
+	assemble = func(n *TreeNode) TreeNode {
+		out := *n
+		out.Children = make([]TreeNode, 0, len(childrenOf[n.ID]))
+		for _, c := range childrenOf[n.ID] {
+			out.Children = append(out.Children, assemble(c))
+		}
+		return out
 	}
 
 	// 解引用指针切片为值切片
 	roots := make([]TreeNode, len(rootsPtr))
 	for i, p := range rootsPtr {
-		roots[i] = *p
+		roots[i] = assemble(p)
 	}
 	return roots, nil
 }
