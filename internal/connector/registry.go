@@ -3,22 +3,24 @@ package connector
 import (
 	"fmt"
 	"sort"
+	"strings"
 )
 
 // drivers 全局驱动注册表，key = protocol。
 var drivers = make(map[string]*Driver)
 
-// Register 登记一个 Driver。Protocol 必须非空，否则 panic。
+// Register 登记一个 Driver。Protocol 必须非空，否则 panic。注册 key 统一小写，
+// 使 Get 大小写不敏感（资产录入/前端可能传混合大小写协议名）。
 func Register(d *Driver) {
 	if d == nil || d.Protocol == "" {
 		panic("connector: Driver 必须提供非空 Protocol")
 	}
-	drivers[d.Protocol] = d
+	drivers[strings.ToLower(d.Protocol)] = d
 }
 
-// Get 按 protocol 查询 Driver；未注册返回 nil。
+// Get 按 protocol 查询 Driver（大小写不敏感）；未注册返回 nil。
 func Get(protocol string) *Driver {
-	return drivers[protocol]
+	return drivers[strings.ToLower(protocol)]
 }
 
 // List 返回所有已注册 Driver，按 Name 排序（供前端 ListDrivers）。

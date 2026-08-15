@@ -111,8 +111,8 @@ func main() {
 		}
 		return meta.Protocol
 	})
-	// 数据库执行器解析：jdbc 资产供 AI 的 execute_sql 工具使用。
-	sessionManager.SetDbExecutorResolver(resolver.DbFor)
+	// 连接能力解析：数据库资产经 connector 注册表构造 execute_sql 工具（DB 语义由驱动 SkillPack 提供）。
+	sessionManager.SetCapabilityResolver(resolver.ConnFor)
 
 	// SFTP 管理器：按 hostID 懒建立/复用连接，应用退出时关闭。
 	// hostFor 由 resolver.HostFor 提供（仅 SSH，WinRM 返回错误）。

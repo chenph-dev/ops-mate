@@ -75,3 +75,13 @@ func TestRegisterPanicsOnEmptyProtocol(t *testing.T) {
 	}()
 	Register(&Driver{Protocol: ""})
 }
+
+func TestGet_CaseInsensitive(t *testing.T) {
+	Register(&Driver{Protocol: "MixedCaseProto", Name: "CS"})
+	if Get("mixedcaseproto") == nil {
+		t.Fatal("Get 应大小写不敏感（小写查询）")
+	}
+	if Get("MIXEDCASEPROTO") == nil {
+		t.Fatal("Get 应大小写不敏感（大写查询）")
+	}
+}

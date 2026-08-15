@@ -153,6 +153,17 @@ func ToolCallResponse(cmd string) *schema.Message {
 	}})
 }
 
+// ToolCallResponseSQL 构造一条带 execute_sql tool_call 的 assistant 回复。
+func ToolCallResponseSQL(sql string) *schema.Message {
+	return schema.AssistantMessage("", []schema.ToolCall{{
+		ID: "call_sql_1", Type: "function",
+		Function: schema.FunctionCall{
+			Name:      "execute_sql",
+			Arguments: `{"sql":"` + sql + `","why":"诊断"}`,
+		},
+	}})
+}
+
 // WaitFor 轮询等待条件成立（超时则 Fail）。
 func WaitFor(t *testing.T, cond func() bool, what string) {
 	t.Helper()

@@ -40,10 +40,10 @@ func AssessRisk(command string) string {
 }
 
 // AssessRiskForProtocol 按协议返回命令风险等级："" 无风险，"high" 危险。
-// protocol 为 "winrm" 时额外套用 Windows 危险模式；"jdbc" 走 SQL 语义。
+// protocol 为 "winrm" 时额外套用 Windows 危险模式；"jdbc"/"sql" 走 SQL 语义。
 func AssessRiskForProtocol(command, protocol string) string {
 	c := strings.TrimSpace(command)
-	if strings.EqualFold(protocol, "jdbc") {
+	if strings.EqualFold(protocol, "jdbc") || strings.EqualFold(protocol, "sql") {
 		risk, _ := classifySQL(c)
 		if risk == "high" {
 			return "high"
@@ -145,9 +145,9 @@ func Classify(command string, readOnlyWhitelist []string) (string, Action) {
 // ClassifyForProtocol 按协议综合分类：返回风险等级（"high"/"read"/"write"）与建议动作。
 // readOnlyWhitelist 为空时回退协议对应的内置默认白名单。
 // 高危命令永远 approve；只读命中 auto；其余 write → approve。
-// jdbc 协议按 SQL 关键字语义分类（只读查询 auto、高危 DDL approve、其余写 approve）。
+// jdbc/sql 协议按 SQL 关键字语义分类（只读查询 auto、高危 DDL approve、其余写 approve）。
 func ClassifyForProtocol(command string, readOnlyWhitelist []string, protocol string) (string, Action) {
-	if strings.EqualFold(protocol, "jdbc") {
+	if strings.EqualFold(protocol, "jdbc") || strings.EqualFold(protocol, "sql") {
 		return classifySQL(command)
 	}
 	if AssessRiskForProtocol(command, protocol) == "high" {

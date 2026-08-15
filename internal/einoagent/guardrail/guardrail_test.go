@@ -207,3 +207,28 @@ func TestAssessRiskForProtocol_Jdbc(t *testing.T) {
 		t.Error("jdbc 不应套用 shell 危险模式")
 	}
 }
+
+func TestClassifyForProtocol_SQLProtocol(t *testing.T) {
+	cases := []struct {
+		sql    string
+		risk   string
+		action Action
+	}{
+		{"SELECT * FROM users", "read", ActionAuto},
+		{"DROP TABLE users", "high", ActionApprove},
+		{"UPDATE users SET name='x'", "write", ActionApprove},
+	}
+	for _, c := range cases {
+		risk, action := ClassifyForProtocol(c.sql, nil, "sql")
+		if risk != c.risk || action != c.action {
+			t.Errorf("ClassifyForProtocol(%q, sql) = (%q,%q), want (%q,%q)",
+				c.sql, risk, action, c.risk, c.action)
+		}
+	}
+	if AssessRiskForProtocol("DROP TABLE users", "sql") != "high" {
+		t.Error("sql DROP 应判高风险")
+	}
+	if AssessRiskForProtocol("rm -rf /", "sql") != "" {
+		t.Error("sql 不应套用 shell 危险模式")
+	}
+}
