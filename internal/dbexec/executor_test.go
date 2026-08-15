@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 func TestDriverName(t *testing.T) {
@@ -31,7 +33,7 @@ func TestDriverName(t *testing.T) {
 
 func TestDSN(t *testing.T) {
 	e := NewExecutor(Host{Driver: "mysql", Addr: "10.0.0.5", Port: 3306, User: "root", Password: "p@ss", Database: "app"})
-	if got, want := e.dsn("mysql"), "root:p%40ss@tcp(10.0.0.5:3306)/app?parseTime=true"; got != want {
+	if got, want := e.dsn("mysql"), "root:p@ss@tcp(10.0.0.5:3306)/app?parseTime=true"; got != want {
 		t.Errorf("mysql dsn = %q, want %q", got, want)
 	}
 	// 特殊字符库名（中文/空格等）不应被 QueryEscape：go-sql-driver 只反转义
@@ -118,6 +120,20 @@ func TestParseSchema(t *testing.T) {
 	}
 	if _, err := parseSchema(nil); err == nil {
 		t.Error("parseSchema(nil) 应报错")
+	}
+}
+
+// TestDSN_PasswordRoundtrip 验证 DSN 构造后 go-sql-driver ParseDSN 能还原原始密码：
+// 转义往返必须正确，特殊字符密码（@ / % + 空格中文等）在测试连接时不被弄错。
+func TestDSN_PasswordRoundtrip(t *testing.T) {
+	orig := "p@ss/%+w 中"
+	e := NewExecutor(Host{Driver: "mysql", Addr: "10.0.0.5", Port: 3306, User: "root", Password: orig, Database: "app"})
+	cfg, err := mysql.ParseDSN(e.dsn("mysql"))
+	if err != nil {
+		t.Fatalf("ParseDSN: %v", err)
+	}
+	if cfg.Passwd != orig {
+		t.Errorf("密码往返失败: 还原密码 = %q, want %q", cfg.Passwd, orig)
 	}
 }
 
