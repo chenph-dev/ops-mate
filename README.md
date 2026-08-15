@@ -1,6 +1,6 @@
 # ops-mate
 
-**ops-mate** is a desktop application for SSH/WinRM server operations and automated ops management, built with [Wails v2](https://wails.io/) (Go backend + React/TypeScript frontend). It combines a classic SSH/SFTP/WinRM client with an **AI-powered ops agent** that can plan and execute troubleshooting or remediation tasks on your servers — with human approval at every step.
+**ops-mate** is a desktop application for SSH/WinRM/database server operations and automated ops management, built with [Wails v2](https://wails.io/) (Go backend + React/TypeScript frontend). It combines a classic SSH/SFTP/WinRM client with an **AI-powered ops agent** that can plan and execute troubleshooting or remediation tasks on your servers — with human approval at every step.
 
 ![ops-mate 主界面](images/home.png)
 
@@ -8,7 +8,7 @@
 
 ### 🖥️ Host Management
 - Organize hosts into a folder **tree** (create / rename / move / delete nodes)
-- Manage connection info for **SSH** and **WinRM** hosts (host, port, user, auth)
+- Manage **SSH / WinRM / database** connection assets (connection types — SSH, WinRM, MySQL, PostgreSQL, SQLite, etc. — are registry-driven; driver-specific params are entered via a schema-driven dynamic form)
 - **Test connection** before saving; run ad-hoc commands
 - Passwords/secrets are **encrypted at rest**
 
@@ -30,9 +30,14 @@
 - **Upload / download** with a concurrent queue
 - Per-task **progress** with pause / resume / cancel
 
+### 🗄️ Database Workbench
+- Connect to **MySQL / PostgreSQL / SQLite** (SQLite is a local file — no host/port/credentials needed)
+- **Schema tree** (tables / columns) + CodeMirror **SQL editor** + results grid
+- The AI agent operates database assets via the **`execute_sql`** tool — **every SQL statement is approved by you before it runs**
+
 ### 🤖 AI Ops Agent
 - Chat with an LLM agent that has a direct view of your selected host
-- **`execute_command` tool** — the agent proposes concrete **shell (SSH) / PowerShell (WinRM)** commands; **every command must be approved by you before it runs**
+- **Tools are assembled by asset type** — `execute_command` (shell/PowerShell for SSH/WinRM) and `execute_sql` (SQL queries/writes for database assets); **every command / SQL statement must be approved by you before it runs**
 - **Plan mode (`create_plan`)** — for complex multi-step tasks the agent first submits an execution plan (goal + step list) for your approval, then executes step by step
 - **Guardrails** — dangerous operations are flagged and always require explicit approval; protocol-aware patterns for **Linux** (`rm -rf /`, `dd`, `reboot`…) and **Windows** (`format`, `del /s`, `rd /s`, `diskpart clean`, `shutdown /s`…)
 - Conversation history per host, with rename / delete
@@ -46,7 +51,7 @@
 | Layer | Technology |
 |-------|-----------|
 | Shell | Wails v2 (Go + WebView2) |
-| Backend | Go, [eino](https://github.com/cloudwego/eino) agent framework, eino-ext model adapters, [masterzen/winrm](https://github.com/masterzen/winrm) (WinRM client) |
+| Backend | Go, [eino](https://github.com/cloudwego/eino) agent framework, eino-ext model adapters, [masterzen/winrm](https://github.com/masterzen/winrm) (WinRM client), database/sql drivers (mysql / postgres / sqlite) |
 | Storage | SQLite via `modernc.org/sqlite` (pure Go, no CGO) + GORM + golang-migrate |
 | Frontend | React 19, TypeScript, Vite, Ant Design 6, react-router-dom 7, xterm.js |
 
@@ -59,9 +64,10 @@
                                    │  Wails bindings (window.go)
 ┌──────────────────────────────────▼──────────────────────────────────┐
 │  Go Backend (Wails)                                                 │
-│  handlers: Hosts · Terminal · Sftp · Sessions · Rdp · AIConfig      │
+│  handlers: Hosts · Terminal · Sftp · Sessions · Rdp · Db · Connector│
+│  internal/connector: connection-type registry + capability interfaces│
 │  internal/einoagent: model(provider) · tools · session · guardrail  │
-│  internal executors: sshexec · winrmexec (Exec interface)           │
+│  internal executors: sshexec · winrmexec · dbexec                   │
 │  internal/store:     hosts · conversations · config · memory        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -99,10 +105,12 @@ wails build -platform darwin/universal
 ```
 ├── main.go                  # Wails app entry, binding
 ├── internal/
-│   ├── handler/             # Wails-bound API handlers (hosts, terminal, sftp, sessions, skills, logs, rdp, ai config, approval policy)
+│   ├── handler/             # Wails-bound API handlers (hosts, terminal, sftp, sessions, skills, logs, rdp, db, connector registry, ai config, approval policy)
+│   ├── connector/           # connection-type registry + capability interface abstraction (Driver / QueryRunner)
 │   ├── einoagent/           # AI agent (model/provider, tools, session, guardrail, prompt)
 │   ├── sshexec/             # SSH command executor (unified Exec interface)
 │   ├── winrmexec/           # WinRM command executor (same Exec interface)
+│   ├── dbexec/              # database executor (mysql / postgres / sqlite drivers)
 │   ├── sftp/                # SFTP transfer engine (concurrent queue)
 │   ├── skill/               # Ops skill management + remote script execution
 │   ├── termctx/             # Terminal context ring buffer (AI context injection)
