@@ -34,6 +34,12 @@ func TestDSN(t *testing.T) {
 	if got, want := e.dsn("mysql"), "root:p%40ss@tcp(10.0.0.5:3306)/app?parseTime=true"; got != want {
 		t.Errorf("mysql dsn = %q, want %q", got, want)
 	}
+	// 特殊字符库名（中文/空格等）不应被 QueryEscape：go-sql-driver 只反转义
+	// password、不反转义 dbname（路径段），转义会连到错误的库名报 Unknown database。
+	special := NewExecutor(Host{Driver: "mysql", Addr: "10.0.0.5", Port: 3306, User: "root", Password: "x", Database: "my db"})
+	if got, want := special.dsn("mysql"), "root:x@tcp(10.0.0.5:3306)/my db?parseTime=true"; got != want {
+		t.Errorf("mysql dsn 特殊字符库名 = %q, want %q（dbname 不应 URL 转义）", got, want)
+	}
 
 	pg := NewExecutor(Host{Driver: "postgres", Addr: "10.0.0.6", Port: 5432, User: "pg", Password: "p@ss/", Database: "db"})
 	got := pg.dsn("postgres")

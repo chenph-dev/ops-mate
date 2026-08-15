@@ -68,9 +68,11 @@ func (e *Executor) dsn(driver string) string {
 	case "sqlite":
 		return e.host.Database // 本地文件路径
 	default: // mysql
+		// 仅转义 password（go-sql-driver 会反转义）；dbname 是路径段、驱动不反转义，
+		// 转义会连到错误的库名（如中文/空格库名），必须原样拼接。
 		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true",
 			e.host.User, url.QueryEscape(e.host.Password), e.host.Addr, e.host.Port,
-			url.QueryEscape(e.host.Database))
+			e.host.Database)
 	}
 }
 
