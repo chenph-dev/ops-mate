@@ -27,6 +27,12 @@ export default function DbPanel({
 }: DbPanelProps): React.JSX.Element {
   const { t } = useTranslation('hosts');
   const { t: tt } = useTranslation('terminal');
+  const params = (host.params ?? {}) as Record<string, unknown>;
+  // 展示：SQLite（本地文件）→ 文件路径；mysql/postgres → user@addr:port/database
+  const dbLabel =
+    typeof params.filePath === 'string' && params.filePath
+      ? `${host.protocol} · ${params.filePath}`
+      : `${host.protocol} · ${host.user}@${host.addr}:${host.port}/${String(params.database ?? '')}`;
   const [sql, setSql] = useState('');
   const [result, setResult] = useState<DBResult | null>(null);
   const [error, setError] = useState('');
@@ -137,7 +143,7 @@ export default function DbPanel({
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <Typography.Text strong>{host.name}</Typography.Text>
         <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          {host.driver} / {host.user}@{host.addr}:{host.port}/{host.database}
+          {dbLabel}
         </Typography.Text>
         <Tooltip title={t('db.refreshSchema')}>
           <Button size="small" icon={<ReloadOutlined />} onClick={() => void loadSchema()} />

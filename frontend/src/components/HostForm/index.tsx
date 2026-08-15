@@ -2,7 +2,8 @@ import { Modal, Form, Input, InputNumber, Select, message, Row, Col } from 'antd
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
-import type { hoststore } from '@wailsjs/go/models';
+import type { hoststore, connector } from '@wailsjs/go/models';
+import { useConnectors } from '@/hooks/useConnectors';
 
 type HostInput = hoststore.HostInput;
 
@@ -25,9 +26,27 @@ const defaultValues: HostInput = {
   autoApprove: 'inherit',
   protocol: 'ssh',
   rdpPort: 3389,
-  driver: 'mysql',
-  database: '',
+  params: {},
 };
+
+// 按参数 schema 类型渲染控件。
+function ParamControl({ p }: { p: connector.ParamSchema }): React.JSX.Element {
+  switch (p.type) {
+    case 'int':
+      return <InputNumber style={{ width: '100%' }} placeholder={p.placeholder} />;
+    case 'secret':
+      return <Input.Password placeholder={p.placeholder} />;
+    case 'select':
+      return (
+        <Select
+          options={(p.options ?? []).map((o) => ({ label: o.label, value: o.value }))}
+          placeholder={p.placeholder}
+        />
+      );
+    default: // string / file
+      return <Input placeholder={p.placeholder} />;
+  }
+}
 
 export default function HostForm({
   open,
@@ -42,12 +61,23 @@ export default function HostForm({
   const authType = Form.useWatch('authType', form);
   const protocol = Form.useWatch('protocol', form);
   const { t } = useTranslation('hosts');
+  const { drivers } = useConnectors();
   const itemStyle: CSSProperties = { marginBottom: 12 };
   const secretIsKey = protocol === 'ssh' && authType === 'privatekey';
 
+  // 当前协议的注册表驱动（无则 ssh/winrm 或未知）
+  const selectedDriver = drivers.find((d) => d.protocol === protocol);
+  const needsHost = selectedDriver?.needsHost ?? true;
+  // 协议下拉：静态 ssh/winrm + 注册表驱动
+  const protocolOptions = [
+    { label: t('form.protocolSsh'), value: 'ssh' },
+    { label: t('form.protocolWinrm'), value: 'winrm' },
+    ...drivers.map((d) => ({ label: d.name, value: d.protocol })),
+  ];
+
   const handleSubmit = async (): Promise<void> => {
     const values = await form.validateFields();
-    if (values.protocol === 'winrm' || values.protocol === 'jdbc') {
+    if (values.protocol !== 'ssh') {
       values.authType = 'password';
     }
     setSubmitting(true);
@@ -64,8 +94,7 @@ export default function HostForm({
 
   const handleTest = async (): Promise<void> => {
     const values = await form.validateFields();
-    // 编辑模式：secret 留空表示不修改，测试连接需要真实凭据，提示先输入
-    if (initialValues && !values.secret) {
+    if (initialValues && !values.secret && needsHost) {
       message.warning(t('form.testNeedSecret'));
       return;
     }
@@ -81,6 +110,23 @@ export default function HostForm({
       message.error(t('form.testError', { err: String(e) }));
     } finally {
       setTesting(false);
+    }
+  };
+
+  // 协议切换：先清空上一协议的专属参数，避免陈旧值随提交泄漏；ssh/winrm/DB 设置或清空端口
+  const onProtocolChange = (value: string): void => {
+    form.resetFields(['params']);
+    if (value === 'winrm') {
+      form.setFieldsValue({
+        port: 5985,
+        rdpPort: form.getFieldValue('rdpPort') || 3389,
+      });
+    } else if (value === 'ssh') {
+      form.setFieldsValue({ port: 22 });
+    } else {
+      // 数据库驱动默认端口（sqlite 无端口，NeedsHost=false 隐藏）
+      const portMap: Record<string, number> = { mysql: 3306, postgres: 5432 };
+      form.setFieldsValue({ port: portMap[value] ?? undefined });
     }
   };
 
@@ -108,111 +154,96 @@ export default function HostForm({
               rules={[{ required: true, message: t('form.nameRequired') }]}
               style={itemStyle}
             >
-              <Input placeholder="web-01" />
+              <Input placeholder="web-01 / app.db" />
             </Form.Item>
           </Col>
           <Col span={12}>
             <Form.Item name="protocol" label={t('form.protocol')} style={itemStyle}>
-              <Select
-                options={[
-                  { label: t('form.protocolSsh'), value: 'ssh' },
-                  { label: t('form.protocolWinrm'), value: 'winrm' },
-                  { label: t('form.protocolJdbc'), value: 'jdbc' },
-                ]}
-                onChange={(value) => {
-                  if (value === 'winrm') {
-                    form.setFieldsValue({
-                      port: 5985,
-                      rdpPort: form.getFieldValue('rdpPort') || 3389,
-                    });
-                  } else if (value === 'jdbc') {
-                    const drv = form.getFieldValue('driver') || 'mysql';
-                    form.setFieldsValue({ port: drv === 'postgres' ? 5432 : 3306 });
-                  } else {
-                    form.setFieldsValue({ port: 22 });
-                  }
-                }}
-              />
+              <Select options={protocolOptions} onChange={onProtocolChange} />
             </Form.Item>
           </Col>
-          <Col span={12}>
-            <Form.Item
-              name="addr"
-              label={t('form.addr')}
-              rules={[{ required: true, message: t('form.addrRequired') }]}
-              style={itemStyle}
-            >
-              <Input placeholder="10.0.0.1 或 example.com" />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              name="port"
-              label={protocol === 'winrm' ? t('form.winrmPort') : t('form.port')}
-              rules={[{ required: true, message: t('form.portRequired') }]}
-              style={itemStyle}
-            >
-              <InputNumber min={1} max={65535} style={{ width: '100%' }} />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              name="user"
-              label={t('form.user')}
-              rules={[{ required: true, message: t('form.userRequired') }]}
-              style={itemStyle}
-            >
-              <Input placeholder="root" />
-            </Form.Item>
-          </Col>
-          {protocol === 'ssh' && (
-            <Col span={12}>
-              <Form.Item
-                name="authType"
-                label={t('form.authType')}
-                rules={[{ required: true }]}
-                style={itemStyle}
-              >
-                <Select
-                  options={[
-                    { label: t('form.password'), value: 'password' },
-                    { label: t('form.privateKey'), value: 'privatekey' },
-                  ]}
-                />
-              </Form.Item>
-            </Col>
-          )}
-          <Col span={secretIsKey ? 24 : 12}>
-            <Form.Item
-              name="secret"
-              label={
-                protocol === 'winrm' || authType !== 'privatekey'
-                  ? t('form.password')
-                  : t('form.privateKey')
-              }
-              rules={[{ required: !initialValues, message: t('form.secretRequired') }]}
-              style={itemStyle}
-            >
-              {protocol === 'winrm' || authType !== 'privatekey' ? (
-                <Input.Password
-                  placeholder={
-                    initialValues
-                      ? t('form.keepPasswordPlaceholder')
-                      : t('form.passwordPlaceholder')
-                  }
-                />
-              ) : (
-                <Input.TextArea
-                  rows={3}
-                  placeholder={
-                    initialValues
-                      ? t('form.keepSecretPlaceholder')
-                      : '-----BEGIN RSA PRIVATE KEY-----...'
-                  }
-                />
+          {needsHost && (
+            <>
+              <Col span={12}>
+                <Form.Item
+                  name="addr"
+                  label={t('form.addr')}
+                  rules={[{ required: true, message: t('form.addrRequired') }]}
+                  style={itemStyle}
+                >
+                  <Input placeholder="10.0.0.1 或 example.com" />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="port"
+                  label={protocol === 'winrm' ? t('form.winrmPort') : t('form.port')}
+                  rules={[{ required: true, message: t('form.portRequired') }]}
+                  style={itemStyle}
+                >
+                  <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+                </Form.Item>
+              </Col>
+              <Col span={12}>
+                <Form.Item
+                  name="user"
+                  label={t('form.user')}
+                  rules={[{ required: true, message: t('form.userRequired') }]}
+                  style={itemStyle}
+                >
+                  <Input placeholder="root" />
+                </Form.Item>
+              </Col>
+              {protocol === 'ssh' && (
+                <Col span={12}>
+                  <Form.Item
+                    name="authType"
+                    label={t('form.authType')}
+                    rules={[{ required: true }]}
+                    style={itemStyle}
+                  >
+                    <Select
+                      options={[
+                        { label: t('form.password'), value: 'password' },
+                        { label: t('form.privateKey'), value: 'privatekey' },
+                      ]}
+                    />
+                  </Form.Item>
+                </Col>
               )}
-            </Form.Item>
-          </Col>
+              <Col span={secretIsKey ? 24 : 12}>
+                <Form.Item
+                  name="secret"
+                  label={
+                    protocol !== 'ssh' || authType !== 'privatekey'
+                      ? t('form.password')
+                      : t('form.privateKey')
+                  }
+                  rules={[{ required: !initialValues, message: t('form.secretRequired') }]}
+                  style={itemStyle}
+                >
+                  {protocol !== 'ssh' || authType !== 'privatekey' ? (
+                    <Input.Password
+                      placeholder={
+                        initialValues
+                          ? t('form.keepPasswordPlaceholder')
+                          : t('form.passwordPlaceholder')
+                      }
+                    />
+                  ) : (
+                    <Input.TextArea
+                      rows={3}
+                      placeholder={
+                        initialValues
+                          ? t('form.keepSecretPlaceholder')
+                          : '-----BEGIN RSA PRIVATE KEY-----...'
+                      }
+                    />
+                  )}
+                </Form.Item>
+              </Col>
+            </>
+          )}
           {protocol === 'winrm' && (
             <Col span={12}>
               <Form.Item
@@ -225,45 +256,26 @@ export default function HostForm({
               </Form.Item>
             </Col>
           )}
-          {protocol === 'jdbc' && (
-            <Col span={12}>
+          {/* 注册表驱动的专属参数：按 schema 动态渲染到 params.<key> */}
+          {selectedDriver?.params.map((p) => (
+            <Col span={12} key={p.key}>
               <Form.Item
-                name="driver"
-                label={t('form.driver')}
-                rules={[{ required: true, message: t('form.driverRequired') }]}
+                name={['params', p.key]}
+                label={p.label || p.key}
+                rules={[{ required: !!p.required }]}
                 style={itemStyle}
               >
-                <Select
-                  options={[
-                    { label: 'MySQL', value: 'mysql' },
-                    { label: 'PostgreSQL', value: 'postgres' },
-                  ]}
-                  onChange={(value) => {
-                    form.setFieldsValue({ port: value === 'postgres' ? 5432 : 3306 });
-                  }}
-                />
+                <ParamControl p={p} />
               </Form.Item>
             </Col>
-          )}
-          {protocol === 'jdbc' && (
-            <Col span={12}>
-              <Form.Item
-                name="database"
-                label={t('form.database')}
-                rules={[{ required: true, message: t('form.databaseRequired') }]}
-                style={itemStyle}
-              >
-                <Input placeholder="app_db" />
-              </Form.Item>
-            </Col>
-          )}
+          ))}
           <Col span={24}>
-            <Form.Item name="autoApprove" label="自动放行只读命令" style={itemStyle}>
+            <Form.Item name="autoApprove" label={t('form.autoApproveLabel')} style={itemStyle}>
               <Select
                 options={[
-                  { label: '继承全局设置', value: 'inherit' },
-                  { label: '允许（覆盖为开启）', value: 'on' },
-                  { label: '禁止（覆盖为关闭）', value: 'off' },
+                  { label: t('form.autoApproveInherit'), value: 'inherit' },
+                  { label: t('form.autoApproveOn'), value: 'on' },
+                  { label: t('form.autoApproveOff'), value: 'off' },
                 ]}
               />
             </Form.Item>

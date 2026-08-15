@@ -12,6 +12,7 @@ import {
 import { useState, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { hoststore } from '@wailsjs/go/models';
+import { useConnectors } from '@/hooks/useConnectors';
 
 type TreeNode = hoststore.TreeNode;
 
@@ -159,6 +160,7 @@ export default function HostList({
 }: HostListProps): React.JSX.Element {
   const { token } = theme.useToken();
   const { t } = useTranslation('hosts');
+  const { isDB } = useConnectors();
   const [contextMenu, setContextMenu] = useState<{
     node: TreeNode;
     x: number;
@@ -181,7 +183,7 @@ export default function HostList({
               {n.name}
               {n.protocol === 'winrm' ? (
                 <span style={{ fontSize: 10, padding: '0 4px', borderRadius: 3, background: token.colorPrimaryBg, color: token.colorPrimary }}>WinRM</span>
-              ) : n.protocol === 'jdbc' ? (
+              ) : isDB(n.protocol) ? (
                 <span style={{ fontSize: 10, padding: '0 4px', borderRadius: 3, background: token.colorSuccessBg, color: token.colorSuccess }}>DB</span>
               ) : (
                 <span style={{ fontSize: 10, padding: '0 4px', borderRadius: 3, background: token.colorFillSecondary, color: token.colorTextSecondary }}>SSH</span>
@@ -198,7 +200,7 @@ export default function HostList({
         data: n,
       }));
     return convert(treeData);
-  }, [treeData, token]);
+  }, [treeData, token, isDB]);
 
   const handleRightClick = useCallback(
     ({ event, node }: { event: React.MouseEvent; node: TreeNodeData }) => {
@@ -329,7 +331,7 @@ export default function HostList({
             onSftp(contextMenu.node);
             setContextMenu(null);
           }}
-          showSftp={contextMenu.node.protocol !== 'winrm' && contextMenu.node.protocol !== 'jdbc'}
+          showSftp={contextMenu.node.protocol !== 'winrm' && !isDB(contextMenu.node.protocol)}
         />
       )}
     </div>

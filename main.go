@@ -16,6 +16,7 @@ import (
 	"ops-mate/internal/handler/aiconfig"
 	"ops-mate/internal/handler/approvalpolicy"
 	"ops-mate/internal/handler/base"
+	connectorhandler "ops-mate/internal/handler/connector"
 	"ops-mate/internal/handler/db"
 	"ops-mate/internal/handler/hosts"
 	"ops-mate/internal/handler/logs"
@@ -165,6 +166,7 @@ func main() {
 			logs.NewLogsHandler(logsStore),
 			rdp.NewRdpHandler(hostsStore),
 			db.NewDbHandler(resolver),
+			connectorhandler.NewConnectorHandler(),
 		},
 	})
 

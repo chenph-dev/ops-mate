@@ -44,9 +44,9 @@ type HostInput struct {
 	AutoApprove string `json:"autoApprove"` // inherit | on | off
 	Protocol    string         `json:"protocol"`
 	RdpPort     int            `json:"rdpPort"`
-	Driver      string         `json:"driver"`   // 兼容层（M6 前），归一化时并入 Protocol/Params
-	Database    string         `json:"database"` // 兼容层（M6 前），归一化时并入 Params
-	Params      map[string]any `json:"params"`
+	Driver      string         `json:"driver,omitempty"`   // 兼容层（M6 后前端不再传），归一化时并入 Protocol/Params
+	Database    string         `json:"database,omitempty"` // 兼容层（M6 后前端不再传），归一化时并入 Params
+	Params      map[string]any `json:"params,omitempty"`
 }
 
 // HostMeta 资产列表项（不含凭据）。

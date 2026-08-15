@@ -5,6 +5,7 @@ import type { hoststore } from '@wailsjs/go/models';
 
 type TreeNode = hoststore.TreeNode;
 type HostInput = hoststore.HostInput;
+import { useConnectors } from '@/hooks/useConnectors';
 import { useHosts } from '@/hooks/useHosts';
 import { useSessions } from '@/hooks/useSessions';
 import { useThemeToggle } from '@/context/ThemeContext';
@@ -32,8 +33,7 @@ function toHostInput(node: TreeNode): HostInput {
     autoApprove: node.autoApprove ?? 'inherit',
     protocol: node.protocol ?? 'ssh',
     rdpPort: node.rdpPort ?? 3389,
-    driver: node.driver ?? 'mysql',
-    database: node.database ?? '',
+    params: node.params ?? {},
   };
 }
 
@@ -46,6 +46,7 @@ export default function HostsPage(): React.JSX.Element {
   const { isDark } = useThemeToggle();
   const { t } = useTranslation('hosts');
   const { t: tc } = useTranslation('common');
+  const { isDB } = useConnectors();
   const {
     tree,
     addHost,
@@ -82,12 +83,10 @@ export default function HostsPage(): React.JSX.Element {
   const activeTab =
     terminal.tabs.find((t) => t.key === terminal.activeKey) ?? null;
   const activeHostID =
-    activeTab?.hostID ??
     (panelHost &&
-    (panelHost.protocol === 'winrm' || panelHost.protocol === 'jdbc')
+    (panelHost.protocol === 'winrm' || isDB(panelHost.protocol))
       ? panelHost.id
-      : null) ??
-    null;
+      : activeTab?.hostID) ?? null;
   const sessions = useSessions(activeHostID);
 
   // 分隔条左右拖动调整左侧资产列表宽度，实时持久化。
@@ -153,7 +152,7 @@ export default function HostsPage(): React.JSX.Element {
   // 双击/连接入口：按协议分流。SSH 走多标签终端，WinRM 走命令执行器面板。
   const openHost = (node: TreeNode): void => {
     setSelectedHost(node);
-    if (node.protocol === 'winrm' || node.protocol === 'jdbc') {
+    if (node.protocol === 'winrm' || isDB(node.protocol)) {
       setPanelHost(node);
       setView('terminal');
       return;
@@ -339,19 +338,19 @@ export default function HostsPage(): React.JSX.Element {
               minWidth: 0,
             }}
           >
-            {panelHost.protocol === 'jdbc' ? (
-              <DbPanel
-                host={panelHost}
-                aiCollapsed={aiCollapsed}
-                onToggleAI={() => setAiCollapsed(!aiCollapsed)}
-              />
-            ) : (
+            {panelHost.protocol === 'winrm' ? (
               <WinRmPanel
                 host={panelHost}
                 aiCollapsed={aiCollapsed}
                 onToggleAI={() => setAiCollapsed(!aiCollapsed)}
               />
-            )}
+            ) : isDB(panelHost.protocol) ? (
+              <DbPanel
+                host={panelHost}
+                aiCollapsed={aiCollapsed}
+                onToggleAI={() => setAiCollapsed(!aiCollapsed)}
+              />
+            ) : null}
             <AIPanel
               {...aiPanelProps}
               sshConnected={true}
