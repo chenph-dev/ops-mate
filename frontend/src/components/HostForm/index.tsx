@@ -30,21 +30,49 @@ const defaultValues: HostInput = {
 };
 
 // 按参数 schema 类型渲染控件。
-function ParamControl({ p }: { p: connector.ParamSchema }): React.JSX.Element {
+// 必须接收并转发 Form.Item 注入的 value/onChange：Form.Item 通过 cloneElement
+// 给直接子元素注入这两个 props，若自定义组件丢弃它们，用户输入不会写回表单
+// store，触发 required 校验失败（现象：填了值仍提示非空）。
+function ParamControl({
+  p,
+  value,
+  onChange,
+}: {
+  p: connector.ParamSchema;
+  value?: unknown;
+  onChange?: (...args: any[]) => void;
+}): React.JSX.Element {
   switch (p.type) {
     case 'int':
-      return <InputNumber style={{ width: '100%' }} placeholder={p.placeholder} />;
+      return (
+        <InputNumber
+          style={{ width: '100%' }}
+          placeholder={p.placeholder}
+          value={value as number}
+          onChange={onChange}
+        />
+      );
     case 'secret':
-      return <Input.Password placeholder={p.placeholder} />;
+      return (
+        <Input.Password
+          placeholder={p.placeholder}
+          value={value as string}
+          onChange={onChange}
+        />
+      );
     case 'select':
       return (
         <Select
           options={(p.options ?? []).map((o) => ({ label: o.label, value: o.value }))}
           placeholder={p.placeholder}
+          value={value as string}
+          onChange={onChange}
         />
       );
     default: // string / file
-      return <Input placeholder={p.placeholder} />;
+      return (
+        <Input placeholder={p.placeholder} value={value as string} onChange={onChange} />
+      );
   }
 }
 
