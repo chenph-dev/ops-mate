@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,15 @@ import (
 	"ops-mate/internal/sshexec"
 	convstore "ops-mate/internal/store/conversations"
 )
+
+// scriptNameRe 脚本名严格白名单：仅字母数字与 . _ -，杜绝 shell 元字符注入。
+var scriptNameRe = regexp.MustCompile(`^[A-Za-z0-9._-]+$`)
+
+// shellQuote 把参数转义为 shell 单引号字面量（' → '\''），
+// 保证参数不被远端 shell 解释为命令/管道/命令替换。
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
 
 // SkillTools 提供 load_skill / run_skill_script 两个技能工具。
 type SkillTools struct {
@@ -55,8 +65,8 @@ func NewSkillTools(
 		return string(data), nil
 	}
 	t.scriptPath = func(s *skill.Skill, name string) (string, error) {
-		if name == "" || strings.ContainsAny(name, `/\`) {
-			return "", fmt.Errorf("脚本名非法: %q", name)
+		if !scriptNameRe.MatchString(name) {
+			return "", fmt.Errorf("脚本名非法（仅允许字母/数字/._-）: %q", name)
 		}
 		p := filepath.Join(s.Dir, "scripts", name)
 		if _, err := os.Stat(p); err != nil {
@@ -110,7 +120,7 @@ func (x *skillTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"skillName": {Type: schema.String, Desc: "技能名称", Required: true},
 			"script":    {Type: schema.String, Desc: "scripts/ 下的脚本文件名", Required: true},
-			"args":      {Type: schema.String, Desc: "传给脚本的命令行参数"},
+			"args":      {Type: schema.String, Desc: "传给脚本的命令行参数（作为单个参数安全转义传入，空格/引号不会被 shell 拆分，多参数请用 --opt=val 形式）"},
 			"why":       {Type: schema.String, Desc: "执行原因"},
 		}),
 	}, nil
@@ -220,7 +230,11 @@ func (t *SkillTools) executeScript(ctx context.Context, s *skill.Skill, scriptPa
 	b64 := base64.StdEncoding.EncodeToString(content)
 	writeCmd := fmt.Sprintf("mkdir -p %s && printf '%%s' '%s' | base64 -d > %s && chmod +x %s",
 		tmpDir, b64, remoteScript, remoteScript)
-	runCmd := strings.TrimSpace(remoteScript + " " + args.Args)
+	// args 单引号转义为单个字面量参数，分号/管道/命令替换不得被远端 shell 解释。
+	runCmd := remoteScript
+	if strings.TrimSpace(args.Args) != "" {
+		runCmd += " " + shellQuote(args.Args)
+	}
 
 	execCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()

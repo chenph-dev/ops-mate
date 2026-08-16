@@ -137,3 +137,50 @@ func TestSkillTools_ExecuteScriptUploadsAndRuns(t *testing.T) {
 		t.Errorf("第二条命令应为执行脚本: %q", cmds[1])
 	}
 }
+
+// 恶意技能 ZIP 的脚本名若含 shell 元字符（x; rm -rf .），必须被 scriptPath
+// 白名单拒绝，不能命中后拼进 shell 命令执行。
+func TestSkillTools_RunScriptShellMetaNameRejected(t *testing.T) {
+	s := skillWithScripts(t, "---\nname: disk-analysis\n---\n",
+		map[string]string{"x; rm -rf .": "#!/bin/bash\necho ok"})
+	st := NewSkillTools("s1", nil, nil, nil, NewToolCallHolder(),
+		func(name string) (*skill.Skill, error) { return s, nil })
+	got, err := st.runSkillScript(context.Background(),
+		`{"skillName":"disk-analysis","script":"x; rm -rf .","args":""}`)
+	if err != nil {
+		t.Fatalf("不应返回 error: %v", err)
+	}
+	if !strings.Contains(got, "非法") {
+		t.Errorf("含 shell 元字符的脚本名应被拒绝，得到: %q", got)
+	}
+}
+
+// run_skill_script 的 args 必须被 shell 单引号转义为字面量，
+// 分号/命令替换等不得被远端 shell 解释。
+func TestSkillTools_ExecuteScriptArgsShellQuoted(t *testing.T) {
+	s := skillWithScripts(t, "---\nname: disk-analysis\n---\n",
+		map[string]string{"check.sh": "#!/bin/bash\nls -la"})
+	ex := &testutil.FakeExec{Lines: []sshexec.Line{{Stream: "stdout", Text: "out"}}}
+	holder := NewToolCallHolder()
+	holder.Add(&schema.ToolCall{ID: "call_1", Function: schema.FunctionCall{Name: "run_skill_script"}})
+	st := NewSkillTools("s1", ex, nil, nil, holder,
+		func(name string) (*skill.Skill, error) { return s, nil })
+
+	scriptPath, _ := st.scriptPath(s, "check.sh")
+	_, err := st.executeScript(context.Background(), s, scriptPath,
+		scriptArgs{SkillName: "disk-analysis", Script: "check.sh", Args: "--path=/tmp/x; rm -rf /"}, "")
+	if err != nil {
+		t.Fatalf("executeScript: %v", err)
+	}
+	cmds := ex.Commands()
+	if len(cmds) < 2 {
+		t.Fatalf("应执行 2 条命令（上传+执行），得到 %d: %v", len(cmds), cmds)
+	}
+	runCmd := cmds[len(cmds)-1]
+	if !strings.Contains(runCmd, "'--path=/tmp/x; rm -rf /'") {
+		t.Errorf("args 应被单引号包裹为字面量，得到: %q", runCmd)
+	}
+	if !strings.Contains(runCmd, "'") {
+		t.Errorf("runCmd 应含引号转义: %q", runCmd)
+	}
+}
