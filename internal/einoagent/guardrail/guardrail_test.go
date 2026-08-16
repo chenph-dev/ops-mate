@@ -239,3 +239,67 @@ func TestClassifyForProtocol_SQLProtocol(t *testing.T) {
 		t.Error("sql 不应套用 shell 危险模式")
 	}
 }
+
+// SQL 护栏不得被注释/空白变体绕过：INTO/**/OUTFILE、FOR\tUPDATE 等
+// 必须降级为人工审批，不能自动放行。
+func TestClassifyForProtocol_SQLCommentBypass(t *testing.T) {
+	cases := []struct {
+		sql    string
+		risk   string
+		action Action
+	}{
+		{"SELECT 1 INTO/**/OUTFILE '/tmp/x'", "write", ActionApprove},
+		{"SELECT 1 INTO\tOUTFILE '/tmp/x'", "write", ActionApprove},
+		{"SELECT 1 INTO\nOUTFILE '/tmp/x'", "write", ActionApprove},
+		{"SELECT LOAD/**/FILE('/etc/passwd')", "write", ActionApprove},
+		{"SELECT * FROM users FOR/**/UPDATE", "write", ActionApprove},
+		{"SELECT * FROM users FOR\tUPDATE", "write", ActionApprove},
+		{"SEL/**/ECT 1 INTO OUTFILE '/tmp/x'", "write", ActionApprove}, // 关键字内注释
+		{"SELECT 1 -- 普通行注释\n", "read", ActionAuto},               // 正常行注释保持只读
+		{"SELECT 1 /* 普通块注释 */", "read", ActionAuto},              // 正常块注释保持只读
+		{"SELECT 1; -- 尾随注释", "write", ActionApprove},              // 剥离注释后真分号仍判审批
+		{"SELECT 1 /*;*/", "read", ActionAuto},                         // 注释内分号不误报
+	}
+	for _, c := range cases {
+		risk, action := ClassifyForProtocol(c.sql, nil, "sql")
+		if risk != c.risk || action != c.action {
+			t.Errorf("ClassifyForProtocol(%q, sql) = (%q,%q), want (%q,%q)",
+				c.sql, risk, action, c.risk, c.action)
+		}
+	}
+}
+
+// 只读命令自动放行不得触及凭据/密钥文件：命中白名单但参数含敏感路径 → 降级审批。
+func TestIsReadOnlyCommand_SensitiveArgs(t *testing.T) {
+	cases := []struct {
+		cmd  string
+		want bool
+	}{
+		{"cat /etc/shadow", false},          // 口令文件
+		{"cat /etc/sh\\adow", false},        // 反斜杠转义绕过
+		{"cat /etc/sh''adow", false},        // 空引号拼接绕过
+		{"cat ~/.ssh/id_rsa", false},        // SSH 私钥
+		{"cat /root/.ssh/authorized_keys", false},
+		{"ls -la /root/.ssh", false},        // 敏感目录
+		{"cat /root/.kube/config", false},   // kubeconfig
+		{"cat /root/.aws/credentials", false},
+		{"grep secret /home/u/.env", false}, // .env 凭据文件
+		{"cat /etc/hosts", true},            // 非敏感路径
+		{"cat /var/log/app.log", true},      // 日志正常读
+		{"ls -la /var/log", true},
+	}
+	for _, c := range cases {
+		if got := IsReadOnlyCommand(c.cmd, DefaultReadOnlyCommands); got != c.want {
+			t.Errorf("IsReadOnlyCommand(%q) = %v, want %v", c.cmd, got, c.want)
+		}
+	}
+}
+
+// env 直接从默认白名单移除：输出全部环境变量（可能含密钥），不应自动放行。
+func TestDefaultReadOnlyCommands_NoEnv(t *testing.T) {
+	for _, w := range DefaultReadOnlyCommands {
+		if w == "env" {
+			t.Error("默认只读白名单不应包含 env（直接泄露全部环境变量）")
+		}
+	}
+}

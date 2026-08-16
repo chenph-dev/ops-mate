@@ -32,6 +32,27 @@ var windowsDangerPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)(?:\bdiskpart\b|\bselect\s+disk\b)[\s\S]*\bclean\b`),
 }
 
+// sqlCommentBlockRe / sqlCommentLineRe 用于归一化前剥离 SQL 注释，
+// 防止 INTO/**/OUTFILE、FOR\tUPDATE、LOAD/**/FILE 等注释/空白变体绕过危险模式判定。
+var (
+	sqlCommentBlockRe = regexp.MustCompile(`(?s)/\*.*?\*/`)
+	sqlCommentLineRe  = regexp.MustCompile(`(?m)--.*$|(?m)#.*$`)
+)
+
+// sensitiveReadPatterns 只读命令参数命中任一即降级为人工审批。
+// 聚焦凭据/密钥/认证信息文件，避免自动放行把敏感内容读出来回灌模型。
+var sensitiveReadPatterns = []string{
+	"/etc/shadow", "/etc/passwd", "/etc/security",
+	"/var/run/secrets", "/run/secrets",
+	".ssh", "id_rsa", "id_ed25519", "authorized_keys", "known_hosts",
+	"kubeconfig", ".kube", ".aws", "credentials", ".env", ".netrc",
+	".pgpass", ".npmrc", ".pypirc", ".gitconfig",
+	"bash_history", "zsh_history",
+}
+
+// shellDequoteReplacer 剥离单/双引号与反斜杠，防 cat /etc/sh\adow、cat /etc/sh''adow 绕过。
+var shellDequoteReplacer = strings.NewReplacer("'", "", `"`, "", `\`, "")
+
 // AssessRisk 返回命令风险等级："" 无风险，"high" 危险。
 // 引擎层永不硬拒——只用于前端标红与二次确认。
 // 为向后兼容，沿用 Linux 语义。
@@ -75,10 +96,12 @@ const (
 
 // DefaultReadOnlyCommands 内置只读命令白名单（策略未配置时兜底）。
 // 仅收录无副作用命令；每条命令必须不含管道/重定向/命令替换才会命中只读。
+// 注意：不含 env（直接输出全部环境变量，可能含密钥）。敏感读取（cat /etc/shadow 等）
+// 由 IsReadOnlyCommand 的参数审计额外降级，不在此白名单层处理。
 var DefaultReadOnlyCommands = []string{
 	"ls", "df", "free", "tail", "cat", "ps", "grep", "awk", "top",
 	"uptime", "who", "hostname", "date", "du", "stat", "whoami",
-	"echo", "env", "uname",
+	"echo", "uname",
 }
 
 // DefaultReadOnlyCommandsWindows WinRM 资产内置只读 PowerShell/cmd 命令白名单。
@@ -110,8 +133,9 @@ func ParseReadOnlyList(s string) []string {
 	return out
 }
 
-// IsReadOnlyCommand 判定命令是否只读：首命令精确命中白名单，且不含
-// 管道（|）、重定向（>、>>）、命令替换（$()、反引号）、命令分隔符（;）。
+// IsReadOnlyCommand 判定命令是否只读：首命令精确命中白名单，不含
+// 管道（|）、重定向（>、>>）、命令替换（$()、反引号）、命令分隔符（;），
+// 且参数未触及敏感文件/目录（见 sensitiveReadPatterns）。
 // 任一命中即视为非只读（保守降级）。
 func IsReadOnlyCommand(command string, whitelist []string) bool {
 	c := strings.TrimSpace(command)
@@ -128,6 +152,18 @@ func IsReadOnlyCommand(command string, whitelist []string) bool {
 	}
 	for _, w := range whitelist {
 		if first == strings.TrimSpace(w) {
+			return !containsSensitiveReadArg(c)
+		}
+	}
+	return false
+}
+
+// containsSensitiveReadArg 判断只读命令参数是否触及敏感文件/目录。
+// 先剥离引号与反斜杠转义，防 cat /etc/sh\adow、cat /etc/sh''adow 绕过。
+func containsSensitiveReadArg(command string) bool {
+	dequoted := shellDequoteReplacer.Replace(strings.ToLower(command))
+	for _, p := range sensitiveReadPatterns {
+		if strings.Contains(dequoted, p) {
 			return true
 		}
 	}
@@ -167,29 +203,37 @@ func ClassifyForProtocol(command string, readOnlyWhitelist []string, protocol st
 	return "write", ActionApprove
 }
 
-// classifySQL 按 SQL 首关键字分类（jdbc 协议）：
+// classifySQL 按 SQL 首关键字分类（jdbc/sql 协议）：
 // 只读查询（SELECT/SHOW/DESC/EXPLAIN 等）→ auto；高危 DDL（DROP/TRUNCATE/ALTER）→ high/approve；
 // 其余（INSERT/UPDATE/DELETE/CREATE/GRANT 及一切写）→ write/approve。
 // 保守策略：WITH 开头的 CTE（可能是写语句）与含分号的多语句一律人工审批，不自动放行。
+// 判定前先 normalizeSQL 剥离注释/折叠空白，防止注释与空白变体绕过护栏。
 func classifySQL(sqlText string) (string, Action) {
-	if strings.Contains(sqlText, ";") {
+	norm := normalizeSQL(sqlText)
+	if strings.Contains(norm, ";") {
 		return "write", ActionApprove
 	}
-	kw := sqlKeyword(sqlText)
+	kw := sqlKeyword(norm)
 	switch kw {
 	case "select", "show", "desc", "describe", "explain", "use", "pragma", "values":
 		// 命中只读关键字仍须降级检查：SELECT INTO OUTFILE / LOAD_FILE / FOR UPDATE
 		// 以及 PRAGMA journal_mode= / writable_schema= 是写或危险操作，不得自动放行。
-		upper := strings.ToUpper(sqlText)
-		if strings.Contains(upper, "INTO OUTFILE") ||
-			strings.Contains(upper, "LOAD_FILE") ||
-			strings.Contains(upper, "FOR UPDATE") {
+		// 去空白/下划线后匹配，覆盖 INTO/**/OUTFILE、INTO\tOUTFILE、LOAD_FILE/LOAD FILE 变体。
+		compact := strings.Map(func(r rune) rune {
+			if r == ' ' || r == '_' {
+				return -1
+			}
+			return r
+		}, norm)
+		if strings.Contains(compact, "INTOOUTFILE") ||
+			strings.Contains(compact, "LOADFILE") ||
+			strings.Contains(compact, "FORUPDATE") {
 			return "write", ActionApprove
 		}
 		if kw == "pragma" &&
-			(strings.Contains(upper, "=") ||
-				strings.Contains(upper, "JOURNAL_MODE") ||
-				strings.Contains(upper, "WRITABLE_SCHEMA")) {
+			(strings.Contains(norm, "=") ||
+				strings.Contains(norm, "JOURNAL_MODE") ||
+				strings.Contains(norm, "WRITABLE_SCHEMA")) {
 			return "write", ActionApprove
 		}
 		return "read", ActionAuto
@@ -198,6 +242,15 @@ func classifySQL(sqlText string) (string, Action) {
 	default:
 		return "write", ActionApprove
 	}
+}
+
+// normalizeSQL 归一化 SQL 供护栏判定：剥离 /*...*/、--、# 注释，
+// 折叠空白（含换行与注释残留空洞）为大写单空格串。注释剥除后
+// SEL/**/ECT 可还原为 SELECT、INTO/**/OUTFILE 还原为 INTO OUTFILE。
+func normalizeSQL(sqlText string) string {
+	s := sqlCommentBlockRe.ReplaceAllString(sqlText, " ")
+	s = sqlCommentLineRe.ReplaceAllString(s, " ")
+	return strings.ToUpper(strings.Join(strings.Fields(s), " "))
 }
 
 // sqlKeyword 提取 SQL 首关键字（小写，忽略前导空白）。
