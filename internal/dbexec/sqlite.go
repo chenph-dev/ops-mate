@@ -16,7 +16,7 @@ func init() {
 			{Key: "filePath", Label: "数据库文件路径", Type: connector.ParamFile, Required: true,
 				Placeholder: "C:\\data\\app.db"},
 		},
-		SkillPack: connector.SkillPack{Prompt: dbSkillPrompt, Guardrail: "sql"},
+		SkillPack: connector.SkillPack{Prompt: dbSkillPrompt, Guardrail: connector.GuardrailSQL},
 		New: func(cfg connector.Config) (connector.Capability, error) {
 			ex := NewExecutor(Host{Driver: "sqlite", Database: paramString(cfg, "filePath")})
 			return &connectorQueryRunner{e: ex}, nil

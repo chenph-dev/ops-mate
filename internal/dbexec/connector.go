@@ -58,7 +58,7 @@ func registerDBDriver(protocol, name, driver string) {
 		Params: []connector.ParamSchema{
 			{Key: "database", Label: "数据库", Type: connector.ParamString, Required: true, Placeholder: "myapp"},
 		},
-		SkillPack: connector.SkillPack{Prompt: dbSkillPrompt, Guardrail: "sql"},
+		SkillPack: connector.SkillPack{Prompt: dbSkillPrompt, Guardrail: connector.GuardrailSQL},
 		New: func(cfg connector.Config) (connector.Capability, error) {
 			ex := NewExecutor(Host{
 				Driver: driver, Addr: cfg.Addr, Port: cfg.Port,

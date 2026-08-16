@@ -118,7 +118,7 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 		if !ok || qr == nil {
 			return fmt.Errorf("连接类型 %q 的数据库查询能力不可用，请检查资产配置", protocol)
 		}
-		sqlTool := agenttools.NewSQLTool(s.id, qr, d.SkillPack.Guardrail, m.emit, m.convs, s.toolCalls)
+		sqlTool := agenttools.NewSQLTool(s.id, qr, string(d.SkillPack.Guardrail), m.emit, m.convs, s.toolCalls)
 		if policyFor != nil {
 			auto, _ := policyFor(s.hostID)
 			sqlTool.SetApprovalPolicy(auto)

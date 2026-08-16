@@ -106,9 +106,10 @@ func (r *ExecutorResolver) HostFor(hostID string) (*sshexec.Host, error) {
 
 // DbFor 按 hostID 构造数据库执行器（数据库协议，db 工作台用）。
 // 未注册协议、凭据或元信息解析失败返回 nil。
-// 注意：当前注册的数据库驱动（mysql/postgres/sqlite）均为 dbexec 后端，
-// protocol 即 dbexec 驱动名；若未来注册非 dbexec 的连接类型（Redis/K8s 等），
-// 此处需改为按 Driver.DBBacked 标记或独立路由，避免构造出无效执行器。
+// 设计说明：db 工作台需要 dbexec 特有的 Schema/Result 类型，且当前注册的
+// 数据库驱动（mysql/postgres/sqlite）均为 dbexec 后端——故此处保留具体类型
+// 返回（与 ConnFor 走注册表服务 AI 装配分工明确）。新增非 dbexec 连接类型
+// 时再按 Driver 后端标记拆分，届时统一走注册表构造。
 func (r *ExecutorResolver) DbFor(hostID string) *dbexec.Executor {
 	if r == nil || r.hosts == nil {
 		return nil

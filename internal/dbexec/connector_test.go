@@ -17,7 +17,7 @@ func TestMysqlPostgresRegistered(t *testing.T) {
 		if !d.NeedsHost {
 			t.Errorf("%q NeedsHost 应为 true", proto)
 		}
-		if d.SkillPack.Guardrail != "sql" {
+		if d.SkillPack.Guardrail != connector.GuardrailSQL {
 			t.Errorf("%q guardrail 应为 sql, got %q", proto, d.SkillPack.Guardrail)
 		}
 	}

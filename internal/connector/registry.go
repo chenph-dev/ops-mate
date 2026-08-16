@@ -11,9 +11,16 @@ var drivers = make(map[string]*Driver)
 
 // Register 登记一个 Driver。Protocol 必须非空，否则 panic。注册 key 统一小写，
 // 使 Get 大小写不敏感（资产录入/前端可能传混合大小写协议名）。
+// SkillPack.Guardrail 必须为合法枚举值（空 = 默认 linux），否则 panic——
+// 防止自由字符串与 guardrail 包封闭协议集漂移（写错字静默降级为 shell 语义）。
 func Register(d *Driver) {
 	if d == nil || d.Protocol == "" {
 		panic("connector: Driver 必须提供非空 Protocol")
+	}
+	g := d.SkillPack.Guardrail
+	if g != "" && g != GuardrailSQL && g != GuardrailLinux &&
+		g != GuardrailWindows && g != GuardrailRedis {
+		panic(fmt.Sprintf("connector: 驱动 %q 的 Guardrail %q 非法", d.Protocol, g))
 	}
 	drivers[strings.ToLower(d.Protocol)] = d
 }
