@@ -126,26 +126,26 @@ export default function ConfigPage(): React.JSX.Element {
       </Card>
 
       <Card size="small" style={{ marginTop: 16 }}>
-        <Title level={5} style={{ marginTop: 0 }}>审批策略</Title>
+        <Title level={5} style={{ marginTop: 0 }}>{t('approvalTitle')}</Title>
         <Paragraph type="secondary" style={{ fontSize: 12 }}>
-          开启后，AI 提议的只读命令（命中下方白名单且不含管道/重定向）将自动执行并展示「已自动执行」卡片；写操作与高危命令仍逐一审批。
+          {t('approvalDesc')}
         </Paragraph>
         <Form layout="vertical" size="small">
-          <Form.Item label="自动放行只读命令">
+          <Form.Item label={t('approvalEnableAuto')}>
             <Switch
               checked={policy.enableAuto}
               onChange={(v) => setPolicy({ ...policy, enableAuto: v })}
             />
           </Form.Item>
           <Form.Item
-            label="只读命令白名单"
-            extra="逗号或空格分隔；留空使用内置默认（ls/df/free/tail/cat/ps 等）"
+            label={t('approvalWhitelist')}
+            extra={t('approvalWhitelistExtra')}
           >
             <Input.TextArea
               value={policyDraft}
               onChange={(e) => setPolicyDraft(e.target.value)}
               autoSize={{ minRows: 3, maxRows: 6 }}
-              placeholder="ls, df, free, tail, cat, ps"
+              placeholder={t('approvalWhitelistPlaceholder')}
             />
           </Form.Item>
           <Form.Item>
@@ -163,15 +163,15 @@ export default function ConfigPage(): React.JSX.Element {
                     enableAuto: policy.enableAuto,
                     readOnlyList: list,
                   });
-                  message.success('审批策略已保存');
+                  message.success(t('approvalSaved'));
                 } catch (e) {
-                  message.error(`保存失败: ${e}`);
+                  message.error(t('approvalSaveFailed', { err: String(e) }));
                 } finally {
                   setSavingPolicy(false);
                 }
               }}
             >
-              保存审批策略
+              {t('approvalSave')}
             </Button>
           </Form.Item>
         </Form>

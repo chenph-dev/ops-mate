@@ -41,7 +41,7 @@ export default function AuditPage(): React.JSX.Element {
     { title: t('col.node'), dataIndex: 'name', width: 140 },
     { title: t('col.provider'), dataIndex: 'provider', width: 100 },
     {
-      title: 'Token (in/out/total)',
+      title: t('col.tokens'),
       key: 'tokens',
       width: 180,
       render: (_, r: CallLog) =>

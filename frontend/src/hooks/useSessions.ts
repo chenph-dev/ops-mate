@@ -69,6 +69,7 @@ export function useSessions(hostId: string | null): {
   planStatus: ApprovalStatus | null;
   sessionState: SessionState;
   lastError: string | null;
+  lastErrorCancelled: boolean;
   runningCommand: string | null;
   runElapsed: number;
   runOutput: string;
@@ -101,6 +102,8 @@ export function useSessions(hostId: string | null): {
   const [planStatus, setPlanStatus] = useState<ApprovalStatus | null>(null);
   const [sessionState, setSessionState] = useState<SessionState>(null);
   const [lastError, setLastError] = useState<string | null>(null);
+  // 主动取消（后端 ai:error 事件带 cancelled 标记）属正常反馈，用中性色展示而非告警红。
+  const [lastErrorCancelled, setLastErrorCancelled] = useState(false);
   // 执行中的命令与计时（run:start 置位，run:result / Idle 清除）
   const [runningCommand, setRunningCommand] = useState<string | null>(null);
   const [runStartAt, setRunStartAt] = useState<number | null>(null);
@@ -185,6 +188,7 @@ export function useSessions(hostId: string | null): {
       setPlanStatus(null);
       setSessionState(null);
       setLastError(null);
+      setLastErrorCancelled(false);
       setStreamingText('');
       await resync(sid);
     },
@@ -264,10 +268,12 @@ export function useSessions(hostId: string | null): {
       setPlanStatus(null);
       setSessionState(null);
       setLastError(null);
+      setLastErrorCancelled(false);
       setRunningCommand(null);
       setRunStartAt(null);
     } catch (e) {
       setLastError(typeof e === 'string' ? e : i18n.t('ai:clearFailed'));
+      setLastErrorCancelled(false);
     }
   }, [activeSession]);
 
@@ -298,10 +304,12 @@ export function useSessions(hostId: string | null): {
       try {
         await SendMessage(activeSession, text);
         setLastError(null);
+      setLastErrorCancelled(false);
       } catch (e) {
         // 发送失败：移除乐观消息，避免残留一条后端未落库的本地消息
         setMessages((prev) => prev.filter((m) => m.id !== localId));
         setLastError(typeof e === 'string' ? e : i18n.t('ai:sendFailed'));
+        setLastErrorCancelled(false);
       }
     },
     [activeSession],
@@ -433,8 +441,9 @@ export function useSessions(hostId: string | null): {
 
     const offError = EventsOn('ai:error', (raw: AgentEvent) => {
       if (!isMine(raw)) return;
-      const d = raw.data as { message?: string };
+      const d = raw.data as { message?: string; cancelled?: boolean };
       setLastError(d?.message ?? i18n.t('ai:unknownError'));
+      setLastErrorCancelled(d?.cancelled === true);
       setStreamingText('');
     });
 
@@ -471,6 +480,7 @@ export function useSessions(hostId: string | null): {
     planStatus,
     sessionState,
     lastError,
+    lastErrorCancelled,
     runningCommand,
     runElapsed,
     runOutput,

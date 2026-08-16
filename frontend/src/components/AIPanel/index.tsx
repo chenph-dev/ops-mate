@@ -26,6 +26,7 @@ export interface AIPanelProps {
   planStatus: ApprovalStatus | null;
   sessionState: SessionState;
   lastError: string | null;
+  lastErrorCancelled: boolean;
   runningCommand: string | null;
   runElapsed: number;
   runOutput: string;
@@ -59,6 +60,7 @@ export default function AIPanel({
   planStatus,
   sessionState,
   lastError,
+  lastErrorCancelled,
   runningCommand,
   runElapsed,
   runOutput,
@@ -264,6 +266,7 @@ export default function AIPanel({
         pendingPlan={pendingPlan}
         planStatus={planStatus}
         lastError={lastError}
+        lastErrorCancelled={lastErrorCancelled}
         busy={busy}
         configured={configured}
         cfgLoading={cfgLoading}

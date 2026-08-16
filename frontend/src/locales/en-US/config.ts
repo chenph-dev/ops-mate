@@ -16,4 +16,15 @@ export default {
   reset: 'Reset',
   saveSuccess: 'Config saved',
   saveFailed: 'Save failed: {{err}}',
+  approvalTitle: 'Approval Policy',
+  approvalDesc:
+    'When enabled, read-only commands proposed by AI (matching the whitelist below and without pipes/redirects) run automatically and show an "auto-executed" card; write and high-risk commands still require approval one by one.',
+  approvalEnableAuto: 'Auto-approve read-only commands',
+  approvalWhitelist: 'Read-only command whitelist',
+  approvalWhitelistExtra:
+    'Comma or space separated; leave empty to use built-in defaults (ls/df/free/tail/cat/ps etc.)',
+  approvalWhitelistPlaceholder: 'ls, df, free, tail, cat, ps',
+  approvalSave: 'Save approval policy',
+  approvalSaved: 'Approval policy saved',
+  approvalSaveFailed: 'Save failed: {{err}}',
 };

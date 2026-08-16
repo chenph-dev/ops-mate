@@ -12,6 +12,7 @@ export default {
     success: 'Success',
     fail: 'Failed',
     error: 'Error',
+    tokens: 'Token (in/out/total)',
   },
   stat: {
     totalCalls: 'Total calls',

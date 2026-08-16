@@ -12,6 +12,7 @@ export default {
     success: '成功',
     fail: '失败',
     error: '错误',
+    tokens: 'Token 入/出/总',
   },
   stat: {
     totalCalls: '总调用',

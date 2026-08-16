@@ -70,9 +70,10 @@ func (m *SessionManager) emitState(sid, state string) {
 	}
 }
 
-// emitError 推送错误事件。
-func (m *SessionManager) emitError(sid, message string) {
+// emitError 推送错误事件。cancelled 标记「主动取消」这一正常反馈，
+// 前端据此用中性色展示而非红色告警（避免依赖错误文本做匹配）。
+func (m *SessionManager) emitError(sid, message string, cancelled bool) {
 	if m.emit != nil {
-		m.emit(sid, "ai:error", map[string]any{"message": message})
+		m.emit(sid, "ai:error", map[string]any{"message": message, "cancelled": cancelled})
 	}
 }

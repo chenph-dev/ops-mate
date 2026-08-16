@@ -259,6 +259,7 @@ export default function HostsPage(): React.JSX.Element {
     planStatus: sessions.planStatus,
     sessionState: sessions.sessionState,
     lastError: sessions.lastError,
+    lastErrorCancelled: sessions.lastErrorCancelled,
     runningCommand: sessions.runningCommand,
     runElapsed: sessions.runElapsed,
     runOutput: sessions.runOutput,

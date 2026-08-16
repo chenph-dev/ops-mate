@@ -45,7 +45,7 @@ func (m *SessionManager) SendMessage(sid, text string) error {
 			s.mu.Lock()
 			s.state = stIdle
 			s.mu.Unlock()
-			m.emitError(sid, "数据库凭据不可用，请在资产页重新录入该资产的密码")
+			m.emitError(sid, "数据库凭据不可用，请在资产页重新录入该资产的密码", false)
 			return fmt.Errorf("connector capability resolver unavailable for host %s", s.hostID)
 		}
 	} else {
@@ -54,7 +54,7 @@ func (m *SessionManager) SendMessage(sid, text string) error {
 			s.mu.Lock()
 			s.state = stIdle
 			s.mu.Unlock()
-			m.emitError(sid, "资产凭据不可用，请在资产页重新录入该资产的密码/密钥")
+			m.emitError(sid, "资产凭据不可用，请在资产页重新录入该资产的密码/密钥", false)
 			return fmt.Errorf("executor unavailable for host %s", s.hostID)
 		}
 		s.holder.Set(ex)
@@ -64,7 +64,7 @@ func (m *SessionManager) SendMessage(sid, text string) error {
 		s.mu.Lock()
 		s.state = stIdle
 		s.mu.Unlock()
-		m.emitError(sid, "AI 后端不可用："+err.Error())
+		m.emitError(sid, "AI 后端不可用："+err.Error(), false)
 		return err
 	}
 

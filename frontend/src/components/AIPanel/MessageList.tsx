@@ -27,6 +27,7 @@ interface MessageListProps {
   pendingPlan: PlanInfo | null;
   planStatus: ApprovalStatus | null;
   lastError: string | null;
+  lastErrorCancelled: boolean;
   busy: boolean;
   configured: boolean;
   cfgLoading: boolean;
@@ -119,6 +120,7 @@ export default function MessageList({
   pendingPlan,
   planStatus,
   lastError,
+  lastErrorCancelled,
   busy,
   configured,
   cfgLoading,
@@ -411,15 +413,14 @@ export default function MessageList({
             />
           )}
 
-          {/* 错误提示；主动取消属正常反馈，用中性色而非红色 */}
+          {/* 错误提示；主动取消（后端 cancelled 标记）属正常反馈，用中性色而非红色 */}
           {lastError && (
             <div
               style={{
                 fontSize: 12,
-                color:
-                  lastError === '本次执行已取消'
-                    ? 'var(--antd-color-text-secondary)'
-                    : 'var(--antd-color-error)',
+                color: lastErrorCancelled
+                  ? 'var(--antd-color-text-secondary)'
+                  : 'var(--antd-color-error)',
                 padding: '4px 8px',
               }}
             >

@@ -58,9 +58,9 @@ func (m *SessionManager) run(s *agentSession, ctx context.Context, input []*sche
 		// （AwaitingApproval 分支不清——当前待审批 tool_call 仍需 Take。）
 		s.toolCalls.Reset()
 		if errors.Is(err, context.Canceled) {
-			m.emitError(s.id, "本次执行已取消")
+			m.emitError(s.id, "本次执行已取消", true)
 		} else {
-			m.emitError(s.id, "AI 对话失败："+err.Error())
+			m.emitError(s.id, "AI 对话失败："+err.Error(), false)
 		}
 		m.emitState(s.id, StateIdle)
 		return

@@ -16,4 +16,15 @@ export default {
   reset: '重置',
   saveSuccess: '配置已保存',
   saveFailed: '保存失败: {{err}}',
+  approvalTitle: '审批策略',
+  approvalDesc:
+    '开启后，AI 提议的只读命令（命中下方白名单且不含管道/重定向）将自动执行并展示「已自动执行」卡片；写操作与高危命令仍逐一审批。',
+  approvalEnableAuto: '自动放行只读命令',
+  approvalWhitelist: '只读命令白名单',
+  approvalWhitelistExtra:
+    '逗号或空格分隔；留空使用内置默认（ls/df/free/tail/cat/ps 等）',
+  approvalWhitelistPlaceholder: 'ls, df, free, tail, cat, ps',
+  approvalSave: '保存审批策略',
+  approvalSaved: '审批策略已保存',
+  approvalSaveFailed: '保存失败: {{err}}',
 };
