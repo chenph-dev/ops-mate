@@ -82,3 +82,12 @@ func TestGet_CaseInsensitive(t *testing.T) {
 		t.Fatal("Get 应大小写不敏感（大写查询）")
 	}
 }
+
+func TestRegister_CommandKindRequired(t *testing.T) {
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatal("Kind=command 但缺 CommandKind 应 panic")
+		}
+	}()
+	Register(&Driver{Protocol: "cmd-no-kind", Kind: KindCommand})
+}

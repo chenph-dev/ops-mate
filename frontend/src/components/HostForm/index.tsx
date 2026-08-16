@@ -69,11 +69,14 @@ export default function HostForm({
   // 当前协议的注册表驱动（无则 ssh/winrm 或未知）
   const selectedDriver = drivers.find((d) => d.protocol === protocol);
   const needsHost = selectedDriver?.needsHost ?? true;
-  // 协议下拉：静态 ssh/winrm + 注册表驱动
+  // 协议下拉：本地化 ssh/winrm 前置 + 注册表中数据库驱动（kind==='db'）追加，
+  // 避免 ssh/winrm 注册进注册表后重复出现。
   const protocolOptions = [
     { label: t('form.protocolSsh'), value: 'ssh' },
     { label: t('form.protocolWinrm'), value: 'winrm' },
-    ...drivers.map((d) => ({ label: d.name, value: d.protocol })),
+    ...(drivers ?? [])
+      .filter((d) => d.kind === 'db')
+      .map((d) => ({ label: d.name, value: d.protocol })),
   ];
 
   const handleSubmit = async (): Promise<void> => {

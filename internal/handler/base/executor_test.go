@@ -8,6 +8,7 @@ import (
 	"ops-mate/internal/connector"
 	"ops-mate/internal/store"
 	hoststore "ops-mate/internal/store/hosts"
+	"ops-mate/internal/winrmexec"
 )
 
 func openTestApp(t *testing.T) *store.DB {
@@ -123,5 +124,32 @@ func TestHostFor_RejectsDBProtocol(t *testing.T) {
 	r := NewExecutorResolver(s)
 	if _, err := r.HostFor(id); err == nil {
 		t.Fatal("HostFor 对数据库资产应返回错误（不支持交互式会话）")
+	}
+}
+
+func TestExecFor_WinRM(t *testing.T) {
+	app := openTestApp(t)
+	s := hoststore.NewHostsStore(app)
+	id, err := s.SaveHost(hoststore.HostInput{
+		Name: "win", Addr: "10.0.0.9", Port: 5985, User: "admin",
+		AuthType: "password", Secret: "x", Protocol: "winrm",
+	})
+	if err != nil {
+		t.Fatalf("SaveHost: %v", err)
+	}
+	r := NewExecutorResolver(s)
+	ex := r.ExecFor(id)
+	if _, ok := ex.(*winrmexec.Executor); !ok {
+		t.Fatalf("ExecFor(winrm) 应返回 winrm 执行器, got %T", ex)
+	}
+}
+
+func TestExecutorForHost_UnknownProtocolNil(t *testing.T) {
+	// jdbc 等未注册/遗留协议应返回 nil（无 shell 执行器），不误当 ssh 连接数据库主机
+	if got := ExecutorForHost("jdbc", "1.1.1.1", 3306, "u", "password", "x"); got != nil {
+		t.Fatalf("未注册协议 ExecutorForHost 应为 nil, got %T", got)
+	}
+	if got := ExecutorForHost("", "1.1.1.1", 22, "u", "password", "x"); got == nil {
+		t.Fatal("空协议（缺省 ssh）ExecutorForHost 应返回 ssh 执行器")
 	}
 }

@@ -40,15 +40,20 @@ export function useConnectors(): {
     }
   }, []);
 
-  const protocolSet = useMemo(
-    () => new Set((drivers ?? []).map((d) => d.protocol.toLowerCase())),
+  // kindOf 返回协议的驱动类型（"db"/"command"）；未注册/未知/空 → undefined。
+  const kindOf = useCallback(
+    (protocol?: string): string | undefined => {
+      if (!protocol) return undefined;
+      const p = protocol.toLowerCase();
+      return (drivers ?? []).find((d) => d.protocol.toLowerCase() === p)?.kind;
+    },
     [drivers],
   );
 
+  // isDB 只认后端归一化的 kind==='db'：未知协议 → undefined → false（保守安全）。
   const isDB = useCallback(
-    (protocol?: string) =>
-      (protocol ? protocolSet.has(protocol.toLowerCase()) : false),
-    [protocolSet],
+    (protocol?: string) => kindOf(protocol) === 'db',
+    [kindOf],
   );
 
   return { drivers: drivers ?? [], isDB };
