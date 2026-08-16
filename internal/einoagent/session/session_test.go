@@ -3,12 +3,15 @@ package session
 import (
 	"context"
 	"errors"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	einomodel "github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 
+	"ops-mate/internal/connector"
+	_ "ops-mate/internal/dbexec" // 注册 mysql/postgres/sqlite driver（connector.New / PromptForProtocol 依赖）
 	"ops-mate/internal/einoagent/history"
 	"ops-mate/internal/einoagent/testutil"
 	"ops-mate/internal/skill"
@@ -30,6 +33,7 @@ type sessionFixture struct {
 	modelImpl *testutil.ScriptedModel
 	ex        *testutil.FakeExec
 	hostID    string
+	hosts     *hoststore.HostsStore
 }
 
 func newSessionFixture(t *testing.T, responses []*schema.Message) *sessionFixture {
@@ -56,6 +60,7 @@ func newSessionFixture(t *testing.T, responses []*schema.Message) *sessionFixtur
 		modelImpl: &testutil.ScriptedModel{Responses: responses},
 		ex:        &testutil.FakeExec{Lines: []sshexec.Line{{Stream: "stdout", Text: "out"}}},
 		hostID:    hostID,
+		hosts:     hosts,
 	}
 	f.mgr = NewSessionManager(app, cfg,
 		func(hid string) sshexec.Exec { return f.ex },
@@ -339,22 +344,26 @@ func TestSessionManager_ProtocolResolverInjected(t *testing.T) {
 	}
 }
 
-func TestBuildInput_OSInjected(t *testing.T) {
+func TestBuildInput_ProtocolPromptInjected(t *testing.T) {
 	f := newSessionFixture(t, []*schema.Message{schema.AssistantMessage("hi", nil)})
-	f.mgr.SetProtocolResolver(func(hostID string) string { return "winrm" })
+	f.mgr.SetProtocolResolver(func(hostID string) string { return "mysql" })
 	sid, _ := f.mgr.EnsureSession(f.hostID)
 	s, err := f.mgr.sessionFor(sid)
-	if err != nil { t.Fatalf("sessionFor: %v", err) }
+	if err != nil {
+		t.Fatalf("sessionFor: %v", err)
+	}
 	input, err := f.mgr.buildInput(s, "继续")
-	if err != nil { t.Fatalf("buildInput: %v", err) }
+	if err != nil {
+		t.Fatalf("buildInput: %v", err)
+	}
 	found := false
 	for _, msg := range input {
-		if msg.Role == schema.System && strings.Contains(msg.Content, "Windows 资产") {
+		if msg.Role == schema.System && strings.Contains(msg.Content, "execute_sql") {
 			found = true
 		}
 	}
 	if !found {
-		t.Error("winrm 协议下 system 消息应含 Windows 资产描述")
+		t.Error("数据库协议下 system 消息应含 execute_sql 语义片段")
 	}
 }
 
@@ -417,5 +426,60 @@ func TestBuildInput_TruncationFirstNonSystemIsUser(t *testing.T) {
 	if firstNonSystem.Role != schema.User {
 		t.Errorf("截断后第一条非 system 消息角色 = %v，want user（内容: %q）",
 			firstNonSystem.Role, firstNonSystem.Content)
+	}
+}
+
+func TestSessionManager_DbAssetAssemblesSQLTool(t *testing.T) {
+	f := newSessionFixture(t, []*schema.Message{
+		testutil.ToolCallResponseSQL("SELECT 1"),
+		schema.AssistantMessage("查询结果已返回", nil),
+	})
+	// sqlite：本地文件，无需外部服务，验证真实 QueryRunner 装配
+	file := filepath.Join(t.TempDir(), "ai.db")
+	hostID, err := f.hosts.SaveHost(hoststore.HostInput{
+		Name: "ai-db", Protocol: "sqlite",
+		Params: map[string]any{"filePath": file},
+	})
+	if err != nil {
+		t.Fatalf("SaveHost(sqlite): %v", err)
+	}
+	f.mgr.SetProtocolResolver(func(hostID string) string { return "sqlite" })
+	f.mgr.SetCapabilityResolver(func(hostID string) connector.Capability {
+		cap, err := connector.New("sqlite", connector.Config{
+			Params: map[string]any{"filePath": file},
+		})
+		if err != nil {
+			return nil
+		}
+		return cap
+	})
+	sid, err := f.mgr.EnsureSession(hostID)
+	if err != nil {
+		t.Fatalf("EnsureSession: %v", err)
+	}
+	if err := f.mgr.SendMessage(sid, "查一下"); err != nil {
+		t.Fatalf("SendMessage: %v", err)
+	}
+	// SELECT 无自动放行 → 走 execute_sql 审批（证明装配的是 SQLTool 而非 SSHTool）
+	f.waitState(sid, StateAwaitingApproval)
+	if err := f.mgr.ApproveCommand(sid, "SELECT 1"); err != nil {
+		t.Fatalf("ApproveCommand: %v", err)
+	}
+	f.waitState(sid, StateIdle)
+	// 断言 execute_sql 的 tool 消息真实包含 sqlite 查询结果（SELECT 1 → 列/行含 "1"）
+	msgs, _ := f.convs.LoadMessages(sid)
+	foundResult := false
+	for _, m := range msgs {
+		if m.Role == history.RoleTool && strings.Contains(m.Content, "1") {
+			foundResult = true
+		}
+	}
+	if !foundResult {
+		t.Error("execute_sql 的 tool 消息应包含查询结果")
+	}
+	for _, e := range f.rec.SnapshotEvents() {
+		if e == "ai:error" {
+			t.Fatalf("DB 会话不应报错: %v", f.rec.SnapshotEvents())
+		}
 	}
 }

@@ -2,8 +2,10 @@ package base
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
+	"ops-mate/internal/connector"
 	"ops-mate/internal/dbexec"
 	"ops-mate/internal/sshexec"
 	hoststore "ops-mate/internal/store/hosts"
@@ -72,6 +74,9 @@ func (r *ExecutorResolver) HostFor(hostID string) (*sshexec.Host, error) {
 	if strings.EqualFold(meta.Protocol, "jdbc") {
 		return nil, fmt.Errorf("数据库资产不支持交互式会话")
 	}
+	if connector.Get(meta.Protocol) != nil {
+		return nil, fmt.Errorf("数据库资产不支持交互式会话")
+	}
 	secret, authType, err := r.hosts.GetHostSecret(hostID)
 	if err != nil {
 		return nil, fmt.Errorf("获取资产凭据失败: %w", err)
@@ -82,8 +87,11 @@ func (r *ExecutorResolver) HostFor(hostID string) (*sshexec.Host, error) {
 	}, nil
 }
 
-// DbFor 按 hostID 构造数据库执行器（jdbc 协议）。
-// 非 jdbc 协议、凭据或元信息解析失败返回 nil。
+// DbFor 按 hostID 构造数据库执行器（数据库协议，db 工作台用）。
+// 未注册协议、凭据或元信息解析失败返回 nil。
+// 注意：当前注册的数据库驱动（mysql/postgres/sqlite）均为 dbexec 后端，
+// protocol 即 dbexec 驱动名；若未来注册非 dbexec 的连接类型（Redis/K8s 等），
+// 此处需改为按 Driver.DBBacked 标记或独立路由，避免构造出无效执行器。
 func (r *ExecutorResolver) DbFor(hostID string) *dbexec.Executor {
 	if r == nil || r.hosts == nil {
 		return nil
@@ -96,11 +104,57 @@ func (r *ExecutorResolver) DbFor(hostID string) *dbexec.Executor {
 	if err != nil || meta == nil {
 		return nil
 	}
-	if !strings.EqualFold(meta.Protocol, "jdbc") {
+	if connector.Get(meta.Protocol) == nil {
 		return nil
 	}
 	return dbexec.NewExecutor(dbexec.Host{
-		Driver: meta.Driver, Addr: meta.Addr, Port: meta.Port,
-		User: meta.User, Password: secret, Database: meta.Database,
+		Driver: meta.Protocol, Addr: meta.Addr, Port: meta.Port,
+		User: meta.User, Password: secret, Database: paramsDatabase(meta.Params),
 	})
+}
+
+// ConnFor 按 hostID 构造连接能力对象（protocol 对应 Driver.New 的产物）。
+// 已注册连接类型（数据库等）返回其能力（QueryRunner/ObjectBrowser/Pingable）；
+// ssh/winrm 等未注册类型返回 nil（AI 命令工具走 holder，交互式会话走 HostFor）。
+func (r *ExecutorResolver) ConnFor(hostID string) connector.Capability {
+	if r == nil || r.hosts == nil {
+		return nil
+	}
+	secret, _, err := r.hosts.GetHostSecret(hostID)
+	if err != nil {
+		log.Printf("resolver: connfor host %s: %v", hostID, err)
+		return nil
+	}
+	meta, err := r.hosts.HostMetaByID(hostID)
+	if err != nil {
+		log.Printf("resolver: connfor host %s: %v", hostID, err)
+		return nil
+	}
+	if meta == nil {
+		log.Printf("resolver: connfor host %s: meta not found", hostID)
+		return nil
+	}
+	if connector.Get(meta.Protocol) == nil {
+		return nil
+	}
+	cap, err := connector.New(meta.Protocol, connector.Config{
+		Addr: meta.Addr, Port: meta.Port, User: meta.User,
+		Password: secret, Params: meta.Params,
+	})
+	if err != nil {
+		log.Printf("resolver: connfor host %s: %v", hostID, err)
+		return nil
+	}
+	return cap
+}
+
+// paramsDatabase 从资产专属参数取数据库名（mysql/postgres 的 database，sqlite 的 filePath）。
+func paramsDatabase(params map[string]any) string {
+	if v, ok := params["database"].(string); ok {
+		return v
+	}
+	if v, ok := params["filePath"].(string); ok {
+		return v
+	}
+	return ""
 }

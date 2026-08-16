@@ -40,10 +40,10 @@ func AssessRisk(command string) string {
 }
 
 // AssessRiskForProtocol 按协议返回命令风险等级："" 无风险，"high" 危险。
-// protocol 为 "winrm" 时额外套用 Windows 危险模式；"jdbc" 走 SQL 语义。
+// protocol 为 "winrm" 时额外套用 Windows 危险模式；"jdbc"/"sql" 走 SQL 语义。
 func AssessRiskForProtocol(command, protocol string) string {
 	c := strings.TrimSpace(command)
-	if strings.EqualFold(protocol, "jdbc") {
+	if strings.EqualFold(protocol, "jdbc") || strings.EqualFold(protocol, "sql") {
 		risk, _ := classifySQL(c)
 		if risk == "high" {
 			return "high"
@@ -145,9 +145,9 @@ func Classify(command string, readOnlyWhitelist []string) (string, Action) {
 // ClassifyForProtocol 按协议综合分类：返回风险等级（"high"/"read"/"write"）与建议动作。
 // readOnlyWhitelist 为空时回退协议对应的内置默认白名单。
 // 高危命令永远 approve；只读命中 auto；其余 write → approve。
-// jdbc 协议按 SQL 关键字语义分类（只读查询 auto、高危 DDL approve、其余写 approve）。
+// jdbc/sql 协议按 SQL 关键字语义分类（只读查询 auto、高危 DDL approve、其余写 approve）。
 func ClassifyForProtocol(command string, readOnlyWhitelist []string, protocol string) (string, Action) {
-	if strings.EqualFold(protocol, "jdbc") {
+	if strings.EqualFold(protocol, "jdbc") || strings.EqualFold(protocol, "sql") {
 		return classifySQL(command)
 	}
 	if AssessRiskForProtocol(command, protocol) == "high" {
@@ -175,8 +175,23 @@ func classifySQL(sqlText string) (string, Action) {
 	if strings.Contains(sqlText, ";") {
 		return "write", ActionApprove
 	}
-	switch sqlKeyword(sqlText) {
+	kw := sqlKeyword(sqlText)
+	switch kw {
 	case "select", "show", "desc", "describe", "explain", "use", "pragma", "values":
+		// 命中只读关键字仍须降级检查：SELECT INTO OUTFILE / LOAD_FILE / FOR UPDATE
+		// 以及 PRAGMA journal_mode= / writable_schema= 是写或危险操作，不得自动放行。
+		upper := strings.ToUpper(sqlText)
+		if strings.Contains(upper, "INTO OUTFILE") ||
+			strings.Contains(upper, "LOAD_FILE") ||
+			strings.Contains(upper, "FOR UPDATE") {
+			return "write", ActionApprove
+		}
+		if kw == "pragma" &&
+			(strings.Contains(upper, "=") ||
+				strings.Contains(upper, "JOURNAL_MODE") ||
+				strings.Contains(upper, "WRITABLE_SCHEMA")) {
+			return "write", ActionApprove
+		}
 		return "read", ActionAuto
 	case "drop", "truncate", "alter":
 		return "high", ActionApprove

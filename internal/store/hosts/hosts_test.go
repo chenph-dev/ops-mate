@@ -118,6 +118,79 @@ func TestHostTree_FolderAndMove(t *testing.T) {
 	}
 }
 
+func TestHostTree_NestedFolder(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	app, err := store.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer closeDB(app)
+
+	s := NewHostsStore(app)
+
+	// 三层嵌套：根目录 -> 子目录 -> 孙目录 -> 资产
+	rootID, err := s.CreateFolder("根目录", "")
+	if err != nil {
+		t.Fatalf("CreateFolder(root): %v", err)
+	}
+	subID, err := s.CreateFolder("子目录", rootID)
+	if err != nil {
+		t.Fatalf("CreateFolder(sub): %v", err)
+	}
+	grandID, err := s.CreateFolder("孙目录", subID)
+	if err != nil {
+		t.Fatalf("CreateFolder(grand): %v", err)
+	}
+	if _, err := s.SaveHost(HostInput{
+		Name: "web-01", ParentID: grandID, Addr: "10.0.0.5",
+		Port: 22, User: "ops", AuthType: "password", Secret: "p@ss",
+	}); err != nil {
+		t.Fatalf("SaveHost: %v", err)
+	}
+
+	// 根目录下同时平铺一个资产，验证 host 平铺正确
+	if _, err := s.SaveHost(HostInput{
+		Name: "root-host", ParentID: rootID, Addr: "10.0.0.6",
+		Port: 22, User: "ops", AuthType: "password", Secret: "p@ss",
+	}); err != nil {
+		t.Fatalf("SaveHost(root-host): %v", err)
+	}
+
+	tree, err := s.ListTree()
+	if err != nil {
+		t.Fatalf("ListTree: %v", err)
+	}
+	if len(tree) != 1 {
+		t.Fatalf("根级应有 1 个目录，得到 %d", len(tree))
+	}
+	root := tree[0]
+	if root.Name != "根目录" {
+		t.Errorf("根节点名 = %q, want 根目录", root.Name)
+	}
+	// 根目录下应有 1 个子目录 + 1 个平铺 host
+	if len(root.Children) != 2 {
+		t.Fatalf("根目录下应有 2 个子节点（子目录 + 平铺 host），得到 %d: %+v", len(root.Children), root.Children)
+	}
+
+	var sub *TreeNode
+	for i := range root.Children {
+		if root.Children[i].Name == "子目录" {
+			sub = &root.Children[i]
+		}
+	}
+	if sub == nil {
+		t.Fatal("根目录下未找到子目录")
+	}
+	if len(sub.Children) != 1 || sub.Children[0].Name != "孙目录" {
+		t.Fatalf("子目录下应有 1 个孙目录，得到 %+v", sub.Children)
+	}
+	// 断言孙节点存在（修复前：值拷贝导致孙节点丢失）
+	grand := sub.Children[0]
+	if len(grand.Children) != 1 || grand.Children[0].Name != "web-01" {
+		t.Fatalf("孙目录下应有 1 个资产（孙节点丢失），得到 %+v", grand.Children)
+	}
+}
+
 func closeDB(app *store.DB) {
 	sqlDB, _ := app.GORM().DB()
 	if sqlDB != nil {
@@ -221,5 +294,97 @@ func TestHostAutoApprove_Roundtrip(t *testing.T) {
 	}
 	if v, _ := s.GetAutoApprove(id); v != "off" {
 		t.Errorf("UpdateHost 后 GetAutoApprove = %q，want off", v)
+	}
+}
+
+func TestHostParams_Roundtrip(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	app, err := store.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer closeDB(app)
+
+	s := NewHostsStore(app)
+
+	// sqlite：无 host，只填 filePath
+	id, err := s.SaveHost(HostInput{
+		Name: "local.db", Protocol: "sqlite",
+		Params: map[string]any{"filePath": "C:\\data\\app.db"},
+	})
+	if err != nil {
+		t.Fatalf("SaveHost(sqlite): %v", err)
+	}
+	meta, err := s.HostMetaByID(id)
+	if err != nil {
+		t.Fatalf("HostMetaByID: %v", err)
+	}
+	if meta.Protocol != "sqlite" {
+		t.Errorf("protocol = %q, want sqlite", meta.Protocol)
+	}
+	if meta.Params == nil || meta.Params["filePath"] != "C:\\data\\app.db" {
+		t.Errorf("Params 未正确回读: %+v", meta.Params)
+	}
+
+	// mysql：params.database 往返
+	id2, err := s.SaveHost(HostInput{
+		Name: "appdb", Protocol: "mysql", Addr: "10.0.0.6", Port: 3306,
+		User: "root", AuthType: "password", Secret: "x",
+		Params: map[string]any{"database": "app"},
+	})
+	if err != nil {
+		t.Fatalf("SaveHost(mysql): %v", err)
+	}
+	meta2, _ := s.HostMetaByID(id2)
+	if meta2.Params["database"] != "app" {
+		t.Errorf("mysql Params.database = %v, want app", meta2.Params["database"])
+	}
+
+	// ListTree 也带出 Params
+	tree, _ := s.ListTree()
+	for _, n := range tree {
+		if n.ID == id2 && n.Params["database"] != "app" {
+			t.Errorf("ListTree Params.database = %v, want app", n.Params["database"])
+		}
+	}
+
+	// UpdateHost 更新 Params
+	if err := s.UpdateHost(id2, HostInput{
+		Name: "appdb", Protocol: "mysql", Addr: "10.0.0.6", Port: 3306,
+		User: "root", AuthType: "password",
+		Params: map[string]any{"database": "other"},
+	}); err != nil {
+		t.Fatalf("UpdateHost: %v", err)
+	}
+	meta2, _ = s.HostMetaByID(id2)
+	if meta2.Params["database"] != "other" {
+		t.Errorf("UpdateHost 后 Params.database = %v, want other", meta2.Params["database"])
+	}
+}
+
+func TestHostJdbcCompatibility_NormalizesToSingleProtocol(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	app, err := store.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer closeDB(app)
+
+	s := NewHostsStore(app)
+	// M6 前前端仍传 jdbc+driver+database：应归一化为 protocol=mysql + params.database
+	id, err := s.SaveHost(HostInput{
+		Name: "legacy", Protocol: "jdbc", Driver: "mysql",
+		Database: "app", Addr: "1.2.3.4", Port: 3306, User: "root",
+		AuthType: "password", Secret: "x",
+	})
+	if err != nil {
+		t.Fatalf("SaveHost(jdbc): %v", err)
+	}
+	meta, _ := s.HostMetaByID(id)
+	if meta.Protocol != "mysql" {
+		t.Errorf("jdbc 未归一化: protocol = %q, want mysql", meta.Protocol)
+	}
+	if meta.Params["database"] != "app" {
+		t.Errorf("jdbc database 未移入 Params: %+v", meta.Params)
 	}
 }

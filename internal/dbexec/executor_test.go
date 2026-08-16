@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 func TestDriverName(t *testing.T) {
@@ -13,6 +15,7 @@ func TestDriverName(t *testing.T) {
 		{"postgres", "postgres"},
 		{"postgresql", "postgres"},
 		{"pq", "postgres"},
+		{"sqlite", "sqlite"},
 	}
 	for _, c := range cases {
 		got, err := driverName(c.in)
@@ -32,6 +35,12 @@ func TestDSN(t *testing.T) {
 	e := NewExecutor(Host{Driver: "mysql", Addr: "10.0.0.5", Port: 3306, User: "root", Password: "p@ss", Database: "app"})
 	if got, want := e.dsn("mysql"), "root:p@ss@tcp(10.0.0.5:3306)/app?parseTime=true"; got != want {
 		t.Errorf("mysql dsn = %q, want %q", got, want)
+	}
+	// 特殊字符库名（中文/空格等）不应被 QueryEscape：go-sql-driver 只反转义
+	// password、不反转义 dbname（路径段），转义会连到错误的库名报 Unknown database。
+	special := NewExecutor(Host{Driver: "mysql", Addr: "10.0.0.5", Port: 3306, User: "root", Password: "x", Database: "my db"})
+	if got, want := special.dsn("mysql"), "root:x@tcp(10.0.0.5:3306)/my db?parseTime=true"; got != want {
+		t.Errorf("mysql dsn 特殊字符库名 = %q, want %q（dbname 不应 URL 转义）", got, want)
 	}
 
 	pg := NewExecutor(Host{Driver: "postgres", Addr: "10.0.0.6", Port: 5432, User: "pg", Password: "p@ss/", Database: "db"})
@@ -111,5 +120,37 @@ func TestParseSchema(t *testing.T) {
 	}
 	if _, err := parseSchema(nil); err == nil {
 		t.Error("parseSchema(nil) 应报错")
+	}
+}
+
+// TestDSN_PasswordRoundtrip 验证 DSN 构造后 go-sql-driver ParseDSN 能还原原始密码：
+// 转义往返必须正确，特殊字符密码（@ / % + 空格中文等）在测试连接时不被弄错。
+func TestDSN_PasswordRoundtrip(t *testing.T) {
+	orig := "p@ss/%+w 中"
+	e := NewExecutor(Host{Driver: "mysql", Addr: "10.0.0.5", Port: 3306, User: "root", Password: orig, Database: "app"})
+	cfg, err := mysql.ParseDSN(e.dsn("mysql"))
+	if err != nil {
+		t.Fatalf("ParseDSN: %v", err)
+	}
+	if cfg.Passwd != orig {
+		t.Errorf("密码往返失败: 还原密码 = %q, want %q", cfg.Passwd, orig)
+	}
+}
+
+func TestSQLiteDSN(t *testing.T) {
+	e := NewExecutor(Host{Driver: "sqlite", Database: `C:\data\app.db`})
+	if got, want := e.dsn("sqlite"), `C:\data\app.db`; got != want {
+		t.Errorf("sqlite dsn = %q, want %q", got, want)
+	}
+}
+
+func TestSQLiteSchemaQuery(t *testing.T) {
+	e := NewExecutor(Host{Driver: "sqlite"})
+	q := e.schemaQuery()
+	if !strings.Contains(q, "sqlite_master") {
+		t.Errorf("sqlite 应查 sqlite_master：%q", q)
+	}
+	if !strings.Contains(q, "pragma_table_info") {
+		t.Errorf("sqlite 应用 pragma_table_info：%q", q)
 	}
 }

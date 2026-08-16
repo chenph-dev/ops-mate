@@ -4,13 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
-	"ops-mate/internal/dbexec"
+	"ops-mate/internal/connector"
 	"ops-mate/internal/einoagent/callback"
 	"ops-mate/internal/einoagent/graph"
 	"ops-mate/internal/einoagent/history"
@@ -80,6 +79,7 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 	policyFor := m.policyFor
 	skillFor := m.skillFor
 	protocolFor := m.protocolFor
+	capabilityFor := m.capabilityFor
 	m.mu.Unlock()
 
 	s.mu.Lock()
@@ -105,15 +105,20 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 	if protocolFor != nil {
 		protocol = protocolFor(s.hostID)
 	}
+	var capability connector.Capability
+	if capabilityFor != nil {
+		capability = capabilityFor(s.hostID)
+	}
 
-	// 命令工具按协议注册：jdbc → execute_sql（数据库执行器），否则 execute_command（sshexec 执行器）。
+	// 命令工具按能力注册：注册表已登记的连接类型（QueryRunner）→ execute_sql；
+	// 否则（ssh/winrm/未知）→ execute_command（sshexec holder 执行器）。
 	var commandTool einotool.BaseTool
-	if strings.EqualFold(protocol, "jdbc") {
-		var dbe *dbexec.Executor
-		if m.dbExecutorFor != nil {
-			dbe = m.dbExecutorFor(s.hostID)
+	if d := connector.Get(protocol); d != nil {
+		qr, ok := capability.(connector.QueryRunner)
+		if !ok || qr == nil {
+			return fmt.Errorf("连接类型 %q 的数据库查询能力不可用，请检查资产配置", protocol)
 		}
-		sqlTool := agenttools.NewSQLTool(s.id, dbe, m.emit, m.convs, s.toolCalls)
+		sqlTool := agenttools.NewSQLTool(s.id, qr, d.SkillPack.Guardrail, m.emit, m.convs, s.toolCalls)
 		if policyFor != nil {
 			auto, _ := policyFor(s.hostID)
 			sqlTool.SetApprovalPolicy(auto)

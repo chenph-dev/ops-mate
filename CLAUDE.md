@@ -56,7 +56,7 @@ pnpm build            # tsc type-check + vite production build
 ### Key Configuration
 
 - `wails.json` — Wails project config (app name, build commands, author). Frontend build/install/dev commands are defined here and invoked by `wails dev` / `wails build`.
-- `go.mod` pins the Wails framework directly (`github.com/wailsapp/wails/v2 v2.12.0`); `wails.json` holds the app-level build config.
+- `go.mod` pins the Wails framework directly (`github.com/wailsapp/wails/v2 v2.13.0`, 需与已安装的 wails CLI 版本一致——CLI 运行时会把库版本对齐到自身版本); `wails.json` holds the app-level build config.
 
 ## Adding a New Backend Method
 

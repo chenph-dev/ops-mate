@@ -1,6 +1,6 @@
 # ops-mate
 
-**ops-mate** 是一款基于 [Wails v2](https://wails.io/)（Go 后端 + React/TypeScript 前端）的 **SSH / WinRM** 运维管理桌面应用。它把经典的 SSH/SFTP/WinRM 客户端与 **AI 运维智能体** 结合，智能体可以规划并执行服务器上的诊断/修复任务——每一步都需要你审批确认。
+**ops-mate** 是一款基于 [Wails v2](https://wails.io/)（Go 后端 + React/TypeScript 前端）的 **SSH / WinRM / 数据库** 运维管理桌面应用。它把经典的 SSH/SFTP/WinRM 客户端与 **AI 运维智能体** 结合，智能体可以规划并执行服务器上的诊断/修复任务——每一步都需要你审批确认。
 
 ![ops-mate 主界面](images/home.png)
 
@@ -8,7 +8,7 @@
 
 ### 🖥️ 主机管理
 - 文件夹**树状**组织主机（新建 / 重命名 / 移动 / 删除节点）
-- 管理 **SSH 与 WinRM** 主机连接信息（主机、端口、用户、认证方式）
+- 管理 **SSH / WinRM / 数据库** 连接资产（SSH、WinRM、MySQL、PostgreSQL、SQLite 等连接类型由注册表驱动，driver 专属参数按 schema 动态表单录入）
 - 保存前可**测试连接**；支持临时执行命令
 - 密码等敏感信息**加密落盘**
 
@@ -30,9 +30,14 @@
 - **上传 / 下载** 并发队列
 - 每个任务独立**进度**，支持暂停 / 继续 / 取消
 
+### 🗄️ 数据库工作台
+- 连接 **MySQL / PostgreSQL / SQLite**（SQLite 为本地文件，无需主机/端口/凭据）
+- 左侧 **schema 树**（表 / 列）+ CodeMirror **SQL 编辑器** + 结果网格
+- AI 智能体在数据库资产上以 `execute_sql` 工具诊断/修复，**每条 SQL 经你批准后执行**
+
 ### 🤖 AI 运维智能体
 - 与能"看到"当前选中主机的 LLM 智能体对话
-- **`execute_command` 工具**：智能体提出具体的 **Shell（SSH）/ PowerShell（WinRM）** 命令，**每条命令都必须经你批准后才执行**
+- **工具按资产类型装配**：`execute_command`（SSH/WinRM 的 Shell/PowerShell 命令）与 `execute_sql`（数据库资产的 SQL 查询/写操作），**每条命令 / 每条 SQL 都必须经你批准后才执行**
 - **计划模式（`create_plan`）**：面对复杂多步任务，智能体先提交执行计划（目标 + 步骤列表）供你审批，批准后按计划逐步执行
 - **安全护栏**：危险操作会明确提示风险，且始终要求显式审批；包含协议感知的 **Linux**（`rm -rf /`、`dd`、`reboot`…）与 **Windows**（`format`、`del /s`、`rd /s`、`diskpart clean`、`shutdown /s`…）危险模式
 - 每台主机独立对话历史，支持重命名 / 删除
@@ -46,7 +51,7 @@
 | 层 | 技术 |
 |----|------|
 | 外壳 | Wails v2（Go + WebView2） |
-| 后端 | Go、[eino](https://github.com/cloudwego/eino) 智能体框架、eino-ext 模型适配器、[masterzen/winrm](https://github.com/masterzen/winrm)（WinRM 客户端） |
+| 后端 | Go、[eino](https://github.com/cloudwego/eino) 智能体框架、eino-ext 模型适配器、[masterzen/winrm](https://github.com/masterzen/winrm)（WinRM 客户端）、database/sql 驱动（mysql / postgres / sqlite） |
 | 存储 | `modernc.org/sqlite`（纯 Go，无需 CGO）+ GORM + golang-migrate |
 | 前端 | React 19、TypeScript、Vite、Ant Design 6、react-router-dom 7、xterm.js |
 
@@ -59,9 +64,10 @@
                                    │  Wails 绑定（window.go）
 ┌──────────────────────────────────▼──────────────────────────────────┐
 │  Go 后端（Wails）                                                       │
-│  handlers: Hosts · Terminal · Sftp · Sessions · Rdp · AIConfig      │
+│  handlers: Hosts · Terminal · Sftp · Sessions · Rdp · Db · Connector│
+│  internal/connector: 连接类型注册表 + 能力接口（QueryRunner 等）          │
 │  internal/einoagent: model(provider) · tools · session · guardrail  │
-│  internal executors: sshexec · winrmexec（统一 Exec 接口）                │
+│  internal executors: sshexec · winrmexec · dbexec                   │
 │  internal/store:     hosts · conversations · config · memory        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -99,10 +105,12 @@ wails build -platform darwin/universal
 ```
 ├── main.go                  # Wails 应用入口、绑定
 ├── internal/
-│   ├── handler/             # Wails 绑定的 API handler（主机、终端、SFTP、会话、技能、日志、RDP、AI 配置、审批策略）
+│   ├── handler/             # Wails 绑定的 API handler（主机、终端、SFTP、会话、技能、日志、RDP、数据库、连接注册表、AI 配置、审批策略）
+│   ├── connector/           # 连接类型注册表 + 能力接口抽象（Driver / QueryRunner）
 │   ├── einoagent/           # AI 智能体（model/provider、tools、session、guardrail、prompt）
 │   ├── sshexec/             # SSH 命令执行器（统一 Exec 接口）
 │   ├── winrmexec/           # WinRM 命令执行器（同一 Exec 接口）
+│   ├── dbexec/              # 数据库执行器（mysql / postgres / sqlite 驱动）
 │   ├── sftp/                # SFTP 传输引擎（并发队列）
 │   ├── skill/               # 运维技能管理与远程脚本执行
 │   ├── termctx/             # 终端上下文环形缓冲（AI 上下文注入）

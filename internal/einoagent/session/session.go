@@ -18,7 +18,7 @@ import (
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
 
-	"ops-mate/internal/dbexec"
+	"ops-mate/internal/connector"
 	"ops-mate/internal/einoagent/checkpoint"
 	agentmodel "ops-mate/internal/einoagent/model"
 	agenttools "ops-mate/internal/einoagent/tools"
@@ -133,11 +133,11 @@ type SessionManager struct {
 	skillCatalogFor func() string
 	skillFor        func(name string) (*skill.Skill, error)
 
-	// protocolFor 按资产解析协议（"ssh"/"winrm"/"jdbc"）；nil 表示默认 ssh。
+	// protocolFor 按资产解析协议（"ssh"/"winrm"/"mysql"...）；nil 表示默认 ssh。
 	protocolFor func(hostID string) string
 
-	// dbExecutorFor 按资产解析数据库执行器（jdbc 协议，供 execute_sql 工具）；nil 表示不启用。
-	dbExecutorFor func(hostID string) *dbexec.Executor
+	// capabilityFor 按资产解析连接能力对象（已注册连接类型，供 execute_sql 工具）；nil 表示不启用。
+	capabilityFor func(hostID string) connector.Capability
 
 	mu            sync.Mutex
 	sessions      map[string]*agentSession
@@ -203,7 +203,7 @@ func (m *SessionManager) SetSkillResolver(catalog func() string, lookup func(nam
 	m.configVersion++
 }
 
-// SetProtocolResolver 注入协议解析器（hostID → "ssh"/"winrm"/"jdbc"）。
+// SetProtocolResolver 注入协议解析器（hostID → "ssh"/"winrm"/"mysql"...）。
 // 注入同时使已构建 Graph 失效（下一轮按新协议重建工具语义）。
 func (m *SessionManager) SetProtocolResolver(fn func(hostID string) string) {
 	m.mu.Lock()
@@ -212,11 +212,11 @@ func (m *SessionManager) SetProtocolResolver(fn func(hostID string) string) {
 	m.configVersion++
 }
 
-// SetDbExecutorResolver 注入数据库执行器解析器（hostID → dbexec.Executor）。
-// 不注入则 jdbc 资产无 execute_sql 工具。注入同时使已构建 Graph 失效。
-func (m *SessionManager) SetDbExecutorResolver(fn func(hostID string) *dbexec.Executor) {
+// SetCapabilityResolver 注入连接能力解析器（hostID → connector.Capability，供 execute_sql 工具）。
+// 不注入则数据库资产无 execute_sql 工具。注入同时使已构建 Graph 失效。
+func (m *SessionManager) SetCapabilityResolver(fn func(hostID string) connector.Capability) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.dbExecutorFor = fn
+	m.capabilityFor = fn
 	m.configVersion++
 }

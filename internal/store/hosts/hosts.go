@@ -2,7 +2,9 @@
 package hoststore
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"ops-mate/internal/store"
@@ -24,8 +26,7 @@ type Host struct {
 	AutoApprove   string  `gorm:"column:auto_approve"`
 	Protocol      string  `gorm:"column:protocol"`
 	RdpPort       int     `gorm:"column:rdp_port"`
-	Driver        string  `gorm:"column:driver"`
-	Database      string  `gorm:"column:database"`
+	ParamsJSON    string  `gorm:"column:params_json"`
 	CreatedAt     int64   `gorm:"column:created_at"`
 }
 
@@ -41,10 +42,11 @@ type HostInput struct {
 	AuthType    string `json:"authType"`
 	Secret      string `json:"secret"`
 	AutoApprove string `json:"autoApprove"` // inherit | on | off
-	Protocol    string `json:"protocol"`
-	RdpPort     int    `json:"rdpPort"`
-	Driver      string `json:"driver"`   // jdbc: mysql | postgres
-	Database    string `json:"database"` // jdbc: 目标库名
+	Protocol    string         `json:"protocol"`
+	RdpPort     int            `json:"rdpPort"`
+	Driver      string         `json:"driver,omitempty"`   // 兼容层（M6 后前端不再传），归一化时并入 Protocol/Params
+	Database    string         `json:"database,omitempty"` // 兼容层（M6 后前端不再传），归一化时并入 Params
+	Params      map[string]any `json:"params,omitempty"`
 }
 
 // HostMeta 资产列表项（不含凭据）。
@@ -59,9 +61,10 @@ type HostMeta struct {
 	AuthType    string `json:"authType"`
 	AutoApprove string `json:"autoApprove"`
 	Protocol    string `json:"protocol"`
-	RdpPort     int    `json:"rdpPort"`
-	Driver      string `json:"driver"`
-	Database    string `json:"database"`
+	RdpPort     int            `json:"rdpPort"`
+	Driver      string         `json:"driver"`   // 兼容输出（M6 前）
+	Database    string         `json:"database"` // 兼容输出（M6 前）
+	Params      map[string]any `json:"params"`
 }
 
 // TreeNode 树形节点返回结构。
@@ -79,9 +82,10 @@ type TreeNode struct {
 	AuthType    string `json:"authType,omitempty"`
 	AutoApprove string `json:"autoApprove,omitempty"`
 	Protocol    string `json:"protocol,omitempty"`
-	RdpPort     int    `json:"rdpPort,omitempty"`
-	Driver      string `json:"driver,omitempty"`
-	Database    string `json:"database,omitempty"`
+	RdpPort     int            `json:"rdpPort,omitempty"`
+	Driver      string         `json:"driver,omitempty"`
+	Database    string         `json:"database,omitempty"`
+	Params      map[string]any `json:"params,omitempty"`
 }
 
 // HostsStore 提供资产/目录管理操作。
@@ -111,10 +115,9 @@ func (s *HostsStore) SaveHost(in HostInput) (string, error) {
 		Addr: in.Addr, Port: in.Port, User: in.User,
 		AuthEncrypted: enc, AuthType: in.AuthType,
 		AutoApprove: autoApproveOrDefault(in.AutoApprove),
-		Protocol:    protocolOrDefault(in.Protocol),
+		Protocol:    normalizeProtocol(in),
 		RdpPort:     rdpPortOrDefault(in.RdpPort),
-		Driver:      driverOrDefault(in.Driver),
-		Database:    in.Database,
+		ParamsJSON:  paramsJSON(in),
 		CreatedAt:   time.Now().Unix(),
 	}).Error
 	if err != nil {
@@ -125,14 +128,21 @@ func (s *HostsStore) SaveHost(in HostInput) (string, error) {
 
 // UpdateHost 更新资产信息（节点编辑）。secret 为空则保留原凭据，非空则重新加密。
 func (s *HostsStore) UpdateHost(id string, in HostInput) error {
+	// 兼容客户端既不传 Params 也不传 Database 时，保留已存的 params_json，避免静默清空 database/filePath。
+	paramsJSON := paramsJSON(in)
+	if len(in.Params) == 0 && in.Database == "" {
+		var existing Host
+		if err := s.app.GORM().First(&existing, "id = ?", id).Error; err == nil {
+			paramsJSON = existing.ParamsJSON
+		}
+	}
 	updates := map[string]any{
 		"name": in.Name, "addr": in.Addr, "port": in.Port,
 		"user": in.User, "auth_type": in.AuthType,
 		"auto_approve": autoApproveOrDefault(in.AutoApprove),
-		"protocol":     protocolOrDefault(in.Protocol),
+		"protocol":     normalizeProtocol(in),
 		"rdp_port":     rdpPortOrDefault(in.RdpPort),
-		"driver":       driverOrDefault(in.Driver),
-		"database":     in.Database,
+		"params_json":  paramsJSON,
 	}
 	if in.Secret != "" {
 		enc, err := s.app.Encrypt([]byte(in.Secret))
@@ -170,14 +180,7 @@ func (s *HostsStore) ListHosts() ([]HostMeta, error) {
 	}
 	out := make([]HostMeta, 0, len(hosts))
 	for _, h := range hosts {
-		out = append(out, HostMeta{
-			ID: h.ID, Name: h.Name, NodeType: h.NodeType,
-			ParentID: strPtrVal(h.ParentID),
-			Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
-			AutoApprove: h.AutoApprove,
-			Protocol:    h.Protocol, RdpPort: h.RdpPort,
-			Driver:      h.Driver, Database: h.Database,
-		})
+		out = append(out, hostToMeta(h))
 	}
 	return out, nil
 }
@@ -193,34 +196,48 @@ func (s *HostsStore) ListTree() ([]TreeNode, error) {
 	nodeMap := make(map[string]*TreeNode)
 	for i := range all {
 		h := &all[i]
+		params := metaParams(*h)
 		nodeMap[h.ID] = &TreeNode{
 			ID: h.ID, Key: h.ID, Name: h.Name, NodeType: h.NodeType,
 			ParentID: strPtrVal(h.ParentID),
 			Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
 			AutoApprove: h.AutoApprove,
 			Protocol:    h.Protocol, RdpPort: h.RdpPort,
-			Driver:      h.Driver, Database: h.Database,
+			Params:      params,
+		}
+		if v, ok := params["database"].(string); ok {
+			nodeMap[h.ID].Database = v
 		}
 	}
 
-	// 构建树：先建立父子关系（通过指针操作 map 中的节点）
+	// 构建树：第一遍收集父 -> 子节点指针关系（不拷贝值，避免孙节点丢失）。
+	childrenOf := make(map[string][]*TreeNode)
 	rootsPtr := make([]*TreeNode, 0)
 	for i := range all {
 		h := &all[i]
 		node := nodeMap[h.ID]
 		if h.ParentID == nil || *h.ParentID == "" {
 			rootsPtr = append(rootsPtr, node)
-		} else {
-			if parent, ok := nodeMap[*h.ParentID]; ok {
-				parent.Children = append(parent.Children, *node)
-			}
+		} else if _, ok := nodeMap[*h.ParentID]; ok {
+			childrenOf[*h.ParentID] = append(childrenOf[*h.ParentID], node)
 		}
+	}
+
+	// 第二遍：递归装配子树（先填孙节点再值拷贝，保证嵌套层级完整）。
+	var assemble func(n *TreeNode) TreeNode
+	assemble = func(n *TreeNode) TreeNode {
+		out := *n
+		out.Children = make([]TreeNode, 0, len(childrenOf[n.ID]))
+		for _, c := range childrenOf[n.ID] {
+			out.Children = append(out.Children, assemble(c))
+		}
+		return out
 	}
 
 	// 解引用指针切片为值切片
 	roots := make([]TreeNode, len(rootsPtr))
 	for i, p := range rootsPtr {
-		roots[i] = *p
+		roots[i] = assemble(p)
 	}
 	return roots, nil
 }
@@ -270,14 +287,8 @@ func (s *HostsStore) HostMetaByID(id string) (*HostMeta, error) {
 	if err := s.app.GORM().First(&h, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
-	return &HostMeta{
-		ID: h.ID, Name: h.Name, NodeType: h.NodeType,
-		ParentID: strPtrVal(h.ParentID),
-		Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
-		AutoApprove: h.AutoApprove,
-		Protocol:    h.Protocol, RdpPort: h.RdpPort,
-		Driver:      h.Driver, Database: h.Database,
-	}, nil
+	meta := hostToMeta(h)
+	return &meta, nil
 }
 
 // GetAutoApprove 返回资产自动放行覆盖（"inherit"/"on"/"off"）。
@@ -304,14 +315,6 @@ func autoApproveOrDefault(v string) string {
 	return v
 }
 
-// protocolOrDefault normalizes empty protocol to "ssh".
-func protocolOrDefault(v string) string {
-	if v == "" {
-		return "ssh"
-	}
-	return v
-}
-
 // rdpPortOrDefault normalizes empty RDP port to default 3389.
 func rdpPortOrDefault(v int) int {
 	if v == 0 {
@@ -320,10 +323,58 @@ func rdpPortOrDefault(v int) int {
 	return v
 }
 
-// driverOrDefault normalizes empty driver to "mysql".
-func driverOrDefault(v string) string {
-	if v == "" {
-		return "mysql"
+// normalizeProtocol 连接类型单层化：空 → ssh；jdbc（M6 前兼容）→ driver。
+func normalizeProtocol(in HostInput) string {
+	p := in.Protocol
+	if p == "" {
+		return "ssh"
 	}
-	return v
+	if strings.EqualFold(p, "jdbc") {
+		if in.Driver != "" {
+			return in.Driver
+		}
+		return "jdbc"
+	}
+	return p
+}
+
+// paramsJSON 序列化资产专属参数：优先 Params，兼容层读 Database。
+func paramsJSON(in HostInput) string {
+	params := in.Params
+	if len(params) == 0 {
+		params = map[string]any{}
+		if in.Database != "" {
+			params["database"] = in.Database
+		}
+	}
+	b, err := json.Marshal(params)
+	if err != nil {
+		return "{}"
+	}
+	return string(b)
+}
+
+// metaParams 解析 params_json 为 map。
+func metaParams(h Host) map[string]any {
+	m := map[string]any{}
+	_ = json.Unmarshal([]byte(h.ParamsJSON), &m)
+	return m
+}
+
+// hostToMeta 把 Host 行转为 HostMeta（含 Params 与兼容的 Driver/Database）。
+func hostToMeta(h Host) HostMeta {
+	params := metaParams(h)
+	meta := HostMeta{
+		ID: h.ID, Name: h.Name, NodeType: h.NodeType,
+		ParentID: strPtrVal(h.ParentID),
+		Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
+		AutoApprove: h.AutoApprove,
+		Protocol:    h.Protocol, RdpPort: h.RdpPort,
+		Params:      params,
+	}
+	// 兼容输出（M6 前前端读 Driver/Database）
+	if v, ok := params["database"].(string); ok {
+		meta.Database = v
+	}
+	return meta
 }

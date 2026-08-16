@@ -14,6 +14,8 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
+
+	"ops-mate/internal/connector"
 )
 
 // Host 描述一个数据库目标。
@@ -51,8 +53,10 @@ func driverName(driver string) (string, error) {
 		return "mysql", nil
 	case "postgres", "postgresql", "pq":
 		return "postgres", nil
+	case "sqlite":
+		return "sqlite", nil
 	}
-	return "", fmt.Errorf("不支持的数据库驱动: %q（仅支持 mysql/postgres）", driver)
+	return "", fmt.Errorf("不支持的数据库驱动: %q（仅支持 mysql/postgres/sqlite）", driver)
 }
 
 // dsn 构造连接串。
@@ -61,9 +65,16 @@ func (e *Executor) dsn(driver string) string {
 	case "postgres":
 		return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
 			e.host.User, url.QueryEscape(e.host.Password), e.host.Addr, e.host.Port, e.host.Database)
+	case "sqlite":
+		return e.host.Database // 本地文件路径
 	default: // mysql
+		// go-sql-driver 用「最后一个 @」分割 userinfo/host、不反转义 password，
+		// 密码原样拼接即可（含 @ : / 由驱动解析策略正确处理）；dbname 是路径段同样不转义。
+		// 注意：不要对 password/database 用 url.QueryEscape——驱动不会反转义，
+		// 转义串会作为字面值（如 %40）发给服务器导致 Access denied / Unknown database。
 		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true",
-			e.host.User, e.host.Password, e.host.Addr, e.host.Port, e.host.Database)
+			e.host.User, e.host.Password, e.host.Addr, e.host.Port,
+			e.host.Database)
 	}
 }
 
@@ -190,6 +201,14 @@ func (e *Executor) schemaQuery() string {
 	if err != nil {
 		drv = "mysql"
 	}
+	if drv == "sqlite" {
+		return `SELECT m.name AS table_name, p.name AS column_name, p.type AS data_type,
+       CASE WHEN p."notnull" THEN 'NO' ELSE 'YES' END AS is_nullable, '' AS key
+FROM sqlite_master m
+JOIN pragma_table_info(m.name) p
+WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
+ORDER BY m.name, p.cid`
+	}
 	if drv == "postgres" {
 		return `SELECT t.table_name, c.column_name, c.data_type, c.is_nullable, '' AS key
 FROM information_schema.tables t
@@ -234,24 +253,9 @@ func parseSchema(res *Result) (*Schema, error) {
 	return &schema, nil
 }
 
-// IsQuery 判断 SQL 首关键字是否为查询类（走 Query 返回行集）。
-// 仅按首关键字粗分；WITH 开头的写语句（如 CTE + UPDATE）会保守走 Query，
-// 但 Query 对无行结果返回空 Rows，不影响正确性。
+// IsQuery 判断 SQL 首关键字是否为查询类（委托 connector.IsQuery，供 db 工作台使用）。
 func IsQuery(sqlText string) bool {
-	switch firstKeyword(sqlText) {
-	case "select", "show", "desc", "describe", "explain", "with", "pragma", "values":
-		return true
-	}
-	return false
-}
-
-// firstKeyword 提取 SQL 的首个关键字（小写）。
-func firstKeyword(s string) string {
-	s = strings.TrimSpace(s)
-	if i := strings.IndexAny(s, " \t\r\n"); i >= 0 {
-		s = s[:i]
-	}
-	return strings.ToLower(s)
+	return connector.IsQuery(sqlText)
 }
 
 // normalizeValue 把驱动返回值转为 JSON 友好 / 前端可展示的类型。

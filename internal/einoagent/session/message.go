@@ -3,8 +3,8 @@ package session
 import (
 	"context"
 	"fmt"
-	"strings"
 
+	"ops-mate/internal/connector"
 	"ops-mate/internal/einoagent/history"
 	convstore "ops-mate/internal/store/conversations"
 )
@@ -34,18 +34,19 @@ func (m *SessionManager) SendMessage(sid, text string) error {
 	}
 
 	// 执行器检查（提前失败，避免进入图执行才报错）。
-	// jdbc 资产走数据库执行器（不实现 sshexec.Exec，无需写入 holder）；其余走命令执行器。
+	// 已注册连接类型（数据库等）走连接能力解析（不实现 sshexec.Exec，无需写入 holder）；
+	// 其余（ssh/winrm）走命令执行器并写入 holder。
 	protocol := "ssh"
 	if m.protocolFor != nil {
 		protocol = m.protocolFor(s.hostID)
 	}
-	if strings.EqualFold(protocol, "jdbc") {
-		if m.dbExecutorFor == nil || m.dbExecutorFor(s.hostID) == nil {
+	if connector.Get(protocol) != nil {
+		if m.capabilityFor == nil {
 			s.mu.Lock()
 			s.state = stIdle
 			s.mu.Unlock()
 			m.emitError(sid, "数据库凭据不可用，请在资产页重新录入该资产的密码")
-			return fmt.Errorf("db executor unavailable for host %s", s.hostID)
+			return fmt.Errorf("connector capability resolver unavailable for host %s", s.hostID)
 		}
 	} else {
 		ex := m.executorFor(s.hostID)

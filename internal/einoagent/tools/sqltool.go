@@ -11,37 +11,45 @@ import (
 	einotool "github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/schema"
 
-	"ops-mate/internal/dbexec"
+	"ops-mate/internal/connector"
 	"ops-mate/internal/einoagent/guardrail"
 	"ops-mate/internal/einoagent/history"
 	convstore "ops-mate/internal/store/conversations"
 )
 
-// SQLTool 把数据库执行器包装为 eino InvokableTool（execute_sql，jdbc 协议）。
+// SQLTool 把数据库查询能力包装为 eino InvokableTool（execute_sql）。
+// 依赖 connector.QueryRunner 接口（由 connector 注册表按协议构造），不再绑定具体驱动。
 // 审批分级：只读查询（SELECT 族）命中自动放行时直连执行；写操作与高危 DDL
 // 每条 SQL 先 emit ai:command 再 einotool.Interrupt 等待人工审批。
 // Resume 数据 = 批准后的 SQL 文本（可能被用户编辑）或保留字 "rejected"。
 type SQLTool struct {
 	sessionID string
-	executor  *dbexec.Executor // 实际为 per-session 注入的数据库执行器
-	emit      func(sessionID, event string, data any)
-	convs     *convstore.ConvStore
-	holder    *ToolCallHolder
+	runner    connector.QueryRunner // 实际为 per-session 注入的数据库查询能力
+	// guardrailProto 危险判定协议名（SkillPack.Guardrail，通常 "sql"）。
+	guardrailProto string
+	emit           func(sessionID, event string, data any)
+	convs          *convstore.ConvStore
+	holder         *ToolCallHolder
 
 	// 审批分级：enableAuto=true 且 SQL 命中只读关键字时自动放行（不 Interrupt）。
 	enableAuto bool
 }
 
-// NewSQLTool 构造 SQL 工具。convs 为 nil 时不落库（测试简化）。
+// NewSQLTool 构造 SQL 工具。runner 为 nil 时执行返回"未配置"提示；
+// guardrailProto 为空时默认 "sql"。convs 为 nil 时不落库（测试简化）。
 func NewSQLTool(
 	sessionID string,
-	executor *dbexec.Executor,
+	runner connector.QueryRunner,
+	guardrailProto string,
 	emit func(sessionID, event string, data any),
 	convs *convstore.ConvStore,
 	holder *ToolCallHolder,
 ) *SQLTool {
+	if guardrailProto == "" {
+		guardrailProto = "sql"
+	}
 	return &SQLTool{
-		sessionID: sessionID, executor: executor,
+		sessionID: sessionID, runner: runner, guardrailProto: guardrailProto,
 		emit: emit, convs: convs, holder: holder,
 	}
 }
@@ -75,7 +83,7 @@ func (t *SQLTool) InvokableRun(ctx context.Context, argsJSON string, _ ...einoto
 		return "SQL 参数解析失败：" + err.Error() + "。请重新以 JSON 格式提议 SQL。", nil
 	}
 
-	risk, action := guardrail.ClassifyForProtocol(args.SQL, nil, "jdbc")
+	risk, action := guardrail.ClassifyForProtocol(args.SQL, nil, t.guardrailProto)
 	riskLabel := risk
 	if riskLabel == "" {
 		riskLabel = "low"
@@ -124,23 +132,28 @@ func (t *SQLTool) InvokableRun(ctx context.Context, argsJSON string, _ ...einoto
 
 // execute 执行 SQL：推送事件、落库、返回回灌模型的文本（永不返回 error）。
 func (t *SQLTool) execute(ctx context.Context, sqlText, approvalStatus string) (string, error) {
-	if t.executor == nil {
-		return "数据库执行器未配置，无法执行 SQL。请确认资产为 JDBC 协议且凭据可用。", nil
+	if t.runner == nil {
+		return "数据库执行器未配置，无法执行 SQL。请确认资产为数据库协议且凭据可用。", nil
 	}
 	start := time.Now()
 	if t.emit != nil {
 		t.emit(t.sessionID, "run:start", map[string]any{"command": sqlText})
 	}
 
-	var res *dbexec.Result
+	var display string
 	var execErr error
-	if dbexec.IsQuery(sqlText) {
-		res, execErr = t.executor.Query(ctx, sqlText)
+	cancelled := false
+	if connector.IsQuery(sqlText) {
+		res, err := t.runner.Query(ctx, sqlText)
+		execErr = err
+		cancelled = ctx.Err() != nil
+		display = formatQueryResult(res, execErr, cancelled)
 	} else {
-		res, execErr = t.executor.Exec(ctx, sqlText)
+		res, err := t.runner.Exec(ctx, sqlText)
+		execErr = err
+		cancelled = ctx.Err() != nil
+		display = formatExecResult(res, execErr, cancelled)
 	}
-	cancelled := ctx.Err() != nil
-	display := formatSQLResult(res, execErr, cancelled)
 	meta := toolMeta{
 		Command: sqlText, DurationMS: time.Since(start).Milliseconds(),
 		Status: approvalStatus, Cancelled: cancelled,
@@ -190,9 +203,8 @@ func (t *SQLTool) saveToolMessage(content, approvalStatus string, meta toolMeta)
 	}
 }
 
-// formatSQLResult 把结构化结果序列化为文本回灌模型/展示：
-// 查询类输出列名 + 制表符分隔行；写类输出受影响行数。
-func formatSQLResult(res *dbexec.Result, execErr error, cancelled bool) string {
+// formatQueryResult 把查询类结果序列化为文本回灌模型/展示（列名 + 制表符分隔行）。
+func formatQueryResult(res *connector.QueryResult, execErr error, cancelled bool) string {
 	var b strings.Builder
 	switch {
 	case cancelled:
@@ -214,12 +226,21 @@ func formatSQLResult(res *dbexec.Result, execErr error, cancelled bool) string {
 				b.WriteString("\n")
 			}
 		}
-		if res.RowsAffected > 0 {
-			if b.Len() > 0 {
-				b.WriteString("\n")
-			}
-			fmt.Fprintf(&b, "[rows_affected=%d]", res.RowsAffected)
-		}
 	}
 	return strings.TrimSuffix(b.String(), "\n")
+}
+
+// formatExecResult 把写类结果序列化为文本（受影响行数）。
+func formatExecResult(res *connector.ExecResult, execErr error, cancelled bool) string {
+	switch {
+	case cancelled:
+		return "SQL 执行被取消。"
+	case execErr != nil:
+		return fmt.Sprintf("SQL 执行失败：%v", execErr)
+	case res == nil:
+		return ""
+	case res.RowsAffected > 0:
+		return fmt.Sprintf("[rows_affected=%d]", res.RowsAffected)
+	}
+	return ""
 }

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"ops-mate/internal/dbexec"
+	"ops-mate/internal/connector"
 	"ops-mate/internal/handler/base"
 	hoststore "ops-mate/internal/store/hosts"
 )
@@ -74,20 +74,42 @@ func (h *HostsHandler) DeleteNode(nodeID string) error {
 // 1~2 个返回值，返回 3 个值（如 bool+string+error）时前端恒得到空值，
 // 导致连接成功也显示"失败"。失败原因走 error 供前端 catch 展示。
 func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, error) {
-	// jdbc 协议：走数据库 Ping，不走 sshexec.Exec（不实现该接口）。
-	if strings.EqualFold(in.Protocol, "jdbc") {
-		dbe := dbexec.NewExecutor(dbexec.Host{
-			Driver: in.Driver, Addr: in.Addr, Port: in.Port,
-			User: in.User, Password: in.Secret, Database: in.Database,
+	// M6 前前端可能仍传 jdbc+driver：先归一化为单层 protocol
+	protocol := in.Protocol
+	if strings.EqualFold(protocol, "jdbc") {
+		protocol = in.Driver
+	}
+	// 数据库驱动：走 connector 注册表构造 + Pingable
+	if d := connector.Get(protocol); d != nil {
+		params := in.Params
+		if len(params) == 0 {
+			params = map[string]any{}
+			if in.Database != "" {
+				params["database"] = in.Database
+			}
+		}
+		cap, err := connector.New(protocol, connector.Config{
+			Addr: in.Addr, Port: in.Port, User: in.User,
+			Password: in.Secret, Params: params,
 		})
+		if err != nil {
+			return false, err
+		}
+		pingable, ok := cap.(connector.Pingable)
+		if !ok {
+			return false, fmt.Errorf("连接类型 %q 不支持连接测试", protocol)
+		}
 		ctx, cancel := context.WithTimeout(base.Ctx(), 15*time.Second)
 		defer cancel()
-		if err := dbe.Ping(ctx); err != nil {
+		if err := pingable.Ping(ctx); err != nil {
 			return false, err
 		}
 		return true, nil
 	}
 	ex := base.ExecutorForHost(in.Protocol, in.Addr, in.Port, in.User, in.AuthType, in.Secret)
+	if ex == nil {
+		return false, fmt.Errorf("无法解析资产连接，请确认协议与凭据")
+	}
 	ctx, cancel := context.WithTimeout(base.Ctx(), 15*time.Second)
 	defer cancel()
 	ch, err := ex.Exec(ctx, "echo ok")
