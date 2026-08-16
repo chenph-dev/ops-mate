@@ -20,6 +20,15 @@ interface DbPanelProps {
   onToggleAI: () => void;
 }
 
+// 表名安全包裹：按目标库标识符引号规则转义并加引号，
+// 防止含空格/保留字/引号的表名生成非法 SQL 或注入面。
+function quoteIdent(protocol: string, name: string): string {
+  if (protocol === 'mysql') {
+    return '`' + name.replaceAll('`', '``') + '`';
+  }
+  return '"' + name.replaceAll('"', '""') + '"';
+}
+
 export default function DbPanel({
   host,
   aiCollapsed,
@@ -115,11 +124,11 @@ export default function DbPanel({
     [schema],
   );
 
-  // 点击表节点 → 生成 SELECT 查询填入编辑器
+  // 点击表节点 → 生成 SELECT 查询填入编辑器（表名按协议加引号）
   const onTreeSelect = (_: React.Key[], info: { node: TreeDataNode }): void => {
     const key = String(info.node.key ?? '');
     if (key.startsWith('table:')) {
-      setSql(`SELECT * FROM ${key.slice('table:'.length)};`);
+      setSql(`SELECT * FROM ${quoteIdent(host.protocol ?? '', key.slice('table:'.length))};`);
     }
   };
 

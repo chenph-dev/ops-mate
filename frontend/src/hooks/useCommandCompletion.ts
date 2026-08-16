@@ -220,12 +220,18 @@ export function useCommandCompletion(
   }, []);
 
   const acceptSelected = useCallback(() => {
-    setCompletion((prev) => {
-      if (!prev.open || prev.matches.length === 0) return prev;
-      acceptMatch(prev.matches[prev.selectedIndex]);
-      return { ...prev, open: false, matches: [], selectedIndex: 0 };
-    });
-  }, [acceptMatch]);
+    if (!completion.open || completion.matches.length === 0) return;
+    // 先取出选中的 match，再在 updater 外调用有副作用的 acceptMatch——
+    // setState updater 必须是纯函数（StrictMode 下会执行两次），
+    // 在 updater 内发终端输入存在命令双发的隐患。
+    const match = completion.matches[completion.selectedIndex];
+    setCompletion((prev) =>
+      prev.open
+        ? { ...prev, open: false, matches: [], selectedIndex: 0 }
+        : prev,
+    );
+    acceptMatch(match);
+  }, [completion.open, completion.matches, completion.selectedIndex, acceptMatch]);
 
   const handleInputData = useCallback(
     (data: string) => {

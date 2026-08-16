@@ -31,7 +31,9 @@ export function useConnectors(): {
           setLoading(false);
         })
         .catch(() => {
-          // 拉取失败：保持空列表（协议下拉仅 ssh/winrm），loading 置 false 避免卡死
+          // 拉取失败：重置缓存允许下次挂载重试（否则本次会话内
+          // 协议注册表永久为空，且新挂载组件 loading 永远 true）
+          cachedPromise = null;
           setLoading(false);
         });
     } else {
