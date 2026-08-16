@@ -24,10 +24,6 @@ func NewHostsHandler(hosts *hoststore.HostsStore, onChange func()) *HostsHandler
 	return &HostsHandler{hosts: hosts, onChange: onChange, resolver: base.NewExecutorResolver(hosts)}
 }
 
-func (h *HostsHandler) ListHosts() ([]hoststore.HostMeta, error) {
-	return h.hosts.ListHosts()
-}
-
 func (h *HostsHandler) SaveHost(in hoststore.HostInput) (string, error) {
 	return h.hosts.SaveHost(in)
 }
@@ -74,19 +70,12 @@ func (h *HostsHandler) DeleteNode(nodeID string) error {
 // 1~2 个返回值，返回 3 个值（如 bool+string+error）时前端恒得到空值，
 // 导致连接成功也显示"失败"。失败原因走 error 供前端 catch 展示。
 func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, error) {
-	// M6 前前端可能仍传 jdbc+driver：先归一化为单层 protocol
 	protocol := in.Protocol
-	if strings.EqualFold(protocol, "jdbc") {
-		protocol = in.Driver
-	}
 	// 数据库驱动（IsDB）：走 connector 注册表构造 + Pingable；命令型走 ExecutorForHost
 	if d := connector.Get(protocol); d != nil && d.IsDB() {
 		params := in.Params
-		if len(params) == 0 {
+		if params == nil {
 			params = map[string]any{}
-			if in.Database != "" {
-				params["database"] = in.Database
-			}
 		}
 		cap, err := connector.New(protocol, connector.Config{
 			Addr: in.Addr, Port: in.Port, User: in.User,

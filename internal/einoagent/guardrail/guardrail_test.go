@@ -163,7 +163,7 @@ func TestDefaultReadOnlyCommandsWindows_NotEmpty(t *testing.T) {
 	}
 }
 
-func TestClassifyForProtocol_JdbcSQL(t *testing.T) {
+func TestClassifyForProtocol_SQL(t *testing.T) {
 	cases := []struct {
 		sql    string
 		risk   string
@@ -192,26 +192,26 @@ func TestClassifyForProtocol_JdbcSQL(t *testing.T) {
 		{"PRAGMA table_info(users)", "read", ActionAuto},                   // 普通只读 PRAGMA 不受影响
 	}
 	for _, c := range cases {
-		risk, action := ClassifyForProtocol(c.sql, nil, "jdbc")
+		risk, action := ClassifyForProtocol(c.sql, nil, "sql")
 		if risk != c.risk || action != c.action {
-			t.Errorf("ClassifyForProtocol(%q, jdbc) = (%q,%q), want (%q,%q)", c.sql, risk, action, c.risk, c.action)
+			t.Errorf("ClassifyForProtocol(%q, sql) = (%q,%q), want (%q,%q)", c.sql, risk, action, c.risk, c.action)
 		}
 	}
 }
 
-func TestAssessRiskForProtocol_Jdbc(t *testing.T) {
-	if AssessRiskForProtocol("SELECT * FROM users", "jdbc") != "" {
-		t.Error("jdbc SELECT 不应判高风险")
+func TestAssessRiskForProtocol_SQL(t *testing.T) {
+	if AssessRiskForProtocol("SELECT * FROM users", "sql") != "" {
+		t.Error("sql SELECT 不应判高风险")
 	}
-	if AssessRiskForProtocol("DROP TABLE users", "jdbc") != "high" {
-		t.Error("jdbc DROP 应判高风险")
+	if AssessRiskForProtocol("DROP TABLE users", "sql") != "high" {
+		t.Error("sql DROP 应判高风险")
 	}
-	if AssessRiskForProtocol("UPDATE users SET name='x'", "jdbc") != "" {
-		t.Error("jdbc UPDATE 不应判高风险（写操作由审批而非 high 标红）")
+	if AssessRiskForProtocol("UPDATE users SET name='x'", "sql") != "" {
+		t.Error("sql UPDATE 不应判高风险（写操作由审批而非 high 标红）")
 	}
-	// jdbc 不受 Linux/Windows shell 危险模式影响
-	if AssessRiskForProtocol("rm -rf /", "jdbc") != "" {
-		t.Error("jdbc 不应套用 shell 危险模式")
+	// sql 不受 Linux/Windows shell 危险模式影响
+	if AssessRiskForProtocol("rm -rf /", "sql") != "" {
+		t.Error("sql 不应套用 shell 危险模式")
 	}
 }
 

@@ -145,8 +145,8 @@ func TestExecFor_WinRM(t *testing.T) {
 }
 
 func TestExecutorForHost_UnknownProtocolNil(t *testing.T) {
-	// jdbc 等未注册/遗留协议应返回 nil（无 shell 执行器），不误当 ssh 连接数据库主机
-	if got := ExecutorForHost("jdbc", "1.1.1.1", 3306, "u", "password", "x"); got != nil {
+	// 未注册协议应返回 nil（无 shell 执行器），不误当 ssh 连接目标
+	if got := ExecutorForHost("foobar", "1.1.1.1", 3306, "u", "password", "x"); got != nil {
 		t.Fatalf("未注册协议 ExecutorForHost 应为 nil, got %T", got)
 	}
 	if got := ExecutorForHost("", "1.1.1.1", 22, "u", "password", "x"); got == nil {

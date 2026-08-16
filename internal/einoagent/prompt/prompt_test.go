@@ -19,15 +19,8 @@ func TestPromptForProtocol_SshDefault(t *testing.T) {
 	}
 }
 
-func TestPromptForProtocol_Winrm(t *testing.T) {
-	got := PromptForProtocol("winrm")
-	if !strings.Contains(got, "PowerShell 命令") {
-		t.Errorf("winrm 片段应含 PowerShell 语义，得到 %q", got)
-	}
-	if !strings.Contains(got, "diskpart clean") {
-		t.Errorf("winrm 片段应含 Windows 危险操作提示，得到 %q", got)
-	}
-}
+// winrm→WinrmPrompt 的映射由 internal/register 显式声明（SkillPack.Prompt），
+// 此处不再单测该 fallback（winrm 恒走注册表）。
 
 func TestPromptForProtocol_DbDriver(t *testing.T) {
 	got := PromptForProtocol("mysql")
@@ -162,7 +155,7 @@ func TestPromptForProtocol_CaseInsensitive(t *testing.T) {
 	if got := PromptForProtocol("MYSQL"); !strings.Contains(got, "execute_sql") {
 		t.Errorf("大写 MYSQL 应命中注册表 db 片段，得到 %q", got)
 	}
-	if got := PromptForProtocol("  WinRM  "); !strings.Contains(got, "PowerShell 命令") {
-		t.Errorf("带空白混合大小写 WinRM 应返回 winrm 片段，得到 %q", got)
+	if got := PromptForProtocol("  FOO  "); !strings.Contains(got, "execute_command") {
+		t.Errorf("未注册协议应回退 ssh 片段，得到 %q", got)
 	}
 }

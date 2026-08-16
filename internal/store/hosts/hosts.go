@@ -4,7 +4,6 @@ package hoststore
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"ops-mate/internal/store"
@@ -44,8 +43,6 @@ type HostInput struct {
 	AutoApprove string `json:"autoApprove"` // inherit | on | off
 	Protocol    string         `json:"protocol"`
 	RdpPort     int            `json:"rdpPort"`
-	Driver      string         `json:"driver,omitempty"`   // 兼容层（M6 后前端不再传），归一化时并入 Protocol/Params
-	Database    string         `json:"database,omitempty"` // 兼容层（M6 后前端不再传），归一化时并入 Params
 	Params      map[string]any `json:"params,omitempty"`
 }
 
@@ -62,8 +59,6 @@ type HostMeta struct {
 	AutoApprove string `json:"autoApprove"`
 	Protocol    string `json:"protocol"`
 	RdpPort     int            `json:"rdpPort"`
-	Driver      string         `json:"driver"`   // 兼容输出（M6 前）
-	Database    string         `json:"database"` // 兼容输出（M6 前）
 	Params      map[string]any `json:"params"`
 }
 
@@ -83,8 +78,6 @@ type TreeNode struct {
 	AutoApprove string `json:"autoApprove,omitempty"`
 	Protocol    string `json:"protocol,omitempty"`
 	RdpPort     int            `json:"rdpPort,omitempty"`
-	Driver      string         `json:"driver,omitempty"`
-	Database    string         `json:"database,omitempty"`
 	Params      map[string]any `json:"params,omitempty"`
 }
 
@@ -128,9 +121,10 @@ func (s *HostsStore) SaveHost(in HostInput) (string, error) {
 
 // UpdateHost 更新资产信息（节点编辑）。secret 为空则保留原凭据，非空则重新加密。
 func (s *HostsStore) UpdateHost(id string, in HostInput) error {
-	// 兼容客户端既不传 Params 也不传 Database 时，保留已存的 params_json，避免静默清空 database/filePath。
+	// 编辑未提供 params 时保留已存 params_json，避免静默清空
+	// database/filePath/hostKeyFingerprint（SSH TOFU 指纹）等已有参数。
 	paramsJSON := paramsJSON(in)
-	if len(in.Params) == 0 && in.Database == "" {
+	if len(in.Params) == 0 {
 		var existing Host
 		if err := s.app.GORM().First(&existing, "id = ?", id).Error; err == nil {
 			paramsJSON = existing.ParamsJSON
@@ -172,19 +166,6 @@ func (s *HostsStore) CreateFolder(name, parentID string) (string, error) {
 	return id, nil
 }
 
-// ListHosts 返回所有资产的扁平列表（兼容旧接口）。
-func (s *HostsStore) ListHosts() ([]HostMeta, error) {
-	var hosts []Host
-	if err := s.app.GORM().Where("node_type = 'host'").Order("name").Find(&hosts).Error; err != nil {
-		return nil, err
-	}
-	out := make([]HostMeta, 0, len(hosts))
-	for _, h := range hosts {
-		out = append(out, hostToMeta(h))
-	}
-	return out, nil
-}
-
 // ListTree 返回完整的树形结构。
 func (s *HostsStore) ListTree() ([]TreeNode, error) {
 	var all []Host
@@ -204,9 +185,6 @@ func (s *HostsStore) ListTree() ([]TreeNode, error) {
 			AutoApprove: h.AutoApprove,
 			Protocol:    h.Protocol, RdpPort: h.RdpPort,
 			Params:      params,
-		}
-		if v, ok := params["database"].(string); ok {
-			nodeMap[h.ID].Database = v
 		}
 	}
 
@@ -352,29 +330,19 @@ func rdpPortOrDefault(v int) int {
 	return v
 }
 
-// normalizeProtocol 连接类型单层化：空 → ssh；jdbc（M6 前兼容）→ driver。
+// normalizeProtocol 连接类型单层化：空 → ssh。
 func normalizeProtocol(in HostInput) string {
-	p := in.Protocol
-	if p == "" {
+	if in.Protocol == "" {
 		return "ssh"
 	}
-	if strings.EqualFold(p, "jdbc") {
-		if in.Driver != "" {
-			return in.Driver
-		}
-		return "jdbc"
-	}
-	return p
+	return in.Protocol
 }
 
-// paramsJSON 序列化资产专属参数：优先 Params，兼容层读 Database。
+// paramsJSON 序列化资产专属参数。
 func paramsJSON(in HostInput) string {
 	params := in.Params
-	if len(params) == 0 {
+	if params == nil {
 		params = map[string]any{}
-		if in.Database != "" {
-			params["database"] = in.Database
-		}
 	}
 	b, err := json.Marshal(params)
 	if err != nil {
@@ -390,20 +358,14 @@ func metaParams(h Host) map[string]any {
 	return m
 }
 
-// hostToMeta 把 Host 行转为 HostMeta（含 Params 与兼容的 Driver/Database）。
+// hostToMeta 把 Host 行转为 HostMeta。
 func hostToMeta(h Host) HostMeta {
-	params := metaParams(h)
-	meta := HostMeta{
+	return HostMeta{
 		ID: h.ID, Name: h.Name, NodeType: h.NodeType,
 		ParentID: strPtrVal(h.ParentID),
 		Addr:     h.Addr, Port: h.Port, User: h.User, AuthType: h.AuthType,
 		AutoApprove: h.AutoApprove,
 		Protocol:    h.Protocol, RdpPort: h.RdpPort,
-		Params:      params,
+		Params:      metaParams(h),
 	}
-	// 兼容输出（M6 前前端读 Driver/Database）
-	if v, ok := params["database"].(string); ok {
-		meta.Database = v
-	}
-	return meta
 }

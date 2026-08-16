@@ -32,12 +32,12 @@ func TestHostCRUD_AuthEncrypted(t *testing.T) {
 		t.Fatal("密码被明文存储")
 	}
 
-	list, err := s.ListHosts()
+	list, err := s.ListTree()
 	if err != nil {
-		t.Fatalf("ListHosts: %v", err)
+		t.Fatalf("ListTree: %v", err)
 	}
 	if len(list) != 1 || list[0].Name != "web-01" {
-		t.Fatalf("ListHosts 结果: %+v", list)
+		t.Fatalf("ListTree 结果: %+v", list)
 	}
 
 	sec, at, err := s.GetHostSecret(id)
@@ -51,7 +51,7 @@ func TestHostCRUD_AuthEncrypted(t *testing.T) {
 	if err := s.DeleteNode(id); err != nil {
 		t.Fatalf("DeleteNode: %v", err)
 	}
-	list, _ = s.ListHosts()
+	list, _ = s.ListTree()
 	if len(list) != 0 {
 		t.Fatal("删除后应无资产")
 	}
@@ -112,9 +112,12 @@ func TestHostTree_FolderAndMove(t *testing.T) {
 	if err := s.DeleteNode(folder2ID); err != nil {
 		t.Fatalf("DeleteNode: %v", err)
 	}
-	list, _ := s.ListHosts()
-	if len(list) != 0 {
-		t.Fatal("级联删除后应无资产")
+	list, _ := s.ListTree()
+	if len(list) != 1 || list[0].Name != "生产环境" {
+		t.Fatal("级联删除后应只剩空的生产环境目录")
+	}
+	if len(list[0].Children) != 0 {
+		t.Fatal("级联删除后资产应消失")
 	}
 }
 
@@ -359,33 +362,6 @@ func TestHostParams_Roundtrip(t *testing.T) {
 	meta2, _ = s.HostMetaByID(id2)
 	if meta2.Params["database"] != "other" {
 		t.Errorf("UpdateHost 后 Params.database = %v, want other", meta2.Params["database"])
-	}
-}
-
-func TestHostJdbcCompatibility_NormalizesToSingleProtocol(t *testing.T) {
-	t.Setenv("APPDATA", t.TempDir())
-	app, err := store.Open()
-	if err != nil {
-		t.Fatalf("Open: %v", err)
-	}
-	defer closeDB(app)
-
-	s := NewHostsStore(app)
-	// M6 前前端仍传 jdbc+driver+database：应归一化为 protocol=mysql + params.database
-	id, err := s.SaveHost(HostInput{
-		Name: "legacy", Protocol: "jdbc", Driver: "mysql",
-		Database: "app", Addr: "1.2.3.4", Port: 3306, User: "root",
-		AuthType: "password", Secret: "x",
-	})
-	if err != nil {
-		t.Fatalf("SaveHost(jdbc): %v", err)
-	}
-	meta, _ := s.HostMetaByID(id)
-	if meta.Protocol != "mysql" {
-		t.Errorf("jdbc 未归一化: protocol = %q, want mysql", meta.Protocol)
-	}
-	if meta.Params["database"] != "app" {
-		t.Errorf("jdbc database 未移入 Params: %+v", meta.Params)
 	}
 }
 

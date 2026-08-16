@@ -54,10 +54,10 @@ var sensitiveReadPatterns = []string{
 var shellDequoteReplacer = strings.NewReplacer("'", "", `"`, "", `\`, "")
 
 // AssessRiskForProtocol 按协议返回命令风险等级："" 无风险，"high" 危险。
-// protocol 为 "winrm" 时额外套用 Windows 危险模式；"jdbc"/"sql" 走 SQL 语义。
+// protocol 为 "winrm" 时额外套用 Windows 危险模式；"sql" 走 SQL 语义。
 func AssessRiskForProtocol(command, protocol string) string {
 	c := strings.TrimSpace(command)
-	if strings.EqualFold(protocol, "jdbc") || strings.EqualFold(protocol, "sql") {
+	if strings.EqualFold(protocol, "sql") {
 		risk, _ := classifySQL(c)
 		if risk == "high" {
 			return "high"
@@ -166,9 +166,9 @@ func containsSensitiveReadArg(command string) bool {
 // ClassifyForProtocol 按协议综合分类：返回风险等级（"high"/"read"/"write"）与建议动作。
 // readOnlyWhitelist 为空时回退协议对应的内置默认白名单。
 // 高危命令永远 approve；只读命中 auto；其余 write → approve。
-// jdbc/sql 协议按 SQL 关键字语义分类（只读查询 auto、高危 DDL approve、其余写 approve）。
+// sql 协议按 SQL 关键字语义分类（只读查询 auto、高危 DDL approve、其余写 approve）。
 func ClassifyForProtocol(command string, readOnlyWhitelist []string, protocol string) (string, Action) {
-	if strings.EqualFold(protocol, "jdbc") || strings.EqualFold(protocol, "sql") {
+	if strings.EqualFold(protocol, "sql") {
 		return classifySQL(command)
 	}
 	if AssessRiskForProtocol(command, protocol) == "high" {
@@ -188,7 +188,7 @@ func ClassifyForProtocol(command string, readOnlyWhitelist []string, protocol st
 	return "write", ActionApprove
 }
 
-// classifySQL 按 SQL 首关键字分类（jdbc/sql 协议）：
+// classifySQL 按 SQL 首关键字分类（sql 协议）：
 // 只读查询（SELECT/SHOW/DESC/EXPLAIN 等）→ auto；高危 DDL（DROP/TRUNCATE/ALTER）→ high/approve；
 // 其余（INSERT/UPDATE/DELETE/CREATE/GRANT 及一切写）→ write/approve。
 // 保守策略：WITH 开头的 CTE（可能是写语句）与含分号的多语句一律人工审批，不自动放行。
