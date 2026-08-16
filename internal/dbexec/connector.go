@@ -54,6 +54,7 @@ func registerDBDriver(protocol, name, driver string) {
 	connector.Register(&connector.Driver{
 		Protocol:  protocol,
 		Name:      name,
+		Kind:      connector.KindDB,
 		NeedsHost: true,
 		Params: []connector.ParamSchema{
 			{Key: "database", Label: "数据库", Type: connector.ParamString, Required: true, Placeholder: "myapp"},

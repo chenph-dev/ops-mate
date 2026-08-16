@@ -26,15 +26,37 @@ type SkillPack struct {
 	Guardrail Guardrail // guardrail 协议名（sql / linux / winrm / redis）
 }
 
-// Driver 一种连接类型的完整声明。
+// DriverKind 连接类型的消费模型：能力型（数据库查询）还是命令型（shell 执行）。
+type DriverKind string
+
+const (
+	KindDB      DriverKind = "db"      // 能力型：New 返回 QueryRunner/Pingable，走 execute_sql / DbPanel
+	KindCommand DriverKind = "command" // 命令型：走 execute_command / 终端 / SFTP，执行器按 CommandKind 构造
+)
+
+// CommandKind 命令型驱动的执行器协议名。
+const (
+	CommandSSH   = "ssh"
+	CommandWinRM = "winrm"
+)
+
+// Driver 一种连接类型的完整声明。所有驱动必须显式声明 Kind（无隐式零值语义）。
 type Driver struct {
-	Protocol  string        // 注册表 key，如 "mysql"
-	Name      string        // 展示名，如 "MySQL"
-	NeedsHost bool          // false 时前端隐藏 host/port/user 区块（如 sqlite 本地文件）
-	Params    []ParamSchema // 资产录入表单的专属参数
-	SkillPack SkillPack
-	New       func(cfg Config) (Capability, error) // 构造能力对象（懒建连）
+	Protocol    string        // 注册表 key，如 "mysql"
+	Name        string        // 展示名，如 "MySQL"
+	Kind        DriverKind    // 必须显式声明（db / command），Register 校验
+	CommandKind string        // Kind==command 时：执行器协议名（CommandSSH / CommandWinRM）
+	NeedsHost   bool          // false 时前端隐藏 host/port/user 区块（如 sqlite 本地文件）
+	Params      []ParamSchema // 资产录入表单的专属参数
+	SkillPack   SkillPack
+	New         func(cfg Config) (Capability, error) // 构造能力对象（懒建连），DB 型使用
 }
 
-// Capability 连接提供的能力对象，具体实现 QueryRunner / ObjectBrowser / CommandRunner 之一或多个。
+// IsDB 是否为能力型（数据库）驱动。
+func (d *Driver) IsDB() bool { return d != nil && d.Kind == KindDB }
+
+// IsCommand 是否为命令型（shell 执行）驱动。
+func (d *Driver) IsCommand() bool { return d != nil && d.Kind == KindCommand }
+
+// Capability 连接提供的能力对象，具体实现 QueryRunner / Pingable 之一或多个。
 type Capability interface{}

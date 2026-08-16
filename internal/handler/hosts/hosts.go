@@ -79,8 +79,8 @@ func (h *HostsHandler) TestConnection(in hoststore.HostInput) (bool, error) {
 	if strings.EqualFold(protocol, "jdbc") {
 		protocol = in.Driver
 	}
-	// 数据库驱动：走 connector 注册表构造 + Pingable
-	if d := connector.Get(protocol); d != nil {
+	// 数据库驱动（IsDB）：走 connector 注册表构造 + Pingable；命令型走 ExecutorForHost
+	if d := connector.Get(protocol); d != nil && d.IsDB() {
 		params := in.Params
 		if len(params) == 0 {
 			params = map[string]any{}

@@ -3,25 +3,29 @@ package base
 import (
 	"fmt"
 	"log"
-	"strings"
 
 	"ops-mate/internal/connector"
 	"ops-mate/internal/dbexec"
+	_ "ops-mate/internal/register" // 登记内置命令型驱动（ssh/winrm）
 	"ops-mate/internal/sshexec"
 	hoststore "ops-mate/internal/store/hosts"
 	"ops-mate/internal/winrmexec"
 )
 
-// ExecutorForHost 按协议构造执行器。protocol 为空或非 winrm 视作 ssh。
+// ExecutorForHost 按协议构造执行器（空协议视作 ssh）。
 // 接收裸字段（保存前的 HostInput 或已解析的 meta），供 TestConnection 等
-// 尚未落库的场景使用。jdbc 协议不实现 sshexec.Exec（结构化结果），返回 nil，
-// 请使用 ExecutorResolver.DbFor 或 dbexec 直接构造。
+// 尚未落库的场景使用。未注册/遗留协议（如 jdbc）或数据库资产返回 nil——
+// 无 shell 执行器，不做旧协议特判。
 func ExecutorForHost(protocol string, addr string, port int, user, authType, secret string) sshexec.Exec {
-	if strings.EqualFold(protocol, "winrm") {
-		return winrmexec.NewExecutor(winrmexec.Host{Addr: addr, Port: port, User: user, Secret: secret})
+	if protocol == "" {
+		protocol = connector.CommandSSH
 	}
-	if strings.EqualFold(protocol, "jdbc") {
+	d := connector.Get(protocol)
+	if d == nil || d.IsDB() {
 		return nil
+	}
+	if d.CommandKind == connector.CommandWinRM {
+		return winrmexec.NewExecutor(winrmexec.Host{Addr: addr, Port: port, User: user, Secret: secret})
 	}
 	return sshexec.NewExecutor(sshexec.Host{Addr: addr, Port: port, User: user, AuthType: authType, Secret: secret})
 }
@@ -53,14 +57,19 @@ func (r *ExecutorResolver) ExecFor(hostID string) sshexec.Exec {
 	if err != nil || meta == nil {
 		return nil
 	}
-	if strings.EqualFold(meta.Protocol, "winrm") {
+	proto := meta.Protocol
+	if proto == "" {
+		proto = connector.CommandSSH
+	}
+	d := connector.Get(proto)
+	if d == nil || d.IsDB() {
+		return nil // 未注册/遗留协议或数据库资产无 shell 执行器
+	}
+	if d.CommandKind == connector.CommandWinRM {
 		return winrmexec.NewExecutor(winrmexec.Host{
 			Addr: meta.Addr, Port: meta.Port, User: meta.User,
 			Secret: secret, SkipVerify: r.skipVerify(meta),
 		})
-	}
-	if strings.EqualFold(meta.Protocol, "jdbc") || connector.Get(meta.Protocol) != nil {
-		return nil // 数据库资产无 shell 执行器
 	}
 	h := &sshexec.Host{
 		Addr: meta.Addr, Port: meta.Port, User: meta.User,
@@ -83,14 +92,18 @@ func (r *ExecutorResolver) HostFor(hostID string) (*sshexec.Host, error) {
 	if meta == nil {
 		return nil, fmt.Errorf("资产不存在")
 	}
-	if strings.EqualFold(meta.Protocol, "winrm") {
+	proto := meta.Protocol
+	if proto == "" {
+		proto = connector.CommandSSH
+	}
+	d := connector.Get(proto)
+	switch {
+	case d == nil:
+		return nil, fmt.Errorf("不支持的资产类型")
+	case d.IsDB():
+		return nil, fmt.Errorf("数据库资产不支持交互式会话")
+	case d.CommandKind == connector.CommandWinRM:
 		return nil, fmt.Errorf("WinRM 资产不支持交互式会话")
-	}
-	if strings.EqualFold(meta.Protocol, "jdbc") {
-		return nil, fmt.Errorf("数据库资产不支持交互式会话")
-	}
-	if connector.Get(meta.Protocol) != nil {
-		return nil, fmt.Errorf("数据库资产不支持交互式会话")
 	}
 	secret, authType, err := r.hosts.GetHostSecret(hostID)
 	if err != nil {
@@ -122,7 +135,7 @@ func (r *ExecutorResolver) DbFor(hostID string) *dbexec.Executor {
 	if err != nil || meta == nil {
 		return nil
 	}
-	if connector.Get(meta.Protocol) == nil {
+	if d := connector.Get(meta.Protocol); d == nil || !d.IsDB() {
 		return nil
 	}
 	return dbexec.NewExecutor(dbexec.Host{
@@ -152,7 +165,7 @@ func (r *ExecutorResolver) ConnFor(hostID string) connector.Capability {
 		log.Printf("resolver: connfor host %s: meta not found", hostID)
 		return nil
 	}
-	if connector.Get(meta.Protocol) == nil {
+	if d := connector.Get(meta.Protocol); d == nil || !d.IsDB() {
 		return nil
 	}
 	cap, err := connector.New(meta.Protocol, connector.Config{

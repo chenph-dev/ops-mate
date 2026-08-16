@@ -34,13 +34,13 @@ func (m *SessionManager) SendMessage(sid, text string) error {
 	}
 
 	// 执行器检查（提前失败，避免进入图执行才报错）。
-	// 已注册连接类型（数据库等）走连接能力解析（不实现 sshexec.Exec，无需写入 holder）；
-	// 其余（ssh/winrm）走命令执行器并写入 holder。
+	// 已注册数据库驱动（IsDB）走连接能力解析（不实现 sshexec.Exec，无需写入 holder）；
+	// 其余（ssh/winrm 命令型）走命令执行器并写入 holder。
 	protocol := "ssh"
 	if m.protocolFor != nil {
 		protocol = m.protocolFor(s.hostID)
 	}
-	if connector.Get(protocol) != nil {
+	if d := connector.Get(protocol); d != nil && d.IsDB() {
 		if m.capabilityFor == nil {
 			s.mu.Lock()
 			s.state = stIdle

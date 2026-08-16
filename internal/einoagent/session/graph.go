@@ -110,10 +110,10 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 		capability = capabilityFor(s.hostID)
 	}
 
-	// 命令工具按能力注册：注册表已登记的连接类型（QueryRunner）→ execute_sql；
-	// 否则（ssh/winrm/未知）→ execute_command（sshexec holder 执行器）。
+	// 命令工具按能力注册：注册表已登记的数据库驱动（IsDB）→ execute_sql；
+	// 否则（ssh/winrm 命令型/未知）→ execute_command（sshexec holder 执行器）。
 	var commandTool einotool.BaseTool
-	if d := connector.Get(protocol); d != nil {
+	if d := connector.Get(protocol); d != nil && d.IsDB() {
 		qr, ok := capability.(connector.QueryRunner)
 		if !ok || qr == nil {
 			return fmt.Errorf("连接类型 %q 的数据库查询能力不可用，请检查资产配置", protocol)
@@ -126,7 +126,13 @@ func (m *SessionManager) ensureGraph(s *agentSession) error {
 		commandTool = sqlTool
 	} else {
 		sshTool := agenttools.NewSSHTool(s.id, s.holder, m.emit, m.convs, s.toolCalls)
-		sshTool.SetProtocol(protocol)
+		// 命令型驱动按注册表 CommandKind 传协议（guardrail 按协议语义判定），
+		// 未注册/未知协议传裸 asset protocol。
+		cmdKind := protocol
+		if d != nil && d.CommandKind != "" {
+			cmdKind = d.CommandKind
+		}
+		sshTool.SetProtocol(cmdKind)
 		if policyFor != nil {
 			auto, wl := policyFor(s.hostID)
 			sshTool.SetApprovalPolicy(auto, wl)

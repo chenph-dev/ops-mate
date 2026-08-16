@@ -11,11 +11,21 @@ var drivers = make(map[string]*Driver)
 
 // Register 登记一个 Driver。Protocol 必须非空，否则 panic。注册 key 统一小写，
 // 使 Get 大小写不敏感（资产录入/前端可能传混合大小写协议名）。
-// SkillPack.Guardrail 必须为合法枚举值（空 = 默认 linux），否则 panic——
-// 防止自由字符串与 guardrail 包封闭协议集漂移（写错字静默降级为 shell 语义）。
+// Kind 必须显式声明（db/command），命令型必须提供 CommandKind——
+// 防止协议分派静默退化；SkillPack.Guardrail 必须为合法枚举值（空 = 默认 linux），
+// 防止自由字符串与 guardrail 包封闭协议集漂移。
 func Register(d *Driver) {
 	if d == nil || d.Protocol == "" {
 		panic("connector: Driver 必须提供非空 Protocol")
+	}
+	switch d.Kind {
+	case KindDB:
+	case KindCommand:
+		if d.CommandKind == "" {
+			panic(fmt.Sprintf("connector: 命令型驱动 %q 必须提供 CommandKind", d.Protocol))
+		}
+	default:
+		panic(fmt.Sprintf("connector: 驱动 %q 的 Kind %q 非法（必须显式声明 db 或 command）", d.Protocol, d.Kind))
 	}
 	g := d.SkillPack.Guardrail
 	if g != "" && g != GuardrailSQL && g != GuardrailLinux &&

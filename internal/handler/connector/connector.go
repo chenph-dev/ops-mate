@@ -3,6 +3,7 @@ package connector
 
 import (
 	connector "ops-mate/internal/connector"
+	_ "ops-mate/internal/register" // 登记内置命令型驱动（ssh/winrm），供 ListDrivers 输出
 )
 
 // ConnectorHandler 暴露连接类型元信息给前端（wails 绑定）。

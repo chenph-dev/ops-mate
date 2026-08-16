@@ -11,6 +11,7 @@ func init() {
 	connector.Register(&connector.Driver{
 		Protocol:  "sqlite",
 		Name:      "SQLite",
+		Kind:      connector.KindDB,
 		NeedsHost: false,
 		Params: []connector.ParamSchema{
 			{Key: "filePath", Label: "数据库文件路径", Type: connector.ParamFile, Required: true,
