@@ -8,9 +8,6 @@ type ParamType string
 
 const (
 	ParamString ParamType = "string"
-	ParamInt    ParamType = "int"
-	ParamSecret ParamType = "secret"
-	ParamSelect ParamType = "select"
 	ParamFile   ParamType = "file"
 )
 

@@ -42,38 +42,11 @@ function ParamControl({
   value?: unknown;
   onChange?: (...args: any[]) => void;
 }): React.JSX.Element {
-  switch (p.type) {
-    case 'int':
-      return (
-        <InputNumber
-          style={{ width: '100%' }}
-          placeholder={p.placeholder}
-          value={value as number}
-          onChange={onChange}
-        />
-      );
-    case 'secret':
-      return (
-        <Input.Password
-          placeholder={p.placeholder}
-          value={value as string}
-          onChange={onChange}
-        />
-      );
-    case 'select':
-      return (
-        <Select
-          options={(p.options ?? []).map((o) => ({ label: o.label, value: o.value }))}
-          placeholder={p.placeholder}
-          value={value as string}
-          onChange={onChange}
-        />
-      );
-    default: // string / file
-      return (
-        <Input placeholder={p.placeholder} value={value as string} onChange={onChange} />
-      );
-  }
+  // 当前驱动仅使用 string/file 两种参数类型（mysql/postgres 的 database、sqlite 的 filePath），
+  // int/secret/select 变体无驱动触发，已移除对应分支。
+  return (
+    <Input placeholder={p.placeholder} value={value as string} onChange={onChange} />
+  );
 }
 
 export default function HostForm({

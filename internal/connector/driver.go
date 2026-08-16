@@ -17,13 +17,12 @@ type SkillPack struct {
 
 // Driver 一种连接类型的完整声明。
 type Driver struct {
-	Protocol     string        // 注册表 key，如 "mysql"
-	Name         string        // 展示名，如 "MySQL"
-	NeedsHost    bool          // false 时前端隐藏 host/port/user 区块（如 sqlite 本地文件）
-	Params       []ParamSchema // 资产录入表单的专属参数
-	Capabilities []string      // 能力标记，如 ["query","objectTree"]
-	SkillPack    SkillPack
-	New          func(cfg Config) (Capability, error) // 构造能力对象（懒建连）
+	Protocol  string        // 注册表 key，如 "mysql"
+	Name      string        // 展示名，如 "MySQL"
+	NeedsHost bool          // false 时前端隐藏 host/port/user 区块（如 sqlite 本地文件）
+	Params    []ParamSchema // 资产录入表单的专属参数
+	SkillPack SkillPack
+	New       func(cfg Config) (Capability, error) // 构造能力对象（懒建连）
 }
 
 // Capability 连接提供的能力对象，具体实现 QueryRunner / ObjectBrowser / CommandRunner 之一或多个。

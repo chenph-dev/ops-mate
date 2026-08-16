@@ -11,16 +11,13 @@ let cachedPromise: Promise<void> | null = null;
 // useConnectors 拉取连接类型注册表元信息（protocol 下拉、参数表单、面板路由的单一事实来源）。
 export function useConnectors(): {
   drivers: DriverMeta[];
-  loading: boolean;
   isDB: (protocol?: string) => boolean;
 } {
   const [drivers, setDrivers] = useState<DriverMeta[]>(cachedDrivers ?? []);
-  const [loading, setLoading] = useState(cachedDrivers === null);
 
   useEffect(() => {
     if (cachedDrivers) {
       setDrivers(cachedDrivers);
-      setLoading(false);
       return;
     }
     if (!cachedPromise) {
@@ -28,19 +25,16 @@ export function useConnectors(): {
         .then((list) => {
           cachedDrivers = list;
           setDrivers(list);
-          setLoading(false);
         })
         .catch(() => {
           // 拉取失败：重置缓存允许下次挂载重试（否则本次会话内
-          // 协议注册表永久为空，且新挂载组件 loading 永远 true）
+          // 协议注册表永久为空、新挂载组件拿不到注册表）
           cachedPromise = null;
-          setLoading(false);
         });
     } else {
       void cachedPromise.then(() => {
         if (cachedDrivers) {
           setDrivers(cachedDrivers);
-          setLoading(false);
         }
       });
     }
@@ -57,5 +51,5 @@ export function useConnectors(): {
     [protocolSet],
   );
 
-  return { drivers: drivers ?? [], loading, isDB };
+  return { drivers: drivers ?? [], isDB };
 }

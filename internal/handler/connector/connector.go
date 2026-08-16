@@ -15,11 +15,10 @@ func NewConnectorHandler() *ConnectorHandler {
 
 // DriverMeta 前端可见的连接类型元信息（映射自 connector.Driver，去除 New 等内部字段）。
 type DriverMeta struct {
-	Protocol     string                  `json:"protocol"`
-	Name         string                  `json:"name"`
-	NeedsHost    bool                    `json:"needsHost"`
-	Params       []connector.ParamSchema `json:"params"`
-	Capabilities []string                `json:"capabilities"`
+	Protocol  string                  `json:"protocol"`
+	Name      string                  `json:"name"`
+	NeedsHost bool                    `json:"needsHost"`
+	Params    []connector.ParamSchema `json:"params"`
 }
 
 // ListDrivers 返回注册表中全部连接类型元信息，供前端动态表单/面板按 protocol 复用。
@@ -29,7 +28,7 @@ func (h *ConnectorHandler) ListDrivers() []DriverMeta {
 	for _, d := range list {
 		out = append(out, DriverMeta{
 			Protocol: d.Protocol, Name: d.Name, NeedsHost: d.NeedsHost,
-			Params: d.Params, Capabilities: d.Capabilities,
+			Params: d.Params,
 		})
 	}
 	return out

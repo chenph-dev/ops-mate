@@ -18,7 +18,7 @@ func TestListDrivers_ContainsRegistered(t *testing.T) {
 		if !ok {
 			t.Fatalf("ListDrivers 应包含 %q", proto)
 		}
-		if d.Name == "" || len(d.Capabilities) == 0 {
+		if d.Name == "" || len(d.Params) == 0 {
 			t.Errorf("%q 元信息不完整: %+v", proto, d)
 		}
 	}

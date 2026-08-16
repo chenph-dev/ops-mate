@@ -53,13 +53,6 @@ var sensitiveReadPatterns = []string{
 // shellDequoteReplacer 剥离单/双引号与反斜杠，防 cat /etc/sh\adow、cat /etc/sh''adow 绕过。
 var shellDequoteReplacer = strings.NewReplacer("'", "", `"`, "", `\`, "")
 
-// AssessRisk 返回命令风险等级："" 无风险，"high" 危险。
-// 引擎层永不硬拒——只用于前端标红与二次确认。
-// 为向后兼容，沿用 Linux 语义。
-func AssessRisk(command string) string {
-	return AssessRiskForProtocol(command, "ssh")
-}
-
 // AssessRiskForProtocol 按协议返回命令风险等级："" 无风险，"high" 危险。
 // protocol 为 "winrm" 时额外套用 Windows 危险模式；"jdbc"/"sql" 走 SQL 语义。
 func AssessRiskForProtocol(command, protocol string) string {
@@ -168,14 +161,6 @@ func containsSensitiveReadArg(command string) bool {
 		}
 	}
 	return false
-}
-
-// Classify 综合分类：返回风险等级（"high"/"read"/"write"）与建议动作。
-// readOnlyWhitelist 为空时回退内置默认白名单。
-// 高危命令永远 approve；只读命中 auto；其余 write → approve。
-// 为向后兼容，沿用 Linux（ssh）语义。
-func Classify(command string, readOnlyWhitelist []string) (string, Action) {
-	return ClassifyForProtocol(command, readOnlyWhitelist, "ssh")
 }
 
 // ClassifyForProtocol 按协议综合分类：返回风险等级（"high"/"read"/"write"）与建议动作。

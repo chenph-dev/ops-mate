@@ -6,7 +6,7 @@ import (
 	"ops-mate/internal/connector"
 )
 
-// connectorQueryRunner 把 Executor 适配为 connector.QueryRunner + ObjectBrowser。
+// connectorQueryRunner 把 Executor 适配为 connector.QueryRunner + Pingable。
 type connectorQueryRunner struct {
 	e *Executor
 }
@@ -29,23 +29,6 @@ func (a *connectorQueryRunner) Exec(ctx context.Context, query string) (*connect
 
 func (a *connectorQueryRunner) Ping(ctx context.Context) error {
 	return a.e.Ping(ctx)
-}
-
-// Tree 把 schema 表/列转为对象树（表 → 列）。
-func (a *connectorQueryRunner) Tree(ctx context.Context) ([]connector.ObjectNode, error) {
-	s, err := a.e.Schema(ctx)
-	if err != nil {
-		return nil, err
-	}
-	nodes := make([]connector.ObjectNode, 0, len(s.Tables))
-	for _, t := range s.Tables {
-		n := connector.ObjectNode{Name: t.Name, Type: "table"}
-		for _, c := range t.Columns {
-			n.Children = append(n.Children, connector.ObjectNode{Name: c.Name, Type: c.DataType})
-		}
-		nodes = append(nodes, n)
-	}
-	return nodes, nil
 }
 
 // paramString 从 Config.Params 取字符串参数，缺失返回空串。
@@ -75,8 +58,7 @@ func registerDBDriver(protocol, name, driver string) {
 		Params: []connector.ParamSchema{
 			{Key: "database", Label: "数据库", Type: connector.ParamString, Required: true, Placeholder: "myapp"},
 		},
-		Capabilities: []string{"query", "objectTree"},
-		SkillPack:    connector.SkillPack{Prompt: dbSkillPrompt, Guardrail: "sql"},
+		SkillPack: connector.SkillPack{Prompt: dbSkillPrompt, Guardrail: "sql"},
 		New: func(cfg connector.Config) (connector.Capability, error) {
 			ex := NewExecutor(Host{
 				Driver: driver, Addr: cfg.Addr, Port: cfg.Port,

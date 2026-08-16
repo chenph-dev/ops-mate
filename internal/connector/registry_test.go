@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// fakeQueryRunner 同时实现 QueryRunner + ObjectBrowser，用于注册测试。
+// fakeQueryRunner 实现 QueryRunner，用于注册测试。
 type fakeQueryRunner struct{}
 
 func (fakeQueryRunner) Query(_ context.Context, query string) (*QueryResult, error) {
@@ -13,9 +13,6 @@ func (fakeQueryRunner) Query(_ context.Context, query string) (*QueryResult, err
 }
 func (fakeQueryRunner) Exec(_ context.Context, query string) (*ExecResult, error) {
 	return &ExecResult{}, nil
-}
-func (fakeQueryRunner) Tree(_ context.Context) ([]ObjectNode, error) {
-	return nil, nil
 }
 
 func TestRegisterAndGet(t *testing.T) {

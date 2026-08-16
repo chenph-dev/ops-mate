@@ -8,15 +8,6 @@ import (
 	"ops-mate/internal/connector"
 )
 
-func hasCap(caps []string, want string) bool {
-	for _, c := range caps {
-		if c == want {
-			return true
-		}
-	}
-	return false
-}
-
 func TestMysqlPostgresRegistered(t *testing.T) {
 	for _, proto := range []string{"mysql", "postgres"} {
 		d := connector.Get(proto)
@@ -25,9 +16,6 @@ func TestMysqlPostgresRegistered(t *testing.T) {
 		}
 		if !d.NeedsHost {
 			t.Errorf("%q NeedsHost 应为 true", proto)
-		}
-		if !hasCap(d.Capabilities, "query") || !hasCap(d.Capabilities, "objectTree") {
-			t.Errorf("%q 应声明 query/objectTree 能力, got %v", proto, d.Capabilities)
 		}
 		if d.SkillPack.Guardrail != "sql" {
 			t.Errorf("%q guardrail 应为 sql, got %q", proto, d.SkillPack.Guardrail)
@@ -45,9 +33,6 @@ func TestMysqlNewReturnsCapabilities(t *testing.T) {
 	}
 	if _, ok := cap.(connector.QueryRunner); !ok {
 		t.Fatalf("mysql 应实现 QueryRunner, got %T", cap)
-	}
-	if _, ok := cap.(connector.ObjectBrowser); !ok {
-		t.Fatalf("mysql 应实现 ObjectBrowser, got %T", cap)
 	}
 }
 

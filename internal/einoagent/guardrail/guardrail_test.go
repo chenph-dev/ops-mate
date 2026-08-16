@@ -19,7 +19,7 @@ func TestAssessRisk(t *testing.T) {
 		{"echo hi > /dev/sda", "high"},
 	}
 	for _, c := range cases {
-		got := AssessRisk(c.cmd)
+		got := AssessRiskForProtocol(c.cmd, "ssh")
 		if c.level == "" {
 			if got != "" {
 				t.Errorf("命令 %q 期望无风险，得到 %q", c.cmd, got)
@@ -50,9 +50,9 @@ func TestClassify(t *testing.T) {
 		{"ls -la", []string{}, "read", ActionAuto},
 	}
 	for _, c := range cases {
-		risk, action := Classify(c.cmd, c.whitelist)
+		risk, action := ClassifyForProtocol(c.cmd, c.whitelist, "ssh")
 		if risk != c.wantRisk || action != c.wantAction {
-			t.Errorf("Classify(%q, %v) = (%q, %q)，want (%q, %q)",
+			t.Errorf("ClassifyForProtocol(%q, %v, ssh) = (%q, %q)，want (%q, %q)",
 				c.cmd, c.whitelist, risk, action, c.wantRisk, c.wantAction)
 		}
 	}
@@ -97,11 +97,11 @@ func TestParseReadOnlyList(t *testing.T) {
 }
 
 func TestAssessRisk_UnchangedForClean(t *testing.T) {
-	if got := AssessRisk("ls -la"); got != "" {
-		t.Errorf("AssessRisk 应保持二态（干净命令返回空串），得到 %q", got)
+	if got := AssessRiskForProtocol("ls -la", "ssh"); got != "" {
+		t.Errorf("AssessRiskForProtocol 应保持二态（干净命令返回空串），得到 %q", got)
 	}
-	if got := AssessRisk("rm -rf /"); got != "high" {
-		t.Errorf("AssessRisk 应返回 high，得到 %q", got)
+	if got := AssessRiskForProtocol("rm -rf /", "ssh"); got != "high" {
+		t.Errorf("AssessRiskForProtocol 应返回 high，得到 %q", got)
 	}
 }
 
