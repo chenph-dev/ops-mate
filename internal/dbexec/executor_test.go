@@ -33,13 +33,13 @@ func TestDriverName(t *testing.T) {
 
 func TestDSN(t *testing.T) {
 	e := NewExecutor(Host{Driver: "mysql", Addr: "10.0.0.5", Port: 3306, User: "root", Password: "p@ss", Database: "app"})
-	if got, want := e.dsn("mysql"), "root:p@ss@tcp(10.0.0.5:3306)/app?parseTime=true"; got != want {
+	if got, want := e.dsn("mysql"), "root:p@ss@tcp(10.0.0.5:3306)/app?parseTime=true&tls=preferred"; got != want {
 		t.Errorf("mysql dsn = %q, want %q", got, want)
 	}
 	// 特殊字符库名（中文/空格等）不应被 QueryEscape：go-sql-driver 只反转义
 	// password、不反转义 dbname（路径段），转义会连到错误的库名报 Unknown database。
 	special := NewExecutor(Host{Driver: "mysql", Addr: "10.0.0.5", Port: 3306, User: "root", Password: "x", Database: "my db"})
-	if got, want := special.dsn("mysql"), "root:x@tcp(10.0.0.5:3306)/my db?parseTime=true"; got != want {
+	if got, want := special.dsn("mysql"), "root:x@tcp(10.0.0.5:3306)/my db?parseTime=true&tls=preferred"; got != want {
 		t.Errorf("mysql dsn 特殊字符库名 = %q, want %q（dbname 不应 URL 转义）", got, want)
 	}
 
@@ -48,8 +48,12 @@ func TestDSN(t *testing.T) {
 	if !strings.Contains(got, "postgres://pg:p%40ss%2F@10.0.0.6:5432/db") {
 		t.Errorf("postgres dsn = %q（密码应 URL 转义）", got)
 	}
-	if !strings.Contains(got, "sslmode=disable") {
-		t.Errorf("postgres dsn 缺 sslmode=disable: %q", got)
+	// 默认加密优先（prefer）：服务端支持 TLS 时加密，防明文泄露凭据/查询。
+	if !strings.Contains(got, "sslmode=prefer") {
+		t.Errorf("postgres dsn 缺 sslmode=prefer: %q", got)
+	}
+	if strings.Contains(got, "sslmode=disable") {
+		t.Errorf("postgres dsn 不应显式关闭 TLS: %q", got)
 	}
 }
 

@@ -388,3 +388,45 @@ func TestHostJdbcCompatibility_NormalizesToSingleProtocol(t *testing.T) {
 		t.Errorf("jdbc database 未移入 Params: %+v", meta.Params)
 	}
 }
+
+func TestHostKeyFingerprint_Roundtrip(t *testing.T) {
+	t.Setenv("APPDATA", t.TempDir())
+	app, err := store.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer closeDB(app)
+
+	s := NewHostsStore(app)
+	id, err := s.SaveHost(HostInput{
+		Name: "linux01", Addr: "10.0.0.10", Port: 22, User: "root",
+		AuthType: "password", Secret: "x", Protocol: "ssh",
+		Params: map[string]any{"database": "app"},
+	})
+	if err != nil {
+		t.Fatalf("SaveHost: %v", err)
+	}
+
+	// 初始无信任记录
+	fp, err := s.HostKeyFingerprint(id)
+	if err != nil || fp != "" {
+		t.Fatalf("初始指纹应为空，得到 %q, %v", fp, err)
+	}
+
+	// 首次连接写入指纹，且不覆盖既有 params
+	const wantFP = "SHA256:abc123"
+	if err := s.SaveHostKeyFingerprint(id, wantFP); err != nil {
+		t.Fatalf("SaveHostKeyFingerprint: %v", err)
+	}
+	got, err := s.HostKeyFingerprint(id)
+	if err != nil || got != wantFP {
+		t.Fatalf("指纹回读 = %q, %v; want %q", got, err, wantFP)
+	}
+	meta, err := s.HostMetaByID(id)
+	if err != nil {
+		t.Fatalf("HostMetaByID: %v", err)
+	}
+	if meta.Params["database"] != "app" {
+		t.Errorf("写入指纹不应覆盖既有 params: %+v", meta.Params)
+	}
+}

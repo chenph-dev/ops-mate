@@ -26,10 +26,18 @@ func Dial(ctx context.Context, host Host) (*ssh.Client, error) {
 		return nil, err
 	}
 	cfg := &ssh.ClientConfig{
-		User:            host.User,
-		Auth:            []ssh.AuthMethod{auth},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         10 * time.Second,
+		User:    host.User,
+		Auth:    []ssh.AuthMethod{auth},
+		Timeout: 10 * time.Second,
+	}
+	if host.TrustHostKey != nil {
+		// TOFU：首次连接记录指纹，后续比对，变更（可能被中间人替换）拒绝连接。
+		cfg.HostKeyCallback = func(_ string, _ net.Addr, key ssh.PublicKey) error {
+			return host.TrustHostKey(ssh.FingerprintSHA256(key))
+		}
+	} else {
+		// 未提供 TOFU 回调（保存前连接测试等尚无资产身份可校验场景）时保持不校验。
+		cfg.HostKeyCallback = ssh.InsecureIgnoreHostKey()
 	}
 	d := net.Dialer{}
 	conn, err := d.DialContext(ctx, "tcp", addr)

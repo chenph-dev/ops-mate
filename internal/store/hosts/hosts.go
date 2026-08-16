@@ -300,6 +300,35 @@ func (s *HostsStore) GetAutoApprove(id string) (string, error) {
 	return autoApproveOrDefault(h.AutoApprove), nil
 }
 
+// HostKeyFingerprint 返回资产已信任的 SSH 主机密钥 SHA256 指纹；未建立信任返回空串。
+func (s *HostsStore) HostKeyFingerprint(id string) (string, error) {
+	var h Host
+	if err := s.app.GORM().First(&h, "id = ?", id).Error; err != nil {
+		return "", err
+	}
+	if v, ok := metaParams(h)["hostKeyFingerprint"].(string); ok {
+		return v, nil
+	}
+	return "", nil
+}
+
+// SaveHostKeyFingerprint 持久化资产首次连接的 SSH 主机密钥指纹（TOFU 信任）。
+// 写入资产 params，不触发协议/凭据等字段变更。
+func (s *HostsStore) SaveHostKeyFingerprint(id, fingerprint string) error {
+	var h Host
+	if err := s.app.GORM().First(&h, "id = ?", id).Error; err != nil {
+		return err
+	}
+	params := metaParams(h)
+	params["hostKeyFingerprint"] = fingerprint
+	b, err := json.Marshal(params)
+	if err != nil {
+		return fmt.Errorf("marshal params: %w", err)
+	}
+	return s.app.GORM().Model(&Host{}).Where("id = ?", id).
+		Update("params_json", string(b)).Error
+}
+
 func strPtrVal(s *string) string {
 	if s == nil {
 		return ""

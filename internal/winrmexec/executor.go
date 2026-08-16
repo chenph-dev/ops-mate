@@ -14,9 +14,13 @@ import (
 // Host describes a WinRM target (password auth only).
 type Host struct {
 	Addr   string
-	Port   int    // 5985 = HTTP, 5986 = HTTPS (skip cert verify)
+	Port   int // 5985 = HTTP, 5986 = HTTPS
 	User   string
 	Secret string // plaintext password
+
+	// SkipVerify HTTPS(5986) 时跳过服务端证书校验。默认 false=校验证书；
+	// Windows 自签名证书场景请在资产 params 显式开启 skipVerify。
+	SkipVerify bool
 }
 
 // runner abstracts the WinRM client's PowerShell execution for test stubbing.
@@ -79,14 +83,16 @@ func (e *Executor) Exec(ctx context.Context, command string) (<-chan sshexec.Lin
 	return out, nil
 }
 
-// defaultNewClient constructs a masterzen/winrm client (NTLM, skip cert verify).
+// defaultNewClient constructs a masterzen/winrm client (NTLM).
+// HTTPS(5986) 默认校验证书；自签名场景由 Host.SkipVerify 显式跳过。
 func defaultNewClient(h Host) (runner, error) {
-	endpoint := winrm.NewEndpoint(h.Addr, h.Port, httpsForPort(h.Port), true, nil, nil, nil, 0)
+	endpoint := winrm.NewEndpoint(h.Addr, h.Port, httpsForPort(h.Port), h.SkipVerify, nil, nil, nil, 0)
 	return winrm.NewClient(endpoint, h.User, h.Secret)
 }
 
 // httpsForPort infers transport from port: 5986 uses HTTPS, otherwise HTTP.
 // Note: transport is inferred from the port number, so custom HTTPS ports are not supported.
+// HTTP(5985) 下凭据/命令走明文，强烈建议使用 HTTPS(5986) 端口。
 func httpsForPort(port int) bool {
 	return port == 5986
 }

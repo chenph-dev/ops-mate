@@ -63,7 +63,8 @@ func driverName(driver string) (string, error) {
 func (e *Executor) dsn(driver string) string {
 	switch driver {
 	case "postgres":
-		return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable",
+		// sslmode=prefer：服务端支持 TLS 时加密传输（防明文泄露凭据/查询），不支持时回退明文。
+		return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=prefer",
 			e.host.User, url.QueryEscape(e.host.Password), e.host.Addr, e.host.Port, e.host.Database)
 	case "sqlite":
 		return e.host.Database // 本地文件路径
@@ -72,7 +73,8 @@ func (e *Executor) dsn(driver string) string {
 		// 密码原样拼接即可（含 @ : / 由驱动解析策略正确处理）；dbname 是路径段同样不转义。
 		// 注意：不要对 password/database 用 url.QueryEscape——驱动不会反转义，
 		// 转义串会作为字面值（如 %40）发给服务器导致 Access denied / Unknown database。
-		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true",
+		// tls=preferred：服务端支持 TLS 时加密传输，不支持时回退明文。
+		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&tls=preferred",
 			e.host.User, e.host.Password, e.host.Addr, e.host.Port,
 			e.host.Database)
 	}

@@ -38,8 +38,9 @@ func NewExecutorResolver(hosts *hoststore.HostsStore) *ExecutorResolver {
 	return &ExecutorResolver{hosts: hosts}
 }
 
-// ExecFor 按 hostID 构造协议对应的执行器（AI 会话、命令执行、连接测试、命令补全共用）。
+// ExecFor 按 hostID 构造协议对应的执行器（AI 会话、命令执行、命令补全共用）。
 // 凭据或元信息解析失败返回 nil（与 session 层 executorFor 契约一致：nil = 不可用）。
+// SSH 执行器注入 TOFU 主机密钥校验；WinRM 按资产 params 决定是否校验证书。
 func (r *ExecutorResolver) ExecFor(hostID string) sshexec.Exec {
 	if r == nil || r.hosts == nil {
 		return nil
@@ -52,7 +53,21 @@ func (r *ExecutorResolver) ExecFor(hostID string) sshexec.Exec {
 	if err != nil || meta == nil {
 		return nil
 	}
-	return ExecutorForHost(meta.Protocol, meta.Addr, meta.Port, meta.User, authType, secret)
+	if strings.EqualFold(meta.Protocol, "winrm") {
+		return winrmexec.NewExecutor(winrmexec.Host{
+			Addr: meta.Addr, Port: meta.Port, User: meta.User,
+			Secret: secret, SkipVerify: r.skipVerify(meta),
+		})
+	}
+	if strings.EqualFold(meta.Protocol, "jdbc") || connector.Get(meta.Protocol) != nil {
+		return nil // 数据库资产无 shell 执行器
+	}
+	h := &sshexec.Host{
+		Addr: meta.Addr, Port: meta.Port, User: meta.User,
+		AuthType: authType, Secret: secret,
+	}
+	h.TrustHostKey = r.trustHostKey(hostID)
+	return sshexec.NewExecutor(*h)
 }
 
 // HostFor 按 hostID 构造 SSH 目标（交互式终端 / SFTP 用）。
@@ -81,10 +96,12 @@ func (r *ExecutorResolver) HostFor(hostID string) (*sshexec.Host, error) {
 	if err != nil {
 		return nil, fmt.Errorf("获取资产凭据失败: %w", err)
 	}
-	return &sshexec.Host{
+	h := &sshexec.Host{
 		Addr: meta.Addr, Port: meta.Port, User: meta.User,
 		AuthType: authType, Secret: secret,
-	}, nil
+	}
+	h.TrustHostKey = r.trustHostKey(hostID)
+	return h, nil
 }
 
 // DbFor 按 hostID 构造数据库执行器（数据库协议，db 工作台用）。
@@ -157,4 +174,30 @@ func paramsDatabase(params map[string]any) string {
 		return v
 	}
 	return ""
+}
+
+// trustHostKey 构造 SSH TOFU 回调：首次连接持久化主机密钥指纹，后续连接比对，
+// 变更（可能遭中间人替换）返回错误拒绝连接。
+func (r *ExecutorResolver) trustHostKey(hostID string) func(string) error {
+	return func(fp string) error {
+		cur, err := r.hosts.HostKeyFingerprint(hostID)
+		if err != nil {
+			return fmt.Errorf("读取主机密钥信任记录失败: %w", err)
+		}
+		if cur == "" {
+			return r.hosts.SaveHostKeyFingerprint(hostID, fp)
+		}
+		if cur != fp {
+			return fmt.Errorf("主机密钥已变更（%s → %s），可能遭中间人替换，已拒绝连接", cur, fp)
+		}
+		return nil
+	}
+}
+
+// skipVerify 读取资产 params 的 WinRM 证书校验开关（缺省 false=校验证书）。
+func (r *ExecutorResolver) skipVerify(meta *hoststore.HostMeta) bool {
+	if v, ok := meta.Params["skipVerify"].(bool); ok {
+		return v
+	}
+	return false
 }

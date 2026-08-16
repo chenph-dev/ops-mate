@@ -107,3 +107,45 @@ func TestSSHExecutor_StreamsOutput(t *testing.T) {
 		t.Fatalf("期望包含执行输出，得到 %q", out.String())
 	}
 }
+
+// TestSSH_TOFU_HostKeyVerified 验证主机密钥 TOFU：首次连接回调收到指纹，
+// 指纹校验失败（可能被中间人替换）时连接必须被拒绝。
+func TestSSH_TOFU_HostKeyVerified(t *testing.T) {
+	addr, privPEM, cleanup := startTestSSHServer(t)
+	defer cleanup()
+
+	var gotFP string
+	host := Host{
+		Addr: addr, Port: 0, User: "test",
+		AuthType: "privatekey", Secret: privPEM,
+		TrustHostKey: func(fp string) error {
+			gotFP = fp
+			return nil // 首次信任
+		},
+	}
+	ex := NewExecutor(host)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	lines, err := ex.Exec(ctx, "echo hi")
+	if err != nil {
+		t.Fatalf("Exec with trusted key: %v", err)
+	}
+	for range lines {
+	}
+	if !strings.HasPrefix(gotFP, "SHA256:") {
+		t.Errorf("指纹应为 SHA256 格式，得到 %q", gotFP)
+	}
+
+	// 指纹校验拒绝（模拟主机密钥变更）→ 连接必须失败
+	reject := Host{
+		Addr: addr, Port: 0, User: "test",
+		AuthType: "privatekey", Secret: privPEM,
+		TrustHostKey: func(fp string) error {
+			return fmt.Errorf("主机密钥已变更，可能遭中间人替换，拒绝连接")
+		},
+	}
+	rejEx := NewExecutor(reject)
+	if _, err := rejEx.Exec(ctx, "echo hi"); err == nil {
+		t.Fatal("主机密钥校验失败时应返回错误并拒绝连接")
+	}
+}

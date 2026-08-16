@@ -17,6 +17,11 @@ type Host struct {
 	User     string
 	AuthType string // "password" | "privatekey"
 	Secret   string
+
+	// TrustHostKey TOFU 回调：传入连接协商的主机密钥 SHA256 指纹。
+	// 首次连接应持久化指纹，后续连接比对、变更时返回错误；nil 时不校验（InsecureIgnoreHostKey），
+	// 仅用于尚无资产身份可校验的场景（如保存前连接测试）。
+	TrustHostKey func(fingerprint string) error
 }
 
 // Line 一行输出，带来源 stdout/stderr。
