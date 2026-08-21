@@ -14,6 +14,7 @@ export default {
   },
   modal: {
     newFolder: '新建目录',
+    editFolder: '编辑目录',
     folderNamePlaceholder: '输入目录名称',
     deleteTitle: '确定删除"{{name}}"？',
     deleteFolderContent: '目录内的所有资产将被一并删除。',

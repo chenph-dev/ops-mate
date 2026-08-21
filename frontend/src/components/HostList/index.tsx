@@ -9,7 +9,7 @@ import {
   DeleteOutlined,
   LinkOutlined,
 } from '@ant-design/icons';
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { hoststore } from '@wailsjs/go/models';
 import { useConnectors } from '@/hooks/useConnectors';
@@ -24,6 +24,7 @@ interface HostListProps {
   onAddHost: (parentId: string) => void;
   onAddFolder: (parentId: string) => void;
   onEditHost: (host: TreeNode) => void;
+  onEditFolder: (folder: TreeNode) => void;
   onDelete: (node: TreeNode) => void;
   onTest: (host: TreeNode) => void;
   onSftp: (host: TreeNode) => void;
@@ -37,6 +38,7 @@ interface ContextMenuProps {
   onAddHost: () => void;
   onAddFolder: () => void;
   onEdit: () => void;
+  onEditFolder: () => void;
   onDelete: () => void;
   onTest: () => void;
   onSftp: () => void;
@@ -51,6 +53,7 @@ function ContextMenu({
   onAddHost,
   onAddFolder,
   onEdit,
+  onEditFolder,
   onDelete,
   onTest,
   onSftp,
@@ -58,6 +61,28 @@ function ContextMenu({
 }: ContextMenuProps): React.JSX.Element {
   const { token } = theme.useToken();
   const { t } = useTranslation('hosts');
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // 点击菜单外部或按 ESC 关闭
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent): void => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    // 使用 capture 确保先于其他点击处理
+    document.addEventListener('mousedown', handleClickOutside, true);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside, true);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [onClose]);
   const items =
     node.nodeType === 'folder'
       ? [
@@ -72,6 +97,12 @@ function ContextMenu({
             icon: <PlusOutlined />,
             label: t('ctx.newHost'),
             onClick: onAddHost,
+          },
+          {
+            key: 'edit',
+            icon: <EditOutlined />,
+            label: t('ctx.edit'),
+            onClick: onEditFolder,
           },
           {
             key: 'delete',
@@ -115,6 +146,7 @@ function ContextMenu({
 
   return (
     <div
+      ref={menuRef}
       style={{
         position: 'fixed',
         left: x,
@@ -126,7 +158,6 @@ function ContextMenu({
         padding: '4px 0',
         minWidth: 140,
       }}
-      onClick={onClose}
     >
       {items.map((item) => (
         <div
@@ -154,6 +185,7 @@ export default function HostList({
   onAddHost,
   onAddFolder,
   onEditHost,
+  onEditFolder,
   onDelete,
   onTest,
   onSftp,
@@ -318,6 +350,10 @@ export default function HostList({
           }}
           onEdit={() => {
             onEditHost(contextMenu.node);
+            setContextMenu(null);
+          }}
+          onEditFolder={() => {
+            onEditFolder(contextMenu.node);
             setContextMenu(null);
           }}
           onDelete={() => {

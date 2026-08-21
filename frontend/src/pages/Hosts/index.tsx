@@ -54,6 +54,7 @@ export default function HostsPage(): React.JSX.Element {
     getHostSecret,
     testConnection,
     createFolder,
+    renameNode,
     deleteNode,
   } = useHosts();
   const [selectedHost, setSelectedHost] = useState<TreeNode | null>(null);
@@ -187,6 +188,29 @@ export default function HostsPage(): React.JSX.Element {
     [createFolder, modal, t],
   );
 
+  const handleEditFolder = useCallback(
+    (folder: TreeNode) => {
+      let name = folder.name;
+      modal.confirm({
+        title: t('modal.editFolder'),
+        content: (
+          <Input
+            autoFocus
+            defaultValue={folder.name}
+            placeholder={t('modal.folderNamePlaceholder')}
+            onChange={(e) => (name = e.target.value)}
+          />
+        ),
+        onOk: async () => {
+          if (name.trim() && name.trim() !== folder.name) {
+            await renameNode(folder.id, name.trim());
+          }
+        },
+      });
+    },
+    [renameNode, modal, t],
+  );
+
   const handleAddHost = useCallback((parentId: string) => {
     setEditingHostId(null);
     setFormInitialValues(null);
@@ -300,6 +324,7 @@ export default function HostsPage(): React.JSX.Element {
         onAddHost={handleAddHost}
         onAddFolder={handleAddFolder}
         onEditHost={handleEditHost}
+        onEditFolder={handleEditFolder}
         onDelete={handleDelete}
         onTest={handleTest}
         onSftp={handleSftp}

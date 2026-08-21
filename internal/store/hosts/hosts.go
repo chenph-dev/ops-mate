@@ -230,6 +230,12 @@ func (s *HostsStore) MoveNode(nodeID, newParentID string) error {
 		Update("parent_id", pid).Error
 }
 
+// RenameNode 重命名节点（目录或资产通用）。
+func (s *HostsStore) RenameNode(nodeID, name string) error {
+	return s.app.GORM().Model(&Host{}).Where("id = ?", nodeID).
+		Update("name", name).Error
+}
+
 // DeleteNode 删除节点（级联删除子节点）。
 func (s *HostsStore) DeleteNode(nodeID string) error {
 	// 先递归删除所有子节点

@@ -14,6 +14,7 @@ export default {
   },
   modal: {
     newFolder: 'New folder',
+    editFolder: 'Edit folder',
     folderNamePlaceholder: 'Enter folder name',
     deleteTitle: 'Delete "{{name}}"?',
     deleteFolderContent: 'All assets in this folder will also be deleted.',

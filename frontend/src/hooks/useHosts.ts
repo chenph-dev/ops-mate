@@ -8,6 +8,7 @@ import {
   ListTree,
   MoveNode,
   DeleteNode,
+  RenameNode,
 } from '@wailsjs/go/hosts/HostsHandler';
 import type { hoststore } from '@wailsjs/go/models';
 
@@ -24,6 +25,7 @@ export function useHosts(): {
   removeHost: (id: string) => Promise<void>;
   testConnection: (input: HostInput) => Promise<boolean>;
   createFolder: (name: string, parentId: string) => Promise<string | void>;
+  renameNode: (nodeId: string, name: string) => Promise<void>;
   moveNode: (nodeId: string, newParentId: string) => Promise<void>;
   deleteNode: (nodeId: string) => Promise<void>;
 } {
@@ -97,6 +99,14 @@ export function useHosts(): {
     [refresh],
   );
 
+  const renameNode = useCallback(
+    async (nodeId: string, name: string) => {
+      await RenameNode(nodeId, name);
+      await refresh();
+    },
+    [refresh],
+  );
+
   const moveNode = useCallback(
     async (nodeId: string, newParentId: string) => {
       await MoveNode(nodeId, newParentId);
@@ -123,6 +133,7 @@ export function useHosts(): {
     removeHost,
     testConnection,
     createFolder,
+    renameNode,
     moveNode,
     deleteNode,
   };

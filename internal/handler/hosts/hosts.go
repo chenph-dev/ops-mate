@@ -61,6 +61,10 @@ func (h *HostsHandler) MoveNode(nodeID, newParentID string) error {
 	return h.hosts.MoveNode(nodeID, newParentID)
 }
 
+func (h *HostsHandler) RenameNode(nodeID, name string) error {
+	return h.hosts.RenameNode(nodeID, name)
+}
+
 func (h *HostsHandler) DeleteNode(nodeID string) error {
 	return h.hosts.DeleteNode(nodeID)
 }
