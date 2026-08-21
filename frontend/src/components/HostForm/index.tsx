@@ -1,4 +1,4 @@
-import { Modal, Form, Input, InputNumber, Select, message, Row, Col } from 'antd';
+import { Modal, Form, Input, InputNumber, Select, message, Row, Col, Collapse } from 'antd';
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -162,7 +162,7 @@ export default function HostForm({
               rules={[{ required: true, message: t('form.nameRequired') }]}
               style={itemStyle}
             >
-              <Input placeholder="web-01 / app.db" />
+              <Input placeholder="e.g. web-01" />
             </Form.Item>
           </Col>
           <Col span={12}>
@@ -170,88 +170,104 @@ export default function HostForm({
               <Select options={protocolOptions} onChange={onProtocolChange} />
             </Form.Item>
           </Col>
-          {needsHost && (
-            <>
-              <Col span={12}>
-                <Form.Item
-                  name="addr"
-                  label={t('form.addr')}
-                  rules={[{ required: true, message: t('form.addrRequired') }]}
-                  style={itemStyle}
-                >
-                  <Input placeholder="10.0.0.1 或 example.com" />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="port"
-                  label={protocol === 'winrm' ? t('form.winrmPort') : t('form.port')}
-                  rules={[{ required: true, message: t('form.portRequired') }]}
-                  style={itemStyle}
-                >
-                  <InputNumber min={1} max={65535} style={{ width: '100%' }} />
-                </Form.Item>
-              </Col>
-              <Col span={12}>
-                <Form.Item
-                  name="user"
-                  label={t('form.user')}
-                  rules={[{ required: true, message: t('form.userRequired') }]}
-                  style={itemStyle}
-                >
-                  <Input placeholder="root" />
-                </Form.Item>
-              </Col>
-              {protocol === 'ssh' && (
-                <Col span={12}>
-                  <Form.Item
-                    name="authType"
-                    label={t('form.authType')}
-                    rules={[{ required: true }]}
-                    style={itemStyle}
-                  >
-                    <Select
-                      options={[
-                        { label: t('form.password'), value: 'password' },
-                        { label: t('form.privateKey'), value: 'privatekey' },
-                      ]}
-                    />
-                  </Form.Item>
-                </Col>
-              )}
-              <Col span={secretIsKey ? 24 : 12}>
-                <Form.Item
-                  name="secret"
-                  label={
-                    protocol !== 'ssh' || authType !== 'privatekey'
-                      ? t('form.password')
-                      : t('form.privateKey')
-                  }
-                  rules={[{ required: !initialValues, message: t('form.secretRequired') }]}
-                  style={itemStyle}
-                >
-                  {protocol !== 'ssh' || authType !== 'privatekey' ? (
-                    <Input.Password
-                      placeholder={
-                        initialValues
-                          ? t('form.keepPasswordPlaceholder')
-                          : t('form.passwordPlaceholder')
-                      }
-                    />
-                  ) : (
-                    <Input.TextArea
-                      rows={3}
-                      placeholder={
-                        initialValues
-                          ? t('form.keepSecretPlaceholder')
-                          : '-----BEGIN RSA PRIVATE KEY-----...'
-                      }
-                    />
-                  )}
-                </Form.Item>
-              </Col>
-            </>
-          )}
+          <Col span={24} style={{ display: 'contents' }}>
+            <Collapse
+              activeKey={needsHost ? 'host' : undefined}
+              bordered={false}
+              ghost
+              style={{ background: 'transparent', width: '100%' }}
+              styles={{ body: { padding: 0 } }}
+              items={[
+                {
+                  key: 'host',
+                  label: null,
+                  showArrow: false,
+                  children: (
+                    <Row gutter={12} style={{ width: '100%' }}>
+                      <Col span={12}>
+                        <Form.Item
+                          name="addr"
+                          label={t('form.addr')}
+                          rules={[{ required: true, message: t('form.addrRequired') }]}
+                          style={itemStyle}
+                        >
+                          <Input placeholder={t('form.addrPlaceholder')} />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item
+                          name="port"
+                          label={protocol === 'winrm' ? t('form.winrmPort') : t('form.port')}
+                          rules={[{ required: true, message: t('form.portRequired') }]}
+                          style={itemStyle}
+                        >
+                          <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+                        </Form.Item>
+                      </Col>
+                      <Col span={12}>
+                        <Form.Item
+                          name="user"
+                          label={t('form.user')}
+                          rules={[{ required: true, message: t('form.userRequired') }]}
+                          style={itemStyle}
+                        >
+                          <Input placeholder="root" />
+                        </Form.Item>
+                      </Col>
+                      {protocol === 'ssh' && (
+                        <Col span={12}>
+                          <Form.Item
+                            name="authType"
+                            label={t('form.authType')}
+                            rules={[{ required: true }]}
+                            style={itemStyle}
+                          >
+                            <Select
+                              options={[
+                                { label: t('form.password'), value: 'password' },
+                                { label: t('form.privateKey'), value: 'privatekey' },
+                              ]}
+                            />
+                          </Form.Item>
+                        </Col>
+                      )}
+                      <Col span={secretIsKey ? 24 : 12}>
+                        <Form.Item
+                          name="secret"
+                          label={
+                            protocol !== 'ssh' || authType !== 'privatekey'
+                              ? t('form.password')
+                              : t('form.privateKey')
+                          }
+                          rules={[{ required: !initialValues, message: t('form.secretRequired') }]}
+                          style={itemStyle}
+                        >
+                          {protocol !== 'ssh' || authType !== 'privatekey' ? (
+                            <Input.Password
+                              placeholder={
+                                initialValues
+                                  ? t('form.keepPasswordPlaceholder')
+                                  : t('form.passwordPlaceholder')
+                              }
+                            />
+                          ) : (
+                            <Input.TextArea
+                              rows={3}
+                              placeholder={
+                                initialValues
+                                  ? t('form.keepSecretPlaceholder')
+                                  : '-----BEGIN RSA PRIVATE KEY-----...'
+                              }
+                            />
+                          )}
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                  ),
+                },
+              ]}
+            />
+          </Col>
           {protocol === 'winrm' && (
             <Col span={12}>
               <Form.Item
@@ -265,7 +281,7 @@ export default function HostForm({
             </Col>
           )}
           {/* 注册表驱动的专属参数：按 schema 动态渲染到 params.<key> */}
-          {selectedConnector?.params.map((p) => (
+          {(selectedConnector?.params ?? []).map((p) => (
             <Col span={12} key={p.key}>
               <Form.Item
                 name={['params', p.key]}

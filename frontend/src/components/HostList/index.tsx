@@ -278,12 +278,13 @@ export default function HostList({
         {treeNodes.length === 0 ? (
           <div
             style={{
-              padding: 16,
+              padding: '32px 16px',
               textAlign: 'center',
               color: token.colorTextSecondary,
               fontSize: 12,
             }}
           >
+            <FolderOutlined style={{ fontSize: 28, display: 'block', marginBottom: 8, opacity: 0.4 }} />
             {t('list.empty')}
           </div>
         ) : (

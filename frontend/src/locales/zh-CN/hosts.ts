@@ -37,6 +37,7 @@ export default {
     nameRequired: '请输入资产名称',
     addr: '地址',
     addrRequired: '请输入 IP 或域名',
+    addrPlaceholder: '输入 IP 或域名',
     port: '端口',
     portRequired: '请输入端口',
     winrmPort: 'WinRM 端口',

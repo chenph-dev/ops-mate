@@ -12,4 +12,8 @@ export default {
   },
   dragResize: 'Drag to resize',
   pageNotFound: 'Page not found',
+  errorTitle: 'Something went wrong',
+  errorSubTitle: 'An unexpected error occurred. Please try again or return home.',
+  errorBackHome: 'Back to home',
+  errorRetry: 'Retry',
 };

@@ -8,6 +8,7 @@ import '@/i18n';
 import { router } from '@/router';
 import { ThemeContext } from '@/context/ThemeContext';
 import { buildTheme } from '@/theme';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 type AlgorithmFn = typeof antdTheme.darkAlgorithm;
 
@@ -37,7 +38,9 @@ export default function App(): React.JSX.Element {
     <ThemeContext.Provider value={{ isDark, toggleTheme: toggleAlgorithm }}>
       <ConfigProvider locale={antdLocale} theme={theme}>
         <AntdApp>
-          <RouterProvider router={router} />
+          <ErrorBoundary>
+            <RouterProvider router={router} />
+          </ErrorBoundary>
         </AntdApp>
       </ConfigProvider>
     </ThemeContext.Provider>

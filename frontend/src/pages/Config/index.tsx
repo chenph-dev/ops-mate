@@ -7,6 +7,7 @@ import {
   Card,
   message,
   Space,
+  Spin,
   Switch,
   Typography,
 } from 'antd';
@@ -38,6 +39,7 @@ export default function ConfigPage(): React.JSX.Element {
 
   const protocols = protocolKeys.map((p) => ({ ...p, label: t(p.label) }));
 
+  const [loading, setLoading] = useState(true);
   const [policy, setPolicy] = useState<ApprovalPolicy>({
     enableAuto: true,
     readOnlyList: [],
@@ -46,21 +48,15 @@ export default function ConfigPage(): React.JSX.Element {
   const [savingPolicy, setSavingPolicy] = useState(false);
 
   useEffect(() => {
-    GetAIConfig()
-      .then((cfg) => {
+    Promise.all([GetAIConfig(), GetApprovalPolicy()])
+      .then(([cfg, p]) => {
         form.setFieldsValue(cfg);
-      })
-      .catch(() => {});
-  }, [form]);
-
-  useEffect(() => {
-    GetApprovalPolicy()
-      .then((p) => {
         setPolicy(p);
         setPolicyDraft(p.readOnlyList?.join(', ') ?? '');
       })
-      .catch(() => {});
-  }, []);
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [form]);
 
   const handleSave = async (): Promise<void> => {
     const values = await form.validateFields();
@@ -82,100 +78,102 @@ export default function ConfigPage(): React.JSX.Element {
         {t('subtitle')}
       </Paragraph>
 
-      <Card size="small">
-        <Form form={form} layout="vertical" size="small">
-          <Form.Item
-            name="provider"
-            label={t('provider')}
-            rules={[{ required: true, message: t('providerRequired') }]}
-          >
-            <Select options={protocols} placeholder={t('providerPlaceholder')} />
-          </Form.Item>
-
-          <Form.Item name="baseURL" label="Base URL">
-            <Input placeholder={t('baseURLPlaceholder')} />
-          </Form.Item>
-
-          <Form.Item name="apiKey" label="API Key">
-            <Input.Password placeholder={t('apiKeyPlaceholder')} />
-          </Form.Item>
-
-          <Form.Item
-            name="model"
-            label={t('model')}
-            rules={[{ required: true, message: t('modelRequired') }]}
-          >
-            <Input placeholder={t('modelPlaceholder')} />
-          </Form.Item>
-
-          <Form.Item>
-            <Space>
-              <Button type="primary" onClick={handleSave} loading={saving}>
-                {t('save')}
-              </Button>
-              <Button
-                onClick={() =>
-                  GetAIConfig().then((cfg) => form.setFieldsValue(cfg))
-                }
-              >
-                {t('reset')}
-              </Button>
-            </Space>
-          </Form.Item>
-        </Form>
-      </Card>
-
-      <Card size="small" style={{ marginTop: 16 }}>
-        <Title level={5} style={{ marginTop: 0 }}>{t('approvalTitle')}</Title>
-        <Paragraph type="secondary" style={{ fontSize: 12 }}>
-          {t('approvalDesc')}
-        </Paragraph>
-        <Form layout="vertical" size="small">
-          <Form.Item label={t('approvalEnableAuto')}>
-            <Switch
-              checked={policy.enableAuto}
-              onChange={(v) => setPolicy({ ...policy, enableAuto: v })}
-            />
-          </Form.Item>
-          <Form.Item
-            label={t('approvalWhitelist')}
-            extra={t('approvalWhitelistExtra')}
-          >
-            <Input.TextArea
-              value={policyDraft}
-              onChange={(e) => setPolicyDraft(e.target.value)}
-              autoSize={{ minRows: 3, maxRows: 6 }}
-              placeholder={t('approvalWhitelistPlaceholder')}
-            />
-          </Form.Item>
-          <Form.Item>
-            <Button
-              type="primary"
-              loading={savingPolicy}
-              onClick={async () => {
-                setSavingPolicy(true);
-                try {
-                  const list = policyDraft
-                    .split(/[\s,]+/)
-                    .map((s) => s.trim())
-                    .filter(Boolean);
-                  await SaveApprovalPolicy({
-                    enableAuto: policy.enableAuto,
-                    readOnlyList: list,
-                  });
-                  message.success(t('approvalSaved'));
-                } catch (e) {
-                  message.error(t('approvalSaveFailed', { err: String(e) }));
-                } finally {
-                  setSavingPolicy(false);
-                }
-              }}
+      <Spin spinning={loading}>
+        <Card size="small">
+          <Form form={form} layout="vertical" size="small">
+            <Form.Item
+              name="provider"
+              label={t('provider')}
+              rules={[{ required: true, message: t('providerRequired') }]}
             >
-              {t('approvalSave')}
-            </Button>
-          </Form.Item>
-        </Form>
-      </Card>
+              <Select options={protocols} placeholder={t('providerPlaceholder')} />
+            </Form.Item>
+
+            <Form.Item name="baseURL" label="Base URL">
+              <Input placeholder={t('baseURLPlaceholder')} />
+            </Form.Item>
+
+            <Form.Item name="apiKey" label="API Key">
+              <Input.Password placeholder={t('apiKeyPlaceholder')} />
+            </Form.Item>
+
+            <Form.Item
+              name="model"
+              label={t('model')}
+              rules={[{ required: true, message: t('modelRequired') }]}
+            >
+              <Input placeholder={t('modelPlaceholder')} />
+            </Form.Item>
+
+            <Form.Item>
+              <Space>
+                <Button type="primary" onClick={handleSave} loading={saving}>
+                  {t('save')}
+                </Button>
+                <Button
+                  onClick={() =>
+                    GetAIConfig().then((cfg) => form.setFieldsValue(cfg))
+                  }
+                >
+                  {t('reset')}
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Card>
+
+        <Card size="small" style={{ marginTop: 16 }}>
+          <Title level={5} style={{ marginTop: 0 }}>{t('approvalTitle')}</Title>
+          <Paragraph type="secondary" style={{ fontSize: 12 }}>
+            {t('approvalDesc')}
+          </Paragraph>
+          <Form layout="vertical" size="small">
+            <Form.Item label={t('approvalEnableAuto')}>
+              <Switch
+                checked={policy.enableAuto}
+                onChange={(v) => setPolicy({ ...policy, enableAuto: v })}
+              />
+            </Form.Item>
+            <Form.Item
+              label={t('approvalWhitelist')}
+              extra={t('approvalWhitelistExtra')}
+            >
+              <Input.TextArea
+                value={policyDraft}
+                onChange={(e) => setPolicyDraft(e.target.value)}
+                autoSize={{ minRows: 3, maxRows: 6 }}
+                placeholder={t('approvalWhitelistPlaceholder')}
+              />
+            </Form.Item>
+            <Form.Item>
+              <Button
+                type="primary"
+                loading={savingPolicy}
+                onClick={async () => {
+                  setSavingPolicy(true);
+                  try {
+                    const list = policyDraft
+                      .split(/[\s,]+/)
+                      .map((s) => s.trim())
+                      .filter(Boolean);
+                    await SaveApprovalPolicy({
+                      enableAuto: policy.enableAuto,
+                      readOnlyList: list,
+                    });
+                    message.success(t('approvalSaved'));
+                  } catch (e) {
+                    message.error(t('approvalSaveFailed', { err: String(e) }));
+                  } finally {
+                    setSavingPolicy(false);
+                  }
+                }}
+              >
+                {t('approvalSave')}
+              </Button>
+            </Form.Item>
+          </Form>
+        </Card>
+      </Spin>
     </div>
   );
 }

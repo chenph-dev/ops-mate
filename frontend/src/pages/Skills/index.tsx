@@ -5,6 +5,7 @@ import {
   Empty,
   List,
   Popconfirm,
+  Spin,
   Switch,
   message,
   Typography,
@@ -30,6 +31,7 @@ const { Title, Paragraph } = Typography;
 export default function SkillsPage(): React.JSX.Element {
   const { t } = useTranslation('skills');
   const [skills, setSkills] = useState<SkillInfo[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async (): Promise<void> => {
@@ -43,7 +45,8 @@ export default function SkillsPage(): React.JSX.Element {
   useEffect(() => {
     ListSkills()
       .then(setSkills)
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setInitialLoading(false));
   }, []);
 
   const handleUpload = async (): Promise<void> => {
@@ -79,50 +82,52 @@ export default function SkillsPage(): React.JSX.Element {
             {t('upload')}
           </Button>
         </div>
-        {skills.length === 0 ? (
-          <Empty description={t('empty')} />
-        ) : (
-          <List
-            dataSource={skills}
-            renderItem={(s) => (
-              <List.Item
-                actions={[
-                  <Switch
-                    key="sw"
-                    checked={s.enabled}
-                    onChange={(v) =>
-                      void ToggleSkill(s.name, v)
-                        .then(load)
-                        .catch((e) =>
-                          message.error(t('toggleFailed', { err: String(e) })),
-                        )
-                    }
-                  />,
-                  <Popconfirm
-                    key="del"
-                    title={t('deleteConfirm', { name: s.name })}
-                    onConfirm={() =>
-                      void DeleteSkill(s.name)
-                        .then(load)
-                        .catch((e) =>
-                          message.error(t('deleteFailed', { err: String(e) })),
-                        )
-                    }
-                  >
-                    <Button size="small" danger>
-                      {t('delete')}
-                    </Button>
-                  </Popconfirm>,
-                ]}
-              >
-                <List.Item.Meta
-                  title={s.name}
-                  description={s.description || s.title}
-                />
-              </List.Item>
-            )}
-          />
-        )}
+        <Spin spinning={initialLoading}>
+          {skills.length === 0 && !initialLoading ? (
+            <Empty description={t('empty')} />
+          ) : (
+            <List
+              dataSource={skills}
+              renderItem={(s) => (
+                <List.Item
+                  actions={[
+                    <Switch
+                      key="sw"
+                      checked={s.enabled}
+                      onChange={(v) =>
+                        void ToggleSkill(s.name, v)
+                          .then(load)
+                          .catch((e) =>
+                            message.error(t('toggleFailed', { err: String(e) })),
+                          )
+                      }
+                    />,
+                    <Popconfirm
+                      key="del"
+                      title={t('deleteConfirm', { name: s.name })}
+                      onConfirm={() =>
+                        void DeleteSkill(s.name)
+                          .then(load)
+                          .catch((e) =>
+                            message.error(t('deleteFailed', { err: String(e) })),
+                          )
+                      }
+                    >
+                      <Button size="small" danger>
+                        {t('delete')}
+                      </Button>
+                    </Popconfirm>,
+                  ]}
+                >
+                  <List.Item.Meta
+                    title={s.name}
+                    description={s.description || s.title}
+                  />
+                </List.Item>
+              )}
+            />
+          )}
+        </Spin>
       </Card>
     </div>
   );

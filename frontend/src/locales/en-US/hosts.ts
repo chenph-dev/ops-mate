@@ -37,6 +37,7 @@ export default {
     nameRequired: 'Enter an asset name',
     addr: 'Address',
     addrRequired: 'Enter IP or domain',
+    addrPlaceholder: 'Enter IP or domain',
     port: 'Port',
     portRequired: 'Enter port',
     winrmPort: 'WinRM port',
