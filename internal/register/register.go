@@ -9,7 +9,7 @@ import (
 )
 
 func init() {
-	connector.Register(&connector.Driver{
+	connector.Register(&connector.Connector{
 		Protocol:    "ssh",
 		Name:        "SSH",
 		Kind:        connector.KindCommand,
@@ -20,7 +20,7 @@ func init() {
 			Guardrail: connector.GuardrailLinux,
 		},
 	})
-	connector.Register(&connector.Driver{
+	connector.Register(&connector.Connector{
 		Protocol:    "winrm",
 		Name:        "WinRM",
 		Kind:        connector.KindCommand,

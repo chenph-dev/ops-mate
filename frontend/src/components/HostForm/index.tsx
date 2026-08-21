@@ -62,21 +62,21 @@ export default function HostForm({
   const authType = Form.useWatch('authType', form);
   const protocol = Form.useWatch('protocol', form);
   const { t } = useTranslation('hosts');
-  const { drivers } = useConnectors();
+  const { connectors } = useConnectors();
   const itemStyle: CSSProperties = { marginBottom: 12 };
   const secretIsKey = protocol === 'ssh' && authType === 'privatekey';
 
   // 当前协议的注册表驱动（无则 ssh/winrm 或未知）
-  const selectedDriver = drivers.find((d) => d.protocol === protocol);
-  const needsHost = selectedDriver?.needsHost ?? true;
+  const selectedConnector = connectors.find((c) => c.protocol === protocol);
+  const needsHost = selectedConnector?.needsHost ?? true;
   // 协议下拉：本地化 ssh/winrm 前置 + 注册表中数据库驱动（kind==='db'）追加，
   // 避免 ssh/winrm 注册进注册表后重复出现。
   const protocolOptions = [
     { label: t('form.protocolSsh'), value: 'ssh' },
     { label: t('form.protocolWinrm'), value: 'winrm' },
-    ...(drivers ?? [])
-      .filter((d) => d.kind === 'db')
-      .map((d) => ({ label: d.name, value: d.protocol })),
+    ...(connectors ?? [])
+      .filter((c) => c.kind === 'db')
+      .map((c) => ({ label: c.name, value: c.protocol })),
   ];
 
   const handleSubmit = async (): Promise<void> => {
@@ -265,7 +265,7 @@ export default function HostForm({
             </Col>
           )}
           {/* 注册表驱动的专属参数：按 schema 动态渲染到 params.<key> */}
-          {selectedDriver?.params.map((p) => (
+          {selectedConnector?.params.map((p) => (
             <Col span={12} key={p.key}>
               <Form.Item
                 name={['params', p.key]}

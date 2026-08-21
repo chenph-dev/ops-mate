@@ -16,7 +16,7 @@ func (fakeQueryRunner) Exec(_ context.Context, query string) (*ExecResult, error
 }
 
 func TestRegisterAndGet(t *testing.T) {
-	Register(&Driver{
+	Register(&Connector{
 		Protocol: "fake", Name: "Fake", Kind: KindDB,
 		Params: []ParamSchema{{Key: "db", Label: "库", Type: ParamString, Required: true}},
 		New: func(cfg Config) (Capability, error) {
@@ -32,8 +32,8 @@ func TestRegisterAndGet(t *testing.T) {
 }
 
 func TestListSortedByName(t *testing.T) {
-	Register(&Driver{Protocol: "z_zzz", Name: "Zulu", Kind: KindDB})
-	Register(&Driver{Protocol: "a_aaa", Name: "Alpha", Kind: KindDB})
+	Register(&Connector{Protocol: "z_zzz", Name: "Zulu", Kind: KindDB})
+	Register(&Connector{Protocol: "a_aaa", Name: "Alpha", Kind: KindDB})
 	list := List()
 	if len(list) < 2 {
 		t.Fatalf("List 长度应 >= 2, got %d", len(list))
@@ -46,7 +46,7 @@ func TestListSortedByName(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
-	Register(&Driver{
+	Register(&Connector{
 		Protocol: "fake2", Name: "Fake2", Kind: KindDB,
 		New: func(cfg Config) (Capability, error) {
 			return fakeQueryRunner{}, nil
@@ -70,11 +70,11 @@ func TestRegisterPanicsOnEmptyProtocol(t *testing.T) {
 			t.Fatal("空 Protocol 注册应 panic")
 		}
 	}()
-	Register(&Driver{Protocol: ""})
+	Register(&Connector{Protocol: ""})
 }
 
 func TestGet_CaseInsensitive(t *testing.T) {
-	Register(&Driver{Protocol: "MixedCaseProto", Name: "CS", Kind: KindDB})
+	Register(&Connector{Protocol: "MixedCaseProto", Name: "CS", Kind: KindDB})
 	if Get("mixedcaseproto") == nil {
 		t.Fatal("Get 应大小写不敏感（小写查询）")
 	}
@@ -89,5 +89,5 @@ func TestRegister_CommandKindRequired(t *testing.T) {
 			t.Fatal("Kind=command 但缺 CommandKind 应 panic")
 		}
 	}()
-	Register(&Driver{Protocol: "cmd-no-kind", Kind: KindCommand})
+	Register(&Connector{Protocol: "cmd-no-kind", Kind: KindCommand})
 }

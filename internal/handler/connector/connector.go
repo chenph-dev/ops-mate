@@ -3,7 +3,7 @@ package connector
 
 import (
 	connector "ops-mate/internal/connector"
-	_ "ops-mate/internal/register" // 登记内置命令型驱动（ssh/winrm），供 ListDrivers 输出
+	_ "ops-mate/internal/register" // 登记内置命令型驱动（ssh/winrm），供 ListConnectors 输出
 )
 
 // ConnectorHandler 暴露连接类型元信息给前端（wails 绑定）。
@@ -14,8 +14,8 @@ func NewConnectorHandler() *ConnectorHandler {
 	return &ConnectorHandler{}
 }
 
-// DriverMeta 前端可见的连接类型元信息（映射自 connector.Driver，去除 New 等内部字段）。
-type DriverMeta struct {
+// ConnectorMeta 前端可见的连接类型元信息（映射自 connector.Connector，去除 New 等内部字段）。
+type ConnectorMeta struct {
 	Protocol    string                  `json:"protocol"`
 	Name        string                  `json:"name"`
 	NeedsHost   bool                    `json:"needsHost"`
@@ -24,18 +24,18 @@ type DriverMeta struct {
 	CommandKind string                  `json:"commandKind,omitempty"`
 }
 
-// ListDrivers 返回注册表中全部连接类型元信息，供前端动态表单/面板按 protocol 复用。
-func (h *ConnectorHandler) ListDrivers() []DriverMeta {
+// ListConnectors 返回注册表中全部连接类型元信息，供前端动态表单/面板按 protocol 复用。
+func (h *ConnectorHandler) ListConnectors() []ConnectorMeta {
 	list := connector.List()
-	out := make([]DriverMeta, 0, len(list))
-	for _, d := range list {
+	out := make([]ConnectorMeta, 0, len(list))
+	for _, c := range list {
 		kind := "db"
-		if d.IsCommand() {
+		if c.IsCommand() {
 			kind = "command"
 		}
-		out = append(out, DriverMeta{
-			Protocol: d.Protocol, Name: d.Name, NeedsHost: d.NeedsHost,
-			Params: d.Params, Kind: kind, CommandKind: d.CommandKind,
+		out = append(out, ConnectorMeta{
+			Protocol: c.Protocol, Name: c.Name, NeedsHost: c.NeedsHost,
+			Params: c.Params, Kind: kind, CommandKind: c.CommandKind,
 		})
 	}
 	return out

@@ -1,30 +1,30 @@
 import { useCallback, useMemo, useState, useEffect } from 'react';
-import { ListDrivers } from '@wailsjs/go/connector/ConnectorHandler';
+import { ListConnectors } from '@wailsjs/go/connector/ConnectorHandler';
 import type { connector } from '@wailsjs/go/models';
 
-type DriverMeta = connector.DriverMeta;
+type ConnectorMeta = connector.ConnectorMeta;
 
 // 模块级缓存：单次拉取，所有消费者共享（避免每组件重复 IPC）。
-let cachedDrivers: DriverMeta[] | null = null;
+let cachedConnectors: ConnectorMeta[] | null = null;
 let cachedPromise: Promise<void> | null = null;
 
 // useConnectors 拉取连接类型注册表元信息（protocol 下拉、参数表单、面板路由的单一事实来源）。
 export function useConnectors(): {
-  drivers: DriverMeta[];
+  connectors: ConnectorMeta[];
   isDB: (protocol?: string) => boolean;
 } {
-  const [drivers, setDrivers] = useState<DriverMeta[]>(cachedDrivers ?? []);
+  const [connectors, setConnectors] = useState<ConnectorMeta[]>(cachedConnectors ?? []);
 
   useEffect(() => {
-    if (cachedDrivers) {
-      setDrivers(cachedDrivers);
+    if (cachedConnectors) {
+      setConnectors(cachedConnectors);
       return;
     }
     if (!cachedPromise) {
-      cachedPromise = ListDrivers()
+      cachedPromise = ListConnectors()
         .then((list) => {
-          cachedDrivers = list;
-          setDrivers(list);
+          cachedConnectors = list;
+          setConnectors(list);
         })
         .catch(() => {
           // 拉取失败：重置缓存允许下次挂载重试（否则本次会话内
@@ -33,8 +33,8 @@ export function useConnectors(): {
         });
     } else {
       void cachedPromise.then(() => {
-        if (cachedDrivers) {
-          setDrivers(cachedDrivers);
+        if (cachedConnectors) {
+          setConnectors(cachedConnectors);
         }
       });
     }
@@ -45,9 +45,9 @@ export function useConnectors(): {
     (protocol?: string): string | undefined => {
       if (!protocol) return undefined;
       const p = protocol.toLowerCase();
-      return (drivers ?? []).find((d) => d.protocol.toLowerCase() === p)?.kind;
+      return (connectors ?? []).find((c) => c.protocol.toLowerCase() === p)?.kind;
     },
-    [drivers],
+    [connectors],
   );
 
   // isDB 只认后端归一化的 kind==='db'：未知协议 → undefined → false（保守安全）。
@@ -56,5 +56,5 @@ export function useConnectors(): {
     [kindOf],
   );
 
-  return { drivers: drivers ?? [], isDB };
+  return { connectors: connectors ?? [], isDB };
 }

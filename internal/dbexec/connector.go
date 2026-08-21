@@ -51,7 +51,7 @@ const dbSkillPrompt = `目标数据库。你拥有 execute_sql 工具，用于�
 
 // registerDBDriver 注册一个"需要 host 的数据库驱动"（mysql/postgres）。
 func registerDBDriver(protocol, name, driver string) {
-	connector.Register(&connector.Driver{
+	connector.Register(&connector.Connector{
 		Protocol:  protocol,
 		Name:      name,
 		Kind:      connector.KindDB,

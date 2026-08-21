@@ -122,7 +122,7 @@ func (r *ExecutorResolver) HostFor(hostID string) (*sshexec.Host, error) {
 // 设计说明：db 工作台需要 dbexec 特有的 Schema/Result 类型，且当前注册的
 // 数据库驱动（mysql/postgres/sqlite）均为 dbexec 后端——故此处保留具体类型
 // 返回（与 ConnFor 走注册表服务 AI 装配分工明确）。新增非 dbexec 连接类型
-// 时再按 Driver 后端标记拆分，届时统一走注册表构造。
+// 时再按 Connector 后端标记拆分，届时统一走注册表构造。
 func (r *ExecutorResolver) DbFor(hostID string) *dbexec.Executor {
 	if r == nil || r.hosts == nil {
 		return nil
@@ -144,7 +144,7 @@ func (r *ExecutorResolver) DbFor(hostID string) *dbexec.Executor {
 	})
 }
 
-// ConnFor 按 hostID 构造连接能力对象（protocol 对应 Driver.New 的产物）。
+// ConnFor 按 hostID 构造连接能力对象（protocol 对应 Connector.New 的产物）。
 // 已注册连接类型（数据库等）返回其能力（QueryRunner/ObjectBrowser/Pingable）；
 // ssh/winrm 等未注册类型返回 nil（AI 命令工具走 holder，交互式会话走 HostFor）。
 func (r *ExecutorResolver) ConnFor(hostID string) connector.Capability {

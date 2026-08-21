@@ -1,5 +1,5 @@
-// Package connector 提供连接类型（Driver）注册表与能力接口抽象。
-// 一种连接类型 = 一个 Driver 声明（参数 schema + 能力 + SkillPack），
+// Package connector 提供连接类型（Connector）注册表与能力接口抽象。
+// 一种连接类型 = 一个 Connector 声明（参数 schema + 能力 + SkillPack），
 // 注册后即可被资产录入表单、执行器解析、AI 工具装配按 protocol 复用。
 package connector
 

@@ -8,7 +8,7 @@ import (
 
 // init 注册 SQLite driver：本地文件类型，无 host/port/user。
 func init() {
-	connector.Register(&connector.Driver{
+	connector.Register(&connector.Connector{
 		Protocol:  "sqlite",
 		Name:      "SQLite",
 		Kind:      connector.KindDB,

@@ -64,7 +64,7 @@ func BuildSystemMessages(ctx context.Context, params map[string]any) ([]*schema.
 }
 
 // PromptForProtocol 返回协议对应的系统提示词片段：
-// 已注册的连接类型（数据库/ssh/winrm）取 Driver.SkillPack.Prompt；
+// 已注册的连接类型（数据库/ssh/winrm）取 Connector.SkillPack.Prompt；
 // 未注册/未知协议回退内置 SshPrompt。
 func PromptForProtocol(protocol string) string {
 	protocol = strings.ToLower(strings.TrimSpace(protocol))

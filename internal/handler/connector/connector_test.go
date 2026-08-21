@@ -6,17 +6,17 @@ import (
 	_ "ops-mate/internal/dbexec" // 注册 mysql/postgres/sqlite driver
 )
 
-func TestListDrivers_ContainsRegistered(t *testing.T) {
+func TestListConnectors_ContainsRegistered(t *testing.T) {
 	h := NewConnectorHandler()
-	list := h.ListDrivers()
-	byProtocol := map[string]DriverMeta{}
+	list := h.ListConnectors()
+	byProtocol := map[string]ConnectorMeta{}
 	for _, d := range list {
 		byProtocol[d.Protocol] = d
 	}
 	for _, proto := range []string{"mysql", "postgres", "sqlite"} {
 		d, ok := byProtocol[proto]
 		if !ok {
-			t.Fatalf("ListDrivers 应包含 %q", proto)
+			t.Fatalf("ListConnectors 应包含 %q", proto)
 		}
 		if d.Name == "" || len(d.Params) == 0 {
 			t.Errorf("%q 元信息不完整: %+v", proto, d)
@@ -44,7 +44,7 @@ func TestListDrivers_ContainsRegistered(t *testing.T) {
 	for _, proto := range []string{"ssh", "winrm"} {
 		d, ok := byProtocol[proto]
 		if !ok {
-			t.Fatalf("ListDrivers 应包含命令型 %q", proto)
+			t.Fatalf("ListConnectors 应包含命令型 %q", proto)
 		}
 		if d.Kind != "command" || d.CommandKind != proto {
 			t.Errorf("%q 应为 command 型且 CommandKind=%q, got %+v", proto, proto, d)
