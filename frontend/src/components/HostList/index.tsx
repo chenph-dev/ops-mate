@@ -1,7 +1,6 @@
 import { Tree, theme } from 'antd';
 import type { DataNode } from 'antd/es/tree';
 import {
-  DesktopOutlined,
   FolderOutlined,
   FolderOpenOutlined,
   PlusOutlined,
@@ -13,6 +12,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { hoststore } from '@wailsjs/go/models';
 import { useConnectors } from '@/hooks/useConnectors';
+import ProtocolIcon from '@/components/ProtocolIcon';
 
 type TreeNode = hoststore.TreeNode;
 
@@ -209,30 +209,16 @@ export default function HostList({
     const convert = (nodes: TreeNode[]): TreeNodeData[] =>
       nodes.map((n) => ({
         key: n.id,
-        title:
-          n.nodeType === 'host' ? (
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              {n.name}
-              {n.protocol === 'winrm' ? (
-                <span style={{ fontSize: 10, padding: '0 4px', borderRadius: 3, background: token.colorPrimaryBg, color: token.colorPrimary }}>WinRM</span>
-              ) : isDB(n.protocol) ? (
-                <span style={{ fontSize: 10, padding: '0 4px', borderRadius: 3, background: token.colorSuccessBg, color: token.colorSuccess }}>DB</span>
-              ) : (
-                <span style={{ fontSize: 10, padding: '0 4px', borderRadius: 3, background: token.colorFillSecondary, color: token.colorTextSecondary }}>SSH</span>
-              )}
-            </span>
-          ) : (
-            n.name
-          ),
+        title: n.name,
         isLeaf: n.nodeType === 'host',
         icon:
-          n.nodeType === 'folder' ? <FolderOutlined /> : <DesktopOutlined />,
+          n.nodeType === 'folder' ? <FolderOutlined /> : <ProtocolIcon protocol={n.protocol} size={14} />,
         children:
           n.children && n.children.length > 0 ? convert(n.children) : undefined,
         data: n,
       }));
     return convert(treeData);
-  }, [treeData, token, isDB]);
+  }, [treeData]);
 
   const handleRightClick = useCallback(
     ({ event, node }: { event: React.MouseEvent; node: TreeNodeData }) => {
