@@ -2,6 +2,7 @@ package dbexec
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -60,8 +61,15 @@ func TestParamStringHelper(t *testing.T) {
 }
 
 func TestDBAdapterImplementsPingable(t *testing.T) {
+	// sqlite 测试连接要求文件已存在，先创建
+	path := filepath.Join(t.TempDir(), "x.db")
+	if f, err := os.Create(path); err != nil {
+		t.Fatalf("create: %v", err)
+	} else {
+		f.Close()
+	}
 	cap, err := connector.New("sqlite", connector.Config{
-		Params: map[string]any{"filePath": filepath.Join(t.TempDir(), "x.db")},
+		Params: map[string]any{"filePath": path},
 	})
 	if err != nil {
 		t.Fatalf("New(sqlite): %v", err)

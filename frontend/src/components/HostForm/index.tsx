@@ -1,7 +1,9 @@
-import { Modal, Form, Input, InputNumber, Select, message, Row, Col, Collapse } from 'antd';
+import { Button, Modal, Form, Input, InputNumber, Select, message, Row, Col, Collapse } from 'antd';
+import { FolderOpenOutlined } from '@ant-design/icons';
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useTranslation } from 'react-i18next';
+import { PickFile } from '@wailsjs/go/hosts/HostsHandler';
 import type { hoststore, connector } from '@wailsjs/go/models';
 import { useConnectors } from '@/hooks/useConnectors';
 
@@ -42,8 +44,33 @@ function ParamControl({
   value?: unknown;
   onChange?: (...args: any[]) => void;
 }): React.JSX.Element {
-  // 当前驱动仅使用 string/file 两种参数类型（mysql/postgres 的 database、sqlite 的 filePath），
-  // int/secret/select 变体无驱动触发，已移除对应分支。
+  // file 类型（sqlite 文件路径）：Input + 文件选择器（Wails OpenFileDialog）；
+  // 其余 string 类型（database 等）普通 Input
+  if (p.type === 'file') {
+    return (
+      <Input
+        placeholder={p.placeholder}
+        value={value as string}
+        onChange={onChange}
+        suffix={
+          <Button
+            type="text"
+            size="small"
+            icon={<FolderOpenOutlined />}
+            title="选择文件"
+            onClick={async () => {
+              try {
+                const picked = await PickFile();
+                if (picked) onChange?.(picked);
+              } catch {
+                // 用户取消选择对话框时不更新
+              }
+            }}
+          />
+        }
+      />
+    );
+  }
   return (
     <Input placeholder={p.placeholder} value={value as string} onChange={onChange} />
   );
@@ -81,7 +108,9 @@ export default function HostForm({
 
   const handleSubmit = async (): Promise<void> => {
     const values = await form.validateFields();
-    if (values.protocol !== 'ssh') {
+    // 仅需要凭据的资产（ssh 之外的 host 型，如 mysql/redis/winrm）设密码认证；
+    // sqlite 等本地文件型（NeedsHost=false）无凭据，保持默认。
+    if (values.protocol !== 'ssh' && needsHost) {
       values.authType = 'password';
     }
     setSubmitting(true);
@@ -170,9 +199,12 @@ export default function HostForm({
               <Select options={protocolOptions} onChange={onProtocolChange} />
             </Form.Item>
           </Col>
-          <Col span={24} style={{ display: 'contents' }}>
-            <Collapse
-              activeKey={needsHost ? 'host' : undefined}
+          {/* host 区块：仅 needsHost（SSH/WinRM/远程库）渲染；本地文件型（sqlite）不挂载，
+              否则其 addr/port/secret 的 required 校验会参与 validateFields 导致保存/测试误报 */}
+          {needsHost && (
+            <Col span={24} style={{ display: 'contents' }}>
+              <Collapse
+                activeKey="host"
               bordered={false}
               ghost
               style={{ background: 'transparent', width: '100%' }}
@@ -270,6 +302,7 @@ export default function HostForm({
               ]}
             />
           </Col>
+          )}
           {protocol === 'winrm' && (
             <Col span={12}>
               <Form.Item

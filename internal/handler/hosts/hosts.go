@@ -10,6 +10,8 @@ import (
 	"ops-mate/internal/connector"
 	"ops-mate/internal/handler/base"
 	hoststore "ops-mate/internal/store/hosts"
+
+	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // HostsHandler 处理资产管理相关的前端调用。
@@ -51,6 +53,21 @@ func (h *HostsHandler) DeleteHost(id string) error {
 
 func (h *HostsHandler) CreateFolder(name, parentID string) (string, error) {
 	return h.hosts.CreateFolder(name, parentID)
+}
+
+// PickFile 打开系统文件选择对话框，返回选中的文件路径（用户取消返回空串）。
+// 供资产表单的 ParamFile 类型（如 SQLite 数据库文件路径）选择文件。
+func (h *HostsHandler) PickFile() (string, error) {
+	file, err := wailsruntime.OpenFileDialog(base.Ctx(), wailsruntime.OpenDialogOptions{
+		Title: "选择文件",
+		Filters: []wailsruntime.FileFilter{
+			{DisplayName: "SQLite 数据库", Pattern: "*.db;*.sqlite;*.sqlite3"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	return file, nil
 }
 
 func (h *HostsHandler) ListTree() ([]hoststore.TreeNode, error) {

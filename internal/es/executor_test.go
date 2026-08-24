@@ -70,8 +70,12 @@ func TestFormatResponse_Array(t *testing.T) {
 	if len(res.Columns) != 3 || len(res.Rows) != 2 {
 		t.Fatalf("数组应 3 列 2 行, got cols=%v rows=%d", res.Columns, len(res.Rows))
 	}
-	if res.Rows[0][0] != "logs-2026" {
-		t.Errorf("首行 index 应为 logs-2026, got %v", res.Rows[0][0])
+	// 列按 key 排序：docs.count / index / store.size
+	if res.Columns[0] != "docs.count" || res.Columns[1] != "index" || res.Columns[2] != "store.size" {
+		t.Fatalf("数组列应按 key 排序: %v", res.Columns)
+	}
+	if res.Rows[0][1] != "logs-2026" {
+		t.Errorf("index 列值应为 logs-2026, got %v", res.Rows[0][1])
 	}
 }
 

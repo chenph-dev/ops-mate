@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 
 // 静态导入所有图标（Vite 会处理为 URL）
 import mysql from '@/assets/icons/mysql.png';
+import sqlite from '@/assets/icons/sqlite.png';
 import postgres from '@/assets/icons/postgres.png';
 import redis from '@/assets/icons/redis.png';
 import mongodb from '@/assets/icons/mongodb.png';
@@ -26,7 +27,7 @@ import prometheus from '@/assets/icons/prometheus.png';
 const PROTOCOL_ICONS: Record<string, string> = {
   mysql,
   postgres,
-  sqlite: linux, // 本地文件型，复用 linux
+  sqlite,
   redis,
   mongodb,
   clickhouse,

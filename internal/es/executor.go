@@ -226,21 +226,29 @@ func extractHits(data map[string]any) ([]any, bool) {
 	return hh, true
 }
 
-// arrayResult JSON 数组 → 列 = 所有对象 key 并集，行 = 值。
+// arrayResult JSON 数组 → 列 = 所有对象 key 并集（排序保证稳定），行 = 值。
 func arrayResult(arr []any) *connector.QueryResult {
-	var cols []string
-	seen := map[string]bool{}
-	var rows [][]any
+	fieldSet := map[string]bool{}
 	for _, item := range arr {
 		obj, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
 		for k := range obj {
-			if !seen[k] {
-				seen[k] = true
-				cols = append(cols, k)
-			}
+			fieldSet[k] = true
+		}
+	}
+	cols := make([]string, 0, len(fieldSet))
+	for k := range fieldSet {
+		cols = append(cols, k)
+	}
+	sort.Strings(cols)
+
+	rows := make([][]any, 0, len(arr))
+	for _, item := range arr {
+		obj, ok := item.(map[string]any)
+		if !ok {
+			continue
 		}
 		row := make([]any, len(cols))
 		for i, c := range cols {

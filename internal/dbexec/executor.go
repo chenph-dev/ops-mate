@@ -8,6 +8,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -100,7 +102,14 @@ func (e *Executor) open(ctx context.Context) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	db, err := sql.Open(drv, e.dsn(drv))
+	dsn := e.dsn(drv)
+	if drv == "sqlite" && e.host.Database != "" {
+		// 相对路径基于应用 CWD 解析为绝对路径，避免文件落点不确定
+		if abs, err := filepath.Abs(e.host.Database); err == nil {
+			dsn = abs
+		}
+	}
+	db, err := sql.Open(drv, dsn)
 	if err != nil {
 		return nil, fmt.Errorf("构造数据库连接失败: %w", err)
 	}
@@ -115,7 +124,21 @@ func (e *Executor) open(ctx context.Context) (*sql.DB, error) {
 }
 
 // Ping 测试连接（保存前连接测试）。
+// sqlite 特殊：文件必须已存在（不自动创建），避免填错路径"测试通过"并在错误位置
+// 生成空库；实际查询（open）仍自动创建，支持"新建数据库"场景。
 func (e *Executor) Ping(ctx context.Context) error {
+	if drv, err := driverName(e.host.Driver); err == nil && drv == "sqlite" {
+		if e.host.Database == "" {
+			return fmt.Errorf("sqlite 数据库文件路径为空")
+		}
+		path := e.host.Database
+		if abs, err := filepath.Abs(path); err == nil {
+			path = abs
+		}
+		if _, err := os.Stat(path); err != nil {
+			return fmt.Errorf("sqlite 数据库文件不存在：%s（若确认路径无误，保存后打开将自动创建）", path)
+		}
+	}
 	db, err := e.open(ctx)
 	if err != nil {
 		return err

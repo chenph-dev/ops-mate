@@ -15,7 +15,7 @@ func init() {
 		NeedsHost: false,
 		Params: []connector.ParamSchema{
 			{Key: "filePath", Label: "数据库文件路径", Type: connector.ParamFile, Required: true,
-				Placeholder: "C:\\data\\app.db"},
+				Placeholder: "请填绝对路径，如 C:\\data\\app.db"},
 		},
 		SkillPack: connector.SkillPack{Prompt: dbSkillPrompt, Guardrail: connector.GuardrailSQL},
 		New: func(cfg connector.Config) (connector.Capability, error) {
