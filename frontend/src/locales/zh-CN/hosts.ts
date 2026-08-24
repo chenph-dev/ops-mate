@@ -76,12 +76,36 @@ export default {
   db: {
     placeholder: '输入 SQL，Ctrl+Enter 执行（Shift+Enter 换行）',
     run: '执行',
-    rowsAffected: '已影响 {{count}} 行',
     noResult: '输入 SQL 后执行，结果将显示在此',
     failed: '执行失败：{{err}}',
-    schema: '表结构',
-    refreshSchema: '刷新结构',
-    clickTableHint: '点击表名生成查询',
+    schema: '对象',
+    refreshSchema: '刷新对象',
+    toolbar: {
+      newQuery: '新建查询',
+    },
+    tree: {
+      tables: '表',
+      views: '视图',
+      expandAll: '全部展开',
+      collapseAll: '全部收缩',
+    },
+    result: {
+      rows: '{{count}} 行',
+      rowsAffected: '已影响 {{count}} 行',
+      duration: '耗时 {{ms}}ms',
+      exportCsv: '导出 CSV',
+    },
+    pager: {
+      prev: '上一页',
+      next: '下一页',
+      page: '{{page}} / {{total}}',
+    },
+    table: {
+      totalRows: '共 {{count}} 行',
+    },
+    status: {
+      ready: '就绪',
+    },
   },
   panel: {
     unsupported: '该连接类型暂不支持面板',

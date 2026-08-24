@@ -85,6 +85,9 @@ func TestSchemaQuery(t *testing.T) {
 	if !strings.Contains(q, "COLUMN_KEY") {
 		t.Errorf("mysql 应含 COLUMN_KEY：%q", q)
 	}
+	if !strings.Contains(q, "'BASE TABLE','VIEW'") || !strings.Contains(q, "TABLE_TYPE AS obj_type") {
+		t.Errorf("mysql 应含视图与 obj_type 列：%q", q)
+	}
 
 	pg := NewExecutor(Host{Driver: "postgres"})
 	q = pg.schemaQuery()
@@ -94,26 +97,36 @@ func TestSchemaQuery(t *testing.T) {
 	if !strings.Contains(q, "'' AS key") {
 		t.Errorf("pg key 应为空串：%q", q)
 	}
+	if !strings.Contains(q, "'BASE TABLE','VIEW'") || !strings.Contains(q, "table_type AS obj_type") {
+		t.Errorf("pg 应含视图与 obj_type 列：%q", q)
+	}
+
+	sl := NewExecutor(Host{Driver: "sqlite"})
+	q = sl.schemaQuery()
+	if !strings.Contains(q, "'table','view'") || !strings.Contains(q, "m.type AS obj_type") {
+		t.Errorf("sqlite 应含视图与 obj_type 列：%q", q)
+	}
 }
 
 func TestParseSchema(t *testing.T) {
 	res := &Result{
-		Columns: []string{"table_name", "column_name", "data_type", "is_nullable", "key"},
+		Columns: []string{"table_name", "column_name", "data_type", "is_nullable", "key", "obj_type"},
 		Rows: [][]any{
-			{"users", "id", "int", "NO", "PRI"},
-			{"users", "name", "varchar", "YES", ""},
-			{"orders", "id", "bigint", "NO", "PRI"},
+			{"users", "id", "int", "NO", "PRI", "BASE TABLE"},
+			{"users", "name", "varchar", "YES", "", "BASE TABLE"},
+			{"orders", "id", "bigint", "NO", "PRI", "BASE TABLE"},
+			{"v_user_sum", "total", "bigint", "YES", "", "VIEW"},
 		},
 	}
 	s, err := parseSchema(res)
 	if err != nil {
 		t.Fatalf("parseSchema: %v", err)
 	}
-	if len(s.Tables) != 2 {
-		t.Fatalf("应 2 张表，得 %d", len(s.Tables))
+	if len(s.Tables) != 3 {
+		t.Fatalf("应 3 个对象，得 %d", len(s.Tables))
 	}
 	users := s.Tables[0]
-	if users.Name != "users" || len(users.Columns) != 2 {
+	if users.Name != "users" || users.Type != "table" || len(users.Columns) != 2 {
 		t.Errorf("users 解析错误: %+v", users)
 	}
 	if users.Columns[0].Name != "id" || users.Columns[0].Key != "PRI" || users.Columns[0].IsNullable {
@@ -121,6 +134,18 @@ func TestParseSchema(t *testing.T) {
 	}
 	if users.Columns[1].Name != "name" || !users.Columns[1].IsNullable {
 		t.Errorf("name 列错误: %+v", users.Columns[1])
+	}
+	view := s.Tables[2]
+	if view.Name != "v_user_sum" || view.Type != "view" || len(view.Columns) != 1 {
+		t.Errorf("视图解析错误: %+v", view)
+	}
+	// 缺第 6 列（旧查询）回退 table
+	legacy := &Result{
+		Rows: [][]any{{"legacy", "id", "int", "NO", "PRI"}},
+	}
+	ls, err := parseSchema(legacy)
+	if err != nil || ls.Tables[0].Type != "table" {
+		t.Errorf("缺 type 列应回退 table，got %+v err=%v", ls, err)
 	}
 	if _, err := parseSchema(nil); err == nil {
 		t.Error("parseSchema(nil) 应报错")

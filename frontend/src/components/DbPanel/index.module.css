@@ -1,0 +1,15 @@
+/* DB 工作台主区：让 antd Tabs 内容区占满剩余高度 */
+.workbenchTabs {
+  display: flex;
+  flex-direction: column;
+}
+.workbenchTabs :global(.ant-tabs-content-holder) {
+  flex: 1;
+  min-height: 0;
+}
+.workbenchTabs :global(.ant-tabs-content) {
+  height: 100%;
+}
+.workbenchTabs :global(.ant-tabs-tabpane) {
+  height: 100%;
+}

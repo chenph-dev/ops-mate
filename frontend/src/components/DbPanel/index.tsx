@@ -1,18 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button, message, Spin, Table, Tag, Tooltip, Tree, Typography } from 'antd';
-import type { TreeDataNode } from 'antd';
-import { ReloadOutlined, RobotOutlined } from '@ant-design/icons';
-import CodeMirror from '@uiw/react-codemirror';
-import { sql as sqlLang } from '@codemirror/lang-sql';
-import { keymap } from '@codemirror/view';
-import { Prec } from '@codemirror/state';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Tabs } from 'antd';
 import { useTranslation } from 'react-i18next';
-import { ExecuteSQL, ListSchema } from '@wailsjs/go/db/DbHandler';
+import { ListSchema } from '@wailsjs/go/db/DbHandler';
 import type { dbexec, hoststore } from '@wailsjs/go/models';
+import { useDbTabs } from '@/hooks/useDbTabs';
+import Toolbar from './Toolbar';
+import ObjectTree from './ObjectTree';
+import QueryTab from './QueryTab';
+import DataTab from './DataTab';
+import StatusBar from './StatusBar';
+import styles from './index.module.css';
 
 type TreeNode = hoststore.TreeNode;
-type DBResult = dbexec.Result;
-type DBSchema = dbexec.Schema;
 
 interface DbPanelProps {
   host: TreeNode;
@@ -20,56 +19,36 @@ interface DbPanelProps {
   onToggleAI: () => void;
 }
 
-// 表名安全包裹：按目标库标识符引号规则转义并加引号，
-// 防止含空格/保留字/引号的表名生成非法 SQL 或注入面。
-function quoteIdent(protocol: string, name: string): string {
-  if (protocol === 'mysql') {
-    return '`' + name.replaceAll('`', '``') + '`';
-  }
-  return '"' + name.replaceAll('"', '""') + '"';
-}
-
+/** Navicat 风格 DB 工作台：工具栏 + 对象树（表/视图）+ 多标签主区 + 状态栏。 */
 export default function DbPanel({
   host,
   aiCollapsed,
   onToggleAI,
 }: DbPanelProps): React.JSX.Element {
   const { t } = useTranslation('hosts');
-  const { t: tt } = useTranslation('terminal');
-  const params = (host.params ?? {}) as Record<string, unknown>;
-  // 展示：SQLite（本地文件）→ 文件路径；mysql/postgres → user@addr:port/database
-  const dbLabel =
-    typeof params.filePath === 'string' && params.filePath
-      ? `${host.protocol} · ${params.filePath}`
-      : `${host.protocol} · ${host.user}@${host.addr}:${host.port}/${String(params.database ?? '')}`;
-  const [sql, setSql] = useState('');
-  const [result, setResult] = useState<DBResult | null>(null);
-  const [error, setError] = useState('');
-  const [running, setRunning] = useState(false);
-
-  // 左侧 schema 树
-  const [schema, setSchema] = useState<DBSchema | null>(null);
+  const [schema, setSchema] = useState<dbexec.Schema | null>(null);
   const [schemaError, setSchemaError] = useState('');
   const [schemaLoading, setSchemaLoading] = useState(false);
+  const { tabs, activeKey, newQuery, openTable, closeTab, activate } =
+    useDbTabs();
 
-  const run = async (): Promise<void> => {
-    if (running) return;
-    const cmd = sql.trim();
-    if (!cmd) return;
-    setRunning(true);
-    setError('');
-    setResult(null);
-    try {
-      setResult(await ExecuteSQL(host.id, cmd));
-    } catch (e) {
-      setError(String(e));
-      message.error(t('db.failed', { err: String(e) }));
-    } finally {
-      setRunning(false);
-    }
-  };
+  // 各查询标签注册的 run：供标题栏「执行」按钮触发当前活动标签。
+  const runsRef = useRef<Record<string, (() => void) | null>>({});
+  const registerRun = useCallback(
+    (key: string) => (run: (() => void) | null) => {
+      runsRef.current[key] = run;
+    },
+    [],
+  );
+  const runActiveQuery = useCallback((): void => {
+    const run = activeKey ? runsRef.current[activeKey] : null;
+    run?.();
+  }, [activeKey]);
+  const activeIsQuery = tabs.some(
+    (tab) => tab.key === activeKey && tab.type === 'query',
+  );
 
-  const loadSchema = async (): Promise<void> => {
+  const loadSchema = useCallback(async (): Promise<void> => {
     setSchemaLoading(true);
     setSchemaError('');
     try {
@@ -79,216 +58,108 @@ export default function DbPanel({
     } finally {
       setSchemaLoading(false);
     }
-  };
+  }, [host.id]);
 
   useEffect(() => {
     void loadSchema();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [host.id]);
+  }, [loadSchema]);
 
-  // CodeMirror：Ctrl/Cmd+Enter 执行（runRef 规避闭包过期）
-  const runRef = useRef(run);
-  useEffect(() => {
-    runRef.current = run;
-  });
-  const extensions = useMemo(
-    () => [
-      sqlLang(),
-      Prec.highest(
-        keymap.of([
-          {
-            key: 'Mod-Enter',
-            run: () => {
-              void runRef.current();
-              return true;
-            },
-          },
-        ]),
+  const params = (host.params ?? {}) as Record<string, unknown>;
+  const dbLabel =
+    typeof params.filePath === 'string' && params.filePath
+      ? `${host.protocol} · ${params.filePath}`
+      : `${host.protocol} · ${host.user}@${host.addr}:${host.port}/${String(
+          params.database ?? '',
+        )}`;
+
+  const items = tabs.map((tab) => ({
+    key: tab.key,
+    label: tab.title,
+    closable: true,
+    children:
+      tab.type === 'query' ? (
+        <QueryTab hostId={host.id} registerRun={registerRun(tab.key)} />
+      ) : (
+        <DataTab
+          hostId={host.id}
+          protocol={host.protocol ?? 'ssh'}
+          tableName={tab.tableName ?? ''}
+        />
       ),
-    ],
-    [],
-  );
-
-  // 表 → 列 的树节点
-  const treeData: TreeDataNode[] = useMemo(
-    () =>
-      (schema?.tables ?? []).map((tbl) => ({
-        key: `table:${tbl.name}`,
-        title: tbl.name,
-        children: tbl.columns.map((col) => ({
-          key: `col:${tbl.name}:${col.name}`,
-          title: `${col.name} : ${col.dataType}`,
-          isLeaf: true,
-        })),
-      })),
-    [schema],
-  );
-
-  // 点击表节点 → 生成 SELECT 查询填入编辑器（表名按协议加引号）
-  const onTreeSelect = (_: React.Key[], info: { node: TreeDataNode }): void => {
-    const key = String(info.node.key ?? '');
-    if (key.startsWith('table:')) {
-      setSql(`SELECT * FROM ${quoteIdent(host.protocol ?? '', key.slice('table:'.length))};`);
-    }
-  };
-
-  const columns = (result?.columns ?? []).map((col) => ({
-    title: col,
-    dataIndex: col,
-    key: col,
-    ellipsis: true,
   }));
-  const dataSource = (result?.rows ?? []).map((row, i) => {
-    const rec: Record<string, unknown> = { key: i };
-    (result?.columns ?? []).forEach((col, j) => {
-      rec[col] = row[j];
-    });
-    return rec;
-  });
 
   return (
-    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', padding: 8, gap: 8 }}>
-      {/* 标题行 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Typography.Text strong>{host.name}</Typography.Text>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-          {dbLabel}
-        </Typography.Text>
-        <Tooltip title={t('db.refreshSchema')}>
-          <Button size="small" icon={<ReloadOutlined />} onClick={() => void loadSchema()} />
-        </Tooltip>
-        <Tooltip title={aiCollapsed ? tt('header.aiClose') : tt('header.aiOpen')}>
-          <Button
-            type={aiCollapsed ? 'text' : 'primary'}
-            size="small"
-            icon={<RobotOutlined />}
-            onClick={onToggleAI}
-          />
-        </Tooltip>
-      </div>
-
-      <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 8 }}>
-        {/* 左：schema 树 */}
+    <div
+      style={{
+        flex: 1,
+        minWidth: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'var(--antd-color-bg-container)',
+      }}
+    >
+      <Toolbar
+        host={host}
+        onNewQuery={newQuery}
+        onRunQuery={runActiveQuery}
+        runEnabled={activeIsQuery}
+        onRefresh={() => void loadSchema()}
+        aiCollapsed={aiCollapsed}
+        onToggleAI={onToggleAI}
+      />
+      <div style={{ flex: 1, minHeight: 0, display: 'flex', gap: 8, padding: 8 }}>
+        <ObjectTree
+          schema={schema}
+          loading={schemaLoading}
+          error={schemaError}
+          onOpenTable={openTable}
+        />
         <div
           style={{
-            width: 200,
-            flexShrink: 0,
+            flex: 1,
+            minWidth: 0,
+            display: 'flex',
+            flexDirection: 'column',
             border: '1px solid var(--antd-color-border-secondary)',
             borderRadius: 4,
-            overflow: 'auto',
-            padding: 4,
+            overflow: 'hidden',
           }}
         >
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            {t('db.schema')}
-          </Typography.Text>
-          {schemaLoading ? (
-            <div style={{ textAlign: 'center', paddingTop: 20 }}>
-              <Spin size="small" />
-            </div>
-          ) : schemaError ? (
+          {tabs.length === 0 ? (
             <div
               style={{
-                color: 'var(--antd-color-error)',
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--antd-color-text-secondary)',
                 fontSize: 12,
-                whiteSpace: 'pre-wrap',
-                padding: 4,
               }}
             >
-              {schemaError}
+              {t('db.noResult')}
             </div>
           ) : (
-            <Tree
-              treeData={treeData}
-              onSelect={onTreeSelect}
-              showLine
-              defaultExpandAll={false}
-              virtual
-              height={400}
+            <Tabs
+              type="editable-card"
+              size="small"
+              className={styles.workbenchTabs}
+              items={items}
+              activeKey={activeKey ?? undefined}
+              onChange={activate}
+              onEdit={(targetKey, action) => {
+                if (action === 'add') {
+                  newQuery();
+                } else if (action === 'remove' && typeof targetKey === 'string') {
+                  closeTab(targetKey);
+                }
+              }}
+              tabBarStyle={{ margin: 0, padding: '2px 4px 0' }}
+              style={{ flex: 1, minHeight: 0 }}
             />
           )}
-          {!schemaLoading && !schemaError && schema && schema.tables.length > 0 && (
-            <Typography.Text type="secondary" style={{ fontSize: 11, padding: '0 4px' }}>
-              {t('db.clickTableHint')}
-            </Typography.Text>
-          )}
-        </div>
-
-        {/* 右：编辑器 + 结果 */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-            <div style={{ flex: 1, minWidth: 0, border: '1px solid var(--antd-color-border-secondary)', borderRadius: 4, overflow: 'hidden' }}>
-              <CodeMirror
-                value={sql}
-                height="140px"
-                theme="dark"
-                extensions={extensions}
-                onChange={(value) => setSql(value)}
-                placeholder={t('db.placeholder')}
-              />
-            </div>
-            <Button type="primary" loading={running} onClick={() => void run()}>
-              {t('db.run')}
-            </Button>
-          </div>
-
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-            {running ? (
-              <div style={{ textAlign: 'center', paddingTop: 60 }}>
-                <Spin />
-              </div>
-            ) : (
-              <>
-                {error && (
-                  <div
-                    style={{
-                      color: 'var(--antd-color-error)',
-                      fontSize: 12,
-                      padding: 8,
-                      border: '1px solid var(--antd-color-error-border)',
-                      borderRadius: 4,
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    {error}
-                  </div>
-                )}
-                {result && !error && (
-                  <>
-                    {typeof result.rowsAffected === 'number' && result.rowsAffected > 0 && (
-                      <Tag color="blue" style={{ marginBottom: 8 }}>
-                        {t('db.rowsAffected', { count: result.rowsAffected })}
-                      </Tag>
-                    )}
-                    {result.columns && result.columns.length > 0 && (
-                      <Table
-                        size="small"
-                        bordered
-                        columns={columns}
-                        dataSource={dataSource}
-                        pagination={{ pageSize: 100, showSizeChanger: false }}
-                        scroll={{ x: true }}
-                      />
-                    )}
-                  </>
-                )}
-                {!result && !error && (
-                  <div
-                    style={{
-                      color: 'var(--antd-color-text-secondary)',
-                      fontSize: 12,
-                      textAlign: 'center',
-                      paddingTop: 40,
-                    }}
-                  >
-                    {t('db.noResult')}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
         </div>
       </div>
+      <StatusBar label={dbLabel} />
     </div>
   );
 }

@@ -76,12 +76,36 @@ export default {
   db: {
     placeholder: 'Enter SQL, Ctrl+Enter to run (Shift+Enter for newline)',
     run: 'Run',
-    rowsAffected: '{{count}} row(s) affected',
     noResult: 'Enter SQL and run; results appear here',
     failed: 'Execution failed: {{err}}',
-    schema: 'Schema',
-    refreshSchema: 'Refresh',
-    clickTableHint: 'Click a table to generate a query',
+    schema: 'Objects',
+    refreshSchema: 'Refresh objects',
+    toolbar: {
+      newQuery: 'New query',
+    },
+    tree: {
+      tables: 'Tables',
+      views: 'Views',
+      expandAll: 'Expand all',
+      collapseAll: 'Collapse all',
+    },
+    result: {
+      rows: '{{count}} rows',
+      rowsAffected: '{{count}} row(s) affected',
+      duration: '{{ms}}ms',
+      exportCsv: 'Export CSV',
+    },
+    pager: {
+      prev: 'Prev',
+      next: 'Next',
+      page: '{{page}} / {{total}}',
+    },
+    table: {
+      totalRows: '{{count}} rows total',
+    },
+    status: {
+      ready: 'Ready',
+    },
   },
   panel: {
     unsupported: 'This connection type does not support a panel yet',

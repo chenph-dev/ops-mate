@@ -29,7 +29,7 @@ func TestSQLiteRealQuery(t *testing.T) {
 	}
 }
 
-// TestSQLiteSchema 验证 sqlite 的 schema 树（表 + 列）。
+// TestSQLiteSchema 验证 sqlite 的 schema 树（表 + 视图分类 + 列）。
 func TestSQLiteSchema(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "test.db")
 	ex := NewExecutor(Host{Driver: "sqlite", Database: dbPath})
@@ -38,15 +38,30 @@ func TestSQLiteSchema(t *testing.T) {
 	if _, err := ex.Exec(ctx, "CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)"); err != nil {
 		t.Fatalf("create: %v", err)
 	}
+	if _, err := ex.Exec(ctx, "CREATE VIEW v_users AS SELECT id, name FROM users"); err != nil {
+		t.Fatalf("create view: %v", err)
+	}
 	s, err := ex.Schema(ctx)
 	if err != nil {
 		t.Fatalf("schema: %v", err)
 	}
-	if len(s.Tables) != 1 || s.Tables[0].Name != "users" {
-		t.Fatalf("schema 异常: %+v", s.Tables)
+	if len(s.Tables) != 2 {
+		t.Fatalf("应有表+视图 2 个对象, got %+v", s.Tables)
 	}
-	if len(s.Tables[0].Columns) != 2 {
-		t.Fatalf("users 应有 2 列, got %d", len(s.Tables[0].Columns))
+	var tbl, view *Table
+	for i := range s.Tables {
+		switch s.Tables[i].Name {
+		case "users":
+			tbl = &s.Tables[i]
+		case "v_users":
+			view = &s.Tables[i]
+		}
+	}
+	if tbl == nil || tbl.Type != "table" || len(tbl.Columns) != 2 {
+		t.Fatalf("users 应归类 table 且 2 列: %+v", tbl)
+	}
+	if view == nil || view.Type != "view" {
+		t.Fatalf("v_users 应归类 view: %+v", view)
 	}
 }
 

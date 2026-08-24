@@ -180,6 +180,7 @@ type Column struct {
 // Table 表元数据。
 type Table struct {
 	Name    string   `json:"name"`
+	Type    string   `json:"type,omitempty"` // "table" | "view"，旧数据缺失默认 table
 	Columns []Column `json:"columns"`
 }
 
@@ -203,27 +204,28 @@ func (e *Executor) schemaQuery() string {
 	if err != nil {
 		drv = "mysql"
 	}
+	// 三驱动均在第 6 列返回对象类型 obj_type（table/view），供前端对象树分类。
 	if drv == "sqlite" {
 		return `SELECT m.name AS table_name, p.name AS column_name, p.type AS data_type,
-       CASE WHEN p."notnull" THEN 'NO' ELSE 'YES' END AS is_nullable, '' AS key
+       CASE WHEN p."notnull" THEN 'NO' ELSE 'YES' END AS is_nullable, '' AS key, m.type AS obj_type
 FROM sqlite_master m
 JOIN pragma_table_info(m.name) p
-WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'
+WHERE m.type IN ('table','view') AND m.name NOT LIKE 'sqlite_%'
 ORDER BY m.name, p.cid`
 	}
 	if drv == "postgres" {
-		return `SELECT t.table_name, c.column_name, c.data_type, c.is_nullable, '' AS key
+		return `SELECT t.table_name, c.column_name, c.data_type, c.is_nullable, '' AS key, t.table_type AS obj_type
 FROM information_schema.tables t
 JOIN information_schema.columns c
   ON c.table_schema = t.table_schema AND c.table_name = t.table_name
-WHERE t.table_schema = current_schema() AND t.table_type = 'BASE TABLE'
+WHERE t.table_schema = current_schema() AND t.table_type IN ('BASE TABLE','VIEW')
 ORDER BY t.table_name, c.ordinal_position`
 	}
-	return `SELECT t.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, c.IS_NULLABLE, c.COLUMN_KEY
+	return `SELECT t.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, c.IS_NULLABLE, c.COLUMN_KEY, t.TABLE_TYPE AS obj_type
 FROM information_schema.TABLES t
 JOIN information_schema.COLUMNS c
   ON c.TABLE_SCHEMA = t.TABLE_SCHEMA AND c.TABLE_NAME = t.TABLE_NAME
-WHERE t.TABLE_SCHEMA = DATABASE() AND t.TABLE_TYPE = 'BASE TABLE'
+WHERE t.TABLE_SCHEMA = DATABASE() AND t.TABLE_TYPE IN ('BASE TABLE','VIEW')
 ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION`
 }
 
@@ -239,9 +241,16 @@ func parseSchema(res *Result) (*Schema, error) {
 			continue
 		}
 		table := fmt.Sprintf("%v", row[0])
+		// 第 6 列为对象类型（table/view）；缺失/空回退 table（兼容旧查询）。
+		objType := "table"
+		if len(row) > 5 {
+			if t := strings.TrimSpace(fmt.Sprintf("%v", row[5])); t != "" && t != "<nil>" {
+				objType = normalizeObjectType(t)
+			}
+		}
 		ti, ok := idx[table]
 		if !ok {
-			schema.Tables = append(schema.Tables, Table{Name: table})
+			schema.Tables = append(schema.Tables, Table{Name: table, Type: objType})
 			idx[table] = len(schema.Tables) - 1
 			ti = idx[table]
 		}
@@ -253,6 +262,18 @@ func parseSchema(res *Result) (*Schema, error) {
 		})
 	}
 	return &schema, nil
+}
+
+// normalizeObjectType 把驱动返回的对象类型归一化为 "table"/"view"。
+func normalizeObjectType(t string) string {
+	switch strings.ToUpper(strings.TrimSpace(t)) {
+	case "BASE TABLE", "TABLE":
+		return "table"
+	case "VIEW":
+		return "view"
+	default:
+		return strings.ToLower(strings.TrimSpace(t))
+	}
 }
 
 // IsQuery 判断 SQL 首关键字是否为查询类（委托 connector.IsQuery，供 db 工作台使用）。
