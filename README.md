@@ -8,14 +8,13 @@
 
 ### 🖥️ Host Management
 - Organize hosts into a folder **tree** (create / rename / move / delete nodes)
-- Manage **SSH / WinRM / database** connection assets (connection types — SSH, WinRM, MySQL, PostgreSQL, SQLite, etc. — are registry-driven; driver-specific params are entered via a schema-driven dynamic form)
+- Manage **SSH / WinRM / database** connection assets (connection types — SSH, WinRM, MySQL, PostgreSQL, SQLite, Redis, etc. — are registry-driven; driver-specific params are entered via a schema-driven dynamic form)
 - **Test connection** before saving; run ad-hoc commands
 - Passwords/secrets are **encrypted at rest**
 
 ### 🪟 Windows Hosts (WinRM)
 - Connect to Windows hosts via **WinRM** (HTTP 5985 / HTTPS 5986, password auth)
-- Run ad-hoc **PowerShell** commands from a command panel
-- **Launch Remote Desktop (RDP)** with one click — password pre-filled via Windows DPAPI
+- Opening a Windows host lands you directly on the **AI agent chat** page; **Launch Remote Desktop (RDP)** with one click from the AI panel header — password pre-filled via Windows DPAPI
 - The AI agent operates Windows hosts in **PowerShell**, with protocol-aware guardrails
 
 ![Windows 主机界面](images/home_win.png)
@@ -32,8 +31,17 @@
 
 ### 🗄️ Database Workbench
 - Connect to **MySQL / PostgreSQL / SQLite** (SQLite is a local file — no host/port/credentials needed)
-- **Schema tree** (tables / columns) + CodeMirror **SQL editor** + results grid
+- **Navicat-style workbench**: object tree (tables / views with expand/collapse), **multi-tab query editor**, double-click a table to browse its data with paging, result grid with row count / duration / **CSV export**, status bar
 - The AI agent operates database assets via the **`execute_sql`** tool — **every SQL statement is approved by you before it runs**
+
+![数据库工作台界面](images/home_mysql.png)
+
+### 🔴 Redis Manager
+- Dedicated **Redis panel**: keyspace browser (SCAN paging + pattern filter), key detail with **type-aware value view** (string / hash / list / set / zset)
+- Edit string values, **delete keys**, **set TTL** — with confirmation
+- **Command terminal** (redis-cli style, ↑↓ history) and server **INFO** overview (version / memory / connections)
+
+![Redis 管理界面](images/home_redis.png)
 
 ### 🤖 AI Ops Agent
 - Chat with an LLM agent that has a direct view of your selected host
@@ -59,7 +67,7 @@
 
 ```
 ┌────────────────────────── Frontend (React) ─────────────────────────┐
-│  HostsPage ► HostTree / Terminal / SFTP / WinRmPanel / AIPanel      │
+│  HostsPage ► HostTree / Terminal / SFTP / DbPanel / RedisPanel / AIPanel │
 └──────────────────────────────────┬──────────────────────────────────┘
                                    │  Wails bindings (window.go)
 ┌──────────────────────────────────▼──────────────────────────────────┐
@@ -67,7 +75,7 @@
 │  handlers: Hosts · Terminal · Sftp · Sessions · Rdp · Db · Connector│
 │  internal/connector: connection-type registry + capability interfaces│
 │  internal/einoagent: model(provider) · tools · session · guardrail  │
-│  internal executors: sshexec · winrmexec · dbexec                   │
+│  internal executors: sshexec · winrmexec · dbexec · redis           │
 │  internal/store:     hosts · conversations · config · memory        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -111,6 +119,7 @@ wails build -platform darwin/universal
 │   ├── sshexec/             # SSH command executor (unified Exec interface)
 │   ├── winrmexec/           # WinRM command executor (same Exec interface)
 │   ├── dbexec/              # database executor (mysql / postgres / sqlite drivers)
+│   ├── redis/               # Redis connector (KindDB: QueryRunner + Pingable)
 │   ├── sftp/                # SFTP transfer engine (concurrent queue)
 │   ├── skill/               # Ops skill management + remote script execution
 │   ├── termctx/             # Terminal context ring buffer (AI context injection)

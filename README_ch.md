@@ -8,14 +8,13 @@
 
 ### 🖥️ 主机管理
 - 文件夹**树状**组织主机（新建 / 重命名 / 移动 / 删除节点）
-- 管理 **SSH / WinRM / 数据库** 连接资产（SSH、WinRM、MySQL、PostgreSQL、SQLite 等连接类型由注册表驱动，driver 专属参数按 schema 动态表单录入）
+- 管理 **SSH / WinRM / 数据库** 连接资产（SSH、WinRM、MySQL、PostgreSQL、SQLite、Redis 等连接类型由注册表驱动，driver 专属参数按 schema 动态表单录入）
 - 保存前可**测试连接**；支持临时执行命令
 - 密码等敏感信息**加密落盘**
 
 ### 🪟 Windows 主机（WinRM）
 - 通过 **WinRM** 连接 Windows 主机（HTTP 5985 / HTTPS 5986，密码认证）
-- 在命令面板中执行 **PowerShell** 命令
-- **一键拉起远程桌面（RDP）**，密码经 Windows DPAPI 预填
+- 打开 Windows 主机即进入**智能体对话页**（不再有独立 PowerShell 命令面板）；在 AI 面板头部**一键拉起远程桌面（RDP）**，密码经 Windows DPAPI 预填
 - AI 智能体在 Windows 主机上以 **PowerShell** 运维，含协议感知的安全护栏
 
 ![Windows 主机界面](images/home_win.png)
@@ -32,8 +31,17 @@
 
 ### 🗄️ 数据库工作台
 - 连接 **MySQL / PostgreSQL / SQLite**（SQLite 为本地文件，无需主机/端口/凭据）
-- 左侧 **schema 树**（表 / 列）+ CodeMirror **SQL 编辑器** + 结果网格
+- **Navicat 风格工作台**：对象树（表 / 视图分组、一键展开/收缩）、**多标签查询**编辑器、双击表**分页浏览数据**、结果网格（行数 / 耗时 / **CSV 导出**）、状态栏
 - AI 智能体在数据库资产上以 `execute_sql` 工具诊断/修复，**每条 SQL 经你批准后执行**
+
+![数据库工作台界面](images/home_mysql.png)
+
+### 🔴 Redis 管理
+- 专属 **Redis 面板**：键空间浏览（SCAN 分页 + pattern 过滤）、键详情**按类型查看值**（string / hash / list / set / zset）
+- 可**编辑 string 值**、**删除键**、**设置过期（TTL）**——均带确认
+- **命令终端**（redis-cli 风格，↑↓ 历史）与服务器 **INFO** 概览（版本 / 内存 / 连接数）
+
+![Redis 管理界面](images/home_redis.png)
 
 ### 🤖 AI 运维智能体
 - 与能"看到"当前选中主机的 LLM 智能体对话
@@ -59,7 +67,7 @@
 
 ```
 ┌───────────────────────────── 前端（React） ─────────────────────────────┐
-│  HostsPage ► HostTree / Terminal / SFTP 面板 / WinRmPanel / AIPanel   │
+│  HostsPage ► HostTree / Terminal / SFTP 面板 / DbPanel / RedisPanel / AIPanel │
 └──────────────────────────────────┬──────────────────────────────────┘
                                    │  Wails 绑定（window.go）
 ┌──────────────────────────────────▼──────────────────────────────────┐
@@ -67,7 +75,7 @@
 │  handlers: Hosts · Terminal · Sftp · Sessions · Rdp · Db · Connector│
 │  internal/connector: 连接类型注册表 + 能力接口（QueryRunner 等）          │
 │  internal/einoagent: model(provider) · tools · session · guardrail  │
-│  internal executors: sshexec · winrmexec · dbexec                   │
+│  internal executors: sshexec · winrmexec · dbexec · redis           │
 │  internal/store:     hosts · conversations · config · memory        │
 └─────────────────────────────────────────────────────────────────────┘
 ```
@@ -111,6 +119,7 @@ wails build -platform darwin/universal
 │   ├── sshexec/             # SSH 命令执行器（统一 Exec 接口）
 │   ├── winrmexec/           # WinRM 命令执行器（同一 Exec 接口）
 │   ├── dbexec/              # 数据库执行器（mysql / postgres / sqlite 驱动）
+│   ├── redis/               # Redis 连接器（KindDB 型：QueryRunner + Pingable）
 │   ├── sftp/                # SFTP 传输引擎（并发队列）
 │   ├── skill/               # 运维技能管理与远程脚本执行
 │   ├── termctx/             # 终端上下文环形缓冲（AI 上下文注入）
