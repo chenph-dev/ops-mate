@@ -10,6 +10,7 @@ export default {
     cancel: 'Cancel current (running or thinking)',
     newConversation: 'New conversation',
     collapse: 'Collapse',
+    openRdp: 'Open RDP remote desktop',
   },
   input: {
     placeholder: 'Type a question...',

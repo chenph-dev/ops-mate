@@ -71,16 +71,7 @@ export default {
     testConnection: 'Test connection',
   },
   winrm: {
-    title: 'Command executor',
-    noHost: 'No Windows asset selected',
-    openRdp: 'Open RDP',
     openRdpFailed: 'Failed to launch RDP: {{err}}',
-    commandPlaceholder: 'Enter a PowerShell command, press Enter to run',
-    run: 'Run',
-    running: 'Running...',
-    output: 'Output',
-    noOutput: 'No command executed yet',
-    failed: 'Execution failed: {{err}}',
   },
   db: {
     placeholder: 'Enter SQL, Ctrl+Enter to run (Shift+Enter for newline)',

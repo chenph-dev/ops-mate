@@ -10,6 +10,7 @@ export default {
     cancel: '取消本次（执行中/思考中均可中止）',
     newConversation: '新建对话',
     collapse: '收起',
+    openRdp: '打开 RDP 远程桌面',
   },
   input: {
     placeholder: '输入问题...',

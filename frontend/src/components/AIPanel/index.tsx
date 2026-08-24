@@ -43,6 +43,10 @@ export interface AIPanelProps {
   onSendMessage: (text: string) => Promise<void>;
   onClearMessages: () => Promise<void>;
   onRunInTerminal: (command: string) => void;
+  /** 非空时头部显示「打开 RDP」按钮（WinRM 资产专用）。 */
+  onOpenRdp?: () => void;
+  /** true 时面板占满容器宽度并隐藏拖拽条（WinRM 资产默认全宽，无终端并排）。 */
+  fullWidth?: boolean;
   onApprove: (command: string) => Promise<void>;
   onReject: () => Promise<void>;
   onApprovePlan: () => Promise<void>;
@@ -78,6 +82,8 @@ export default function AIPanel({
   onSendMessage,
   onClearMessages,
   onRunInTerminal,
+  onOpenRdp,
+  fullWidth = false,
   onApprove,
   onReject,
   onApprovePlan,
@@ -196,7 +202,7 @@ export default function AIPanel({
   return (
     <div
       style={{
-        width: panelWidth,
+        width: fullWidth ? '100%' : panelWidth,
         height: '100%',
         flexShrink: 0,
         display: 'flex',
@@ -207,27 +213,29 @@ export default function AIPanel({
         border: '1px solid var(--antd-color-border-secondary)',
         borderRadius: 8,
         overflow: 'hidden',
-        marginLeft: 5,
+        marginLeft: fullWidth ? 0 : 5,
       }}
     >
-      {/* 左边缘拖拽条：调整面板宽度（与终端并排，终端自动让出空间） */}
-      <div
-        onMouseDown={onResizeStart}
-        onMouseEnter={() => setResizeHover(true)}
-        onMouseLeave={() => setResizeHover(false)}
-        title={tc('dragResize')}
-        style={{
-          position: 'absolute',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          width: 5,
-          cursor: 'ew-resize',
-          background: resizeHover ? 'var(--antd-color-primary)' : 'transparent',
-          opacity: resizeHover ? 0.5 : 0,
-          zIndex: 2,
-        }}
-      />
+      {/* 左边缘拖拽条：调整面板宽度（与终端并排，终端自动让出空间）；全宽模式无终端并排，隐藏 */}
+      {!fullWidth && (
+        <div
+          onMouseDown={onResizeStart}
+          onMouseEnter={() => setResizeHover(true)}
+          onMouseLeave={() => setResizeHover(false)}
+          title={tc('dragResize')}
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 5,
+            cursor: 'ew-resize',
+            background: resizeHover ? 'var(--antd-color-primary)' : 'transparent',
+            opacity: resizeHover ? 0.5 : 0,
+            zIndex: 2,
+          }}
+        />
+      )}
       <PanelHeader
         hostName={hostName}
         aiCfg={aiCfg}
@@ -245,6 +253,8 @@ export default function AIPanel({
         onCancel={onCancel}
         onNewConversation={onNewConversation}
         onToggleCollapse={onToggleCollapse}
+        onOpenRdp={onOpenRdp}
+        fullWidth={fullWidth}
       />
       {/* SSH 断开警告：AI 命令依赖资产连接 */}
       {!sshConnected && (

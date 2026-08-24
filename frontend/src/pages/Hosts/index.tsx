@@ -15,8 +15,8 @@ import HostForm from '@/components/HostForm';
 import SftpPanel from '@/components/SftpPanel';
 import Terminal from '@/components/Terminal';
 import AIPanel from '@/components/AIPanel';
-import WinRmPanel from '@/components/WinRmPanel';
 import DbPanel from '@/components/DbPanel';
+import { OpenRdp } from '@wailsjs/go/rdp/RdpHandler';
 
 const MAX_TABS = 6;
 
@@ -163,12 +163,16 @@ export default function HostsPage(): React.JSX.Element {
     }
   }, [activeHostID]);
 
-  // 双击/连接入口：按协议分流。SSH 走多标签终端，WinRM 走命令执行器面板。
+  // 双击/连接入口：按协议分流。SSH 走多标签终端，WinRM/DB 走面板。
+  // WinRM 打开默认进入智能体对话页（无 PowerShell 面板），RDP 入口在 AI 面板头部。
   const openHost = (node: TreeNode): void => {
     setSelectedHost(node);
     if (node.protocol === 'winrm' || isDB(node.protocol)) {
       setPanelHost(node);
       setView('terminal');
+      if (node.protocol === 'winrm') {
+        setAiCollapsed(false);
+      }
       return;
     }
     setPanelHost(null);
@@ -276,6 +280,16 @@ export default function HostsPage(): React.JSX.Element {
     setView('sftp');
   };
 
+  // WinRM 资产：拉起 RDP 远程桌面（入口在智能体面板头部）。
+  const openRdp = useCallback(async (): Promise<void> => {
+    if (!panelHost) return;
+    try {
+      await OpenRdp(panelHost.id);
+    } catch (e) {
+      message.error(t('winrm.openRdpFailed', { err: String(e) }));
+    }
+  }, [panelHost, message, t]);
+
   const handleSelect = useCallback((node: TreeNode) => {
     setSelectedHost(node);
   }, []);
@@ -378,11 +392,8 @@ export default function HostsPage(): React.JSX.Element {
             }}
           >
             {panelHost.protocol === 'winrm' ? (
-              <WinRmPanel
-                host={panelHost}
-                aiCollapsed={aiCollapsed}
-                onToggleAI={() => setAiCollapsed(!aiCollapsed)}
-              />
+              // WinRM：无 PowerShell 面板，默认智能体对话页（RDP 入口在 AI 面板头部）
+              null
             ) : isDB(panelHost.protocol) ? (
               <DbPanel
                 host={panelHost}
@@ -408,6 +419,8 @@ export default function HostsPage(): React.JSX.Element {
               sshConnected={panelHost.protocol === 'winrm' || isDB(panelHost.protocol)}
               hostName={panelHost.name}
               protocol={panelHost.protocol ?? 'ssh'}
+              onOpenRdp={panelHost.protocol === 'winrm' ? openRdp : undefined}
+              fullWidth={panelHost.protocol === 'winrm'}
               onRunInTerminal={() => {}}
             />
           </div>

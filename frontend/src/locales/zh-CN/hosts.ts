@@ -71,16 +71,7 @@ export default {
     testConnection: '测试连接',
   },
   winrm: {
-    title: '命令执行器',
-    noHost: '未选择 Windows 资产',
-    openRdp: '打开 RDP',
     openRdpFailed: 'RDP 拉起失败：{{err}}',
-    commandPlaceholder: '输入 PowerShell 命令，回车执行',
-    run: '执行',
-    running: '执行中...',
-    output: '输出',
-    noOutput: '尚未执行命令',
-    failed: '执行失败：{{err}}',
   },
   db: {
     placeholder: '输入 SQL，Ctrl+Enter 执行（Shift+Enter 换行）',

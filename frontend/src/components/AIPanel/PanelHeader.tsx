@@ -9,6 +9,8 @@ import {
 import type { configstore, convstore } from '@wailsjs/go/models';
 import type { SessionState } from './types';
 import HistoryPopover from './HistoryPopover';
+// Windows 图标（RDP 入口，WinRM 资产头部专用）
+import windowsPng from '@/assets/icons/windows.png';
 
 interface PanelHeaderProps {
   hostName: string;
@@ -27,6 +29,10 @@ interface PanelHeaderProps {
   onCancel: () => Promise<void>;
   onNewConversation: () => Promise<void>;
   onToggleCollapse: () => void;
+  /** 非空时显示「打开 RDP」按钮（WinRM 资产专用）。 */
+  onOpenRdp?: () => void;
+  /** true 时隐藏折叠按钮（全宽模式即主界面，折叠后无入口恢复）。 */
+  fullWidth?: boolean;
 }
 
 /** 抽屉标题栏：智能体信息 + 会话操作按钮。宽度由面板左边缘拖拽条调整。 */
@@ -47,6 +53,8 @@ export default function PanelHeader({
   onCancel,
   onNewConversation,
   onToggleCollapse,
+  onOpenRdp,
+  fullWidth = false,
 }: PanelHeaderProps): React.JSX.Element {
   const { t } = useTranslation('ai');
   return (
@@ -97,6 +105,22 @@ export default function PanelHeader({
             />
           </Tooltip>
         )}
+        {onOpenRdp && (
+          <Tooltip title={t('header.openRdp')}>
+            <Button
+              type="text"
+              size="small"
+              icon={
+                <img
+                  src={windowsPng}
+                  alt="RDP"
+                  style={{ width: 14, height: 14, display: 'block' }}
+                />
+              }
+              onClick={() => void onOpenRdp()}
+            />
+          </Tooltip>
+        )}
         <HistoryPopover
           conversations={conversations}
           activeSession={activeSession}
@@ -113,14 +137,16 @@ export default function PanelHeader({
             onClick={() => void onNewConversation()}
           />
         </Tooltip>
-        <Tooltip title={t('header.collapse')}>
-          <Button
-            type="text"
-            size="small"
-            icon={<CompressOutlined />}
-            onClick={onToggleCollapse}
-          />
-        </Tooltip>
+        {!fullWidth && (
+          <Tooltip title={t('header.collapse')}>
+            <Button
+              type="text"
+              size="small"
+              icon={<CompressOutlined />}
+              onClick={onToggleCollapse}
+            />
+          </Tooltip>
+        )}
       </div>
     </div>
   );
