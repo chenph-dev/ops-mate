@@ -132,7 +132,7 @@ export default function HostForm({
       form.setFieldsValue({ port: 22 });
     } else {
       // 数据库驱动默认端口（sqlite 无端口，NeedsHost=false 隐藏）
-      const portMap: Record<string, number> = { mysql: 3306, postgres: 5432, redis: 6379 };
+      const portMap: Record<string, number> = { mysql: 3306, postgres: 5432, redis: 6379, elasticsearch: 9200 };
       form.setFieldsValue({ port: portMap[value] ?? undefined });
     }
   };
@@ -183,7 +183,9 @@ export default function HostForm({
                   label: null,
                   showArrow: false,
                   children: (
-                    <Row gutter={12} style={{ width: '100%' }}>
+                    // 覆盖 gutter 的负 margin：外层 Row gutter 会对 display:contents 的 Col
+                    // 无效（padding 不渲染），此处若保留负 margin 会让静态字段比外层动态字段偏左 6px
+                    <Row gutter={12} style={{ width: '100%', marginLeft: 0, marginRight: 0 }}>
                       <Col span={12}>
                         <Form.Item
                           name="addr"

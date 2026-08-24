@@ -17,6 +17,7 @@ import Terminal from '@/components/Terminal';
 import AIPanel from '@/components/AIPanel';
 import DbPanel from '@/components/DbPanel';
 import RedisPanel from '@/components/RedisPanel';
+import EsPanel from '@/components/EsPanel';
 import { OpenRdp } from '@wailsjs/go/rdp/RdpHandler';
 
 const MAX_TABS = 6;
@@ -398,6 +399,13 @@ export default function HostsPage(): React.JSX.Element {
             ) : panelHost.protocol === 'redis' ? (
               // Redis：专用管理面板（键空间浏览/命令终端/服务器信息）
               <RedisPanel
+                host={panelHost}
+                aiCollapsed={aiCollapsed}
+                onToggleAI={() => setAiCollapsed(!aiCollapsed)}
+              />
+            ) : panelHost.protocol === 'elasticsearch' ? (
+              // Elasticsearch：专用管理面板（索引浏览/DSL 查询/集群信息）
+              <EsPanel
                 host={panelHost}
                 aiCollapsed={aiCollapsed}
                 onToggleAI={() => setAiCollapsed(!aiCollapsed)}

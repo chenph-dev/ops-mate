@@ -56,6 +56,11 @@ export default {
     suggestRedisDbsize: '查看当前数据库的键总数',
     suggestRedisKeys: '列出当前数据库的键与类型',
     suggestRedisMemory: '查看内存使用情况',
+    // Elasticsearch
+    suggestEsHealth: '查看集群健康状态',
+    suggestEsIndices: '列出所有索引',
+    suggestEsDocs: '查看某索引的文档数量',
+    suggestEsSearch: '搜索包含某关键词的文档',
   },
   unconfigured: {
     hint: '尚未配置 LLM 模型。请在「LLM模型配置」页设置 LLM 模型供应商、Base URL、API Key 与模型。',

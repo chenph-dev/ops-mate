@@ -174,6 +174,9 @@ func ClassifyForProtocol(command string, readOnlyWhitelist []string, protocol st
 	if strings.EqualFold(protocol, "redis") {
 		return classifyRedis(command)
 	}
+	if strings.EqualFold(protocol, "es") {
+		return classifyES(command)
+	}
 	if AssessRiskForProtocol(command, protocol) == "high" {
 		return "high", ActionApprove
 	}
@@ -253,6 +256,52 @@ func redisKeyword(s string) string {
 		return s[:i]
 	}
 	return s
+}
+
+// esReadOnlyPrefixes ES 只读系统 API 前缀（GET + 命中即 read/auto）。
+var esReadOnlyPrefixes = []string{
+	"_cat", "_cluster", "_nodes", "_stats", "_mapping", "_settings", "_aliases",
+}
+
+// classifyES 按 ES REST 查询分类（es 协议）：
+// 高危（DELETE 任何目标、_all、_delete_by_query/_update_by_query/_reindex）→ high/approve；
+// 只读（GET + 系统 API 或 /_search）→ read/auto；其余写操作 → write/approve。
+func classifyES(command string) (string, Action) {
+	c := strings.TrimSpace(command)
+	if c == "" {
+		return "write", ActionApprove
+	}
+	first := c
+	if i := strings.IndexByte(first, '\n'); i >= 0 {
+		first = first[:i]
+	}
+	first = strings.TrimSpace(first)
+	method, path := "GET", strings.TrimSpace(first)
+	if i := strings.IndexByte(first, ' '); i > 0 {
+		upper := strings.ToUpper(first[:i])
+		switch upper {
+		case "GET", "POST", "PUT", "DELETE", "HEAD":
+			method, path = upper, strings.TrimSpace(first[i+1:])
+		}
+	}
+	lowerPath := strings.ToLower(path)
+	if method == "DELETE" || strings.Contains(lowerPath, "_all") ||
+		strings.Contains(lowerPath, "_delete_by_query") ||
+		strings.Contains(lowerPath, "_update_by_query") ||
+		strings.Contains(lowerPath, "_reindex") {
+		return "high", ActionApprove
+	}
+	if method == "GET" {
+		for _, pre := range esReadOnlyPrefixes {
+			if strings.HasPrefix(lowerPath, pre) {
+				return "read", ActionAuto
+			}
+		}
+		if strings.HasSuffix(lowerPath, "/_search") {
+			return "read", ActionAuto
+		}
+	}
+	return "write", ActionApprove
 }
 
 // classifySQL 按 SQL 首关键字分类（sql 协议）：

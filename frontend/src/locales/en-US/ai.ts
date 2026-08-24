@@ -56,6 +56,11 @@ export default {
     suggestRedisDbsize: 'Show total key count of the current database',
     suggestRedisKeys: 'List keys and their types in the current database',
     suggestRedisMemory: 'Check memory usage',
+    // Elasticsearch
+    suggestEsHealth: 'Check cluster health',
+    suggestEsIndices: 'List all indices',
+    suggestEsDocs: 'Show document count of an index',
+    suggestEsSearch: 'Search documents matching a keyword',
   },
   unconfigured: {
     hint: 'No LLM model configured yet. Set provider, Base URL, API key and model on the "LLM Config" page.',

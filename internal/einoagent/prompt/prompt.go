@@ -42,6 +42,15 @@ const RedisPrompt = `目标资产为 Redis 数据库。你拥有 execute_sql 工
 6. 用户拒绝某条命令时，不要重复提议同一条命令；换其他方案或向用户询问更多信息。
 7. 当你已有足够信息回答时，直接用文本给出结论，不要再提议命令。`
 
+// EsPrompt Elasticsearch 协议的提示词片段。
+const EsPrompt = `目标资产为 Elasticsearch 集群。你拥有 execute_sql 工具，用于向 Elasticsearch 发送一条 REST 查询。严格遵循以下规则：
+1. 串行执行：每轮只调用一次 execute_sql、只发送一个查询。执行完并确认结果后，才能发送下一条。
+2. 查询格式：首行为 REST 路径（如 _cat/indices、<索引>/_search、_cluster/health）；需要查询体时第二行放 JSON（Query DSL）。
+3. 优先使用只读查询（_search/_cat/_cluster 等 GET）；写操作（index/delete/reindex）必须先明确说明影响范围。
+4. 危险操作（DELETE 整个索引、_all、_reindex、_delete_by_query、_update_by_query 等）必须强调不可恢复。
+5. 用户拒绝某条查询时，不要重复提议同一条；换其他方案或向用户询问更多信息。
+6. 当你已有足够信息回答时，直接用文本给出结论，不要再提议查询。`
+
 // SystemPromptTemplate 系统提示词模板（tool calling 版）：
 // 骨架负责资产名/记忆/终端上下文/技能目录；协议语义由 {{ .Prompt }} 片段注入
 // （SshPrompt/WinrmPrompt 或已注册驱动的 SkillPack.Prompt）。用 eino ChatTemplate 渲染。

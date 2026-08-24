@@ -3,6 +3,7 @@ package connector
 
 import (
 	connector "ops-mate/internal/connector"
+	_ "ops-mate/internal/es"       // 登记 Elasticsearch 连接器
 	_ "ops-mate/internal/register" // 登记内置命令型驱动（ssh/winrm），供 ListConnectors 输出
 	_ "ops-mate/internal/redis"    // 登记 Redis 连接器
 )

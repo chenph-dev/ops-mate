@@ -29,7 +29,7 @@ func Register(c *Connector) {
 	}
 	g := c.SkillPack.Guardrail
 	if g != "" && g != GuardrailSQL && g != GuardrailLinux &&
-		g != GuardrailWindows && g != GuardrailRedis {
+		g != GuardrailWindows && g != GuardrailRedis && g != GuardrailES {
 		panic(fmt.Sprintf("connector: 驱动 %q 的 Guardrail %q 非法", c.Protocol, g))
 	}
 	connectors[strings.ToLower(c.Protocol)] = c

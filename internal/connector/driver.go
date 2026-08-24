@@ -17,7 +17,8 @@ const (
 	GuardrailSQL     Guardrail = "sql"   // SQL 语义（只读查询 auto、高危 DDL approve）
 	GuardrailLinux   Guardrail = "linux" // Linux shell 语义（guardrail 包默认分支）
 	GuardrailWindows Guardrail = "winrm" // Windows PowerShell 语义
-	GuardrailRedis   Guardrail = "redis" // Redis 语义（guardrail 包当前回落 Linux，供未来驱动）
+	GuardrailRedis   Guardrail = "redis" // Redis 语义（只读命令 auto、高危命令 approve）
+	GuardrailES      Guardrail = "es"    // Elasticsearch 语义（只读搜索 auto、写/危险操作 approve）
 )
 
 // SkillPack 协议 skill 包：统一 agent 按连接类型切换的三件套。
