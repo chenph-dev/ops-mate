@@ -110,6 +110,41 @@ func TestDbFor_SSHReturnsNil(t *testing.T) {
 	}
 }
 
+func TestDbFor_RedisReturnsNil(t *testing.T) {
+	app := openTestApp(t)
+	s := hoststore.NewHostsStore(app)
+	id, err := s.SaveHost(hoststore.HostInput{
+		Name: "redis", Protocol: "redis", Addr: "10.0.0.7", Port: 6379,
+		User: "default", AuthType: "password", Secret: "x",
+		Params: map[string]any{"db": "0"},
+	})
+	if err != nil {
+		t.Fatalf("SaveHost: %v", err)
+	}
+	r := NewExecutorResolver(s)
+	if got := r.DbFor(id); got != nil {
+		t.Fatalf("redis 协议 DbFor 应为 nil（非 dbexec 驱动走注册表）, got %+v", got)
+	}
+}
+
+func TestConnFor_RedisQueryRunner(t *testing.T) {
+	app := openTestApp(t)
+	s := hoststore.NewHostsStore(app)
+	id, err := s.SaveHost(hoststore.HostInput{
+		Name: "redis", Protocol: "redis", Addr: "10.0.0.7", Port: 6379,
+		User: "default", AuthType: "password", Secret: "x",
+		Params: map[string]any{"db": "0"},
+	})
+	if err != nil {
+		t.Fatalf("SaveHost: %v", err)
+	}
+	r := NewExecutorResolver(s)
+	cap := r.ConnFor(id)
+	if _, ok := cap.(connector.QueryRunner); !ok {
+		t.Fatalf("ConnFor(redis) 应返回 QueryRunner, got %T", cap)
+	}
+}
+
 func TestHostFor_RejectsDBProtocol(t *testing.T) {
 	app := openTestApp(t)
 	s := hoststore.NewHostsStore(app)

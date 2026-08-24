@@ -1,0 +1,41 @@
+export default {
+  toolbar: {
+    refresh: 'Refresh',
+  },
+  browser: {
+    title: 'Keyspace',
+    patternPlaceholder: 'Pattern, e.g. user:*',
+    search: 'Search',
+    next: 'Next',
+    empty: 'No keys',
+    loadFailed: 'Failed to load keys: {{err}}',
+  },
+  detail: {
+    title: 'Key Detail',
+    selectHint: 'Select a key on the left to view details',
+    type: 'Type',
+    ttl: 'TTL',
+    ttlNone: 'No expiry',
+    valueTitle: 'Value',
+    editValue: 'Edit value',
+    delete: 'Delete',
+    deleteConfirm: 'Delete key "{{key}}"? This cannot be undone.',
+    setTtl: 'Set TTL',
+    editStringTitle: 'Edit string value',
+    ttlTitle: 'Set expiry (seconds)',
+    ttlPlaceholder: '0 removes the expiry',
+    loadFailed: 'Failed to load key details: {{err}}',
+    deleteFailed: 'Delete failed: {{err}}',
+    saveFailed: 'Save failed: {{err}}',
+  },
+  terminal: {
+    title: 'Command Terminal',
+    placeholder: 'Enter a Redis command, Enter to run (↑↓ history)',
+    empty: 'Command output appears here',
+    failed: 'Execution failed: {{err}}',
+  },
+  info: {
+    title: 'Server Info',
+    loadFailed: 'Failed to load server info: {{err}}',
+  },
+};

@@ -8,6 +8,7 @@ import config from './config';
 import audit from './audit';
 import skills from './skills';
 import about from './about';
+import redis from './redis';
 
 export default {
   common,
@@ -20,4 +21,5 @@ export default {
   audit,
   skills,
   about,
+  redis,
 };

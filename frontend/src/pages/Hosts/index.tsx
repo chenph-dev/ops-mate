@@ -16,6 +16,7 @@ import SftpPanel from '@/components/SftpPanel';
 import Terminal from '@/components/Terminal';
 import AIPanel from '@/components/AIPanel';
 import DbPanel from '@/components/DbPanel';
+import RedisPanel from '@/components/RedisPanel';
 import { OpenRdp } from '@wailsjs/go/rdp/RdpHandler';
 
 const MAX_TABS = 6;
@@ -139,12 +140,12 @@ export default function HostsPage(): React.JSX.Element {
   useEffect(() => {
     sessionsRef.current = sessions;
   });
-  // 展开 AI 面板时清空消息区显示（不动 DB 与历史列表）：去掉上一资产会话的残留内容，
-  // 避免「当前资产是 mysql，面板却带着上一个资产最近的对话」。
+  // 展开 AI 面板时新建对话（新会话 + 空消息区）：避免发送时带着上一个资产/上次会话的历史
+  // 继续对话——仅清空显示（resetView）不动 activeSession，发送仍会落到旧会话并重新加载旧历史。
   const prevCollapsedRef = useRef(aiCollapsed);
   useEffect(() => {
     if (prevCollapsedRef.current && !aiCollapsed) {
-      sessionsRef.current.resetView();
+      sessionsRef.current.newConversation();
     }
     prevCollapsedRef.current = aiCollapsed;
   }, [aiCollapsed]);
@@ -394,6 +395,13 @@ export default function HostsPage(): React.JSX.Element {
             {panelHost.protocol === 'winrm' ? (
               // WinRM：无 PowerShell 面板，默认智能体对话页（RDP 入口在 AI 面板头部）
               null
+            ) : panelHost.protocol === 'redis' ? (
+              // Redis：专用管理面板（键空间浏览/命令终端/服务器信息）
+              <RedisPanel
+                host={panelHost}
+                aiCollapsed={aiCollapsed}
+                onToggleAI={() => setAiCollapsed(!aiCollapsed)}
+              />
             ) : isDB(panelHost.protocol) ? (
               <DbPanel
                 host={panelHost}

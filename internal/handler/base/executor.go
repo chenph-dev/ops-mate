@@ -3,6 +3,7 @@ package base
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"ops-mate/internal/connector"
 	"ops-mate/internal/dbexec"
@@ -137,6 +138,13 @@ func (r *ExecutorResolver) DbFor(hostID string) *dbexec.Executor {
 		return nil
 	}
 	if d := connector.Get(meta.Protocol); d == nil || !d.IsDB() {
+		return nil
+	}
+	// 仅 dbexec 支持的驱动（mysql/postgres/sqlite）构造 dbexec；redis 等非 dbexec
+	// DB 驱动走注册表（ConnFor + QueryRunner），供 Redis 面板/通用查询使用。
+	switch strings.ToLower(meta.Protocol) {
+	case "mysql", "postgres", "sqlite":
+	default:
 		return nil
 	}
 	return dbexec.NewExecutor(dbexec.Host{

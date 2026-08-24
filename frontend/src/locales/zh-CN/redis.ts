@@ -1,0 +1,41 @@
+export default {
+  toolbar: {
+    refresh: '刷新',
+  },
+  browser: {
+    title: '键空间',
+    patternPlaceholder: '模式过滤，如 user:*',
+    search: '搜索',
+    next: '下一页',
+    empty: '暂无键',
+    loadFailed: '加载键失败：{{err}}',
+  },
+  detail: {
+    title: '键详情',
+    selectHint: '在左侧选择一个键查看详情',
+    type: '类型',
+    ttl: 'TTL',
+    ttlNone: '永不过期',
+    valueTitle: '值',
+    editValue: '编辑值',
+    delete: '删除',
+    deleteConfirm: '确定删除键「{{key}}」？此操作不可恢复。',
+    setTtl: '设置过期',
+    editStringTitle: '编辑字符串值',
+    ttlTitle: '设置过期时间（秒）',
+    ttlPlaceholder: '0 表示移除过期',
+    loadFailed: '加载键详情失败：{{err}}',
+    deleteFailed: '删除失败：{{err}}',
+    saveFailed: '保存失败：{{err}}',
+  },
+  terminal: {
+    title: '命令终端',
+    placeholder: '输入 Redis 命令，回车执行（↑↓ 历史）',
+    empty: '执行命令后输出显示在此',
+    failed: '执行失败：{{err}}',
+  },
+  info: {
+    title: '服务器信息',
+    loadFailed: '加载服务器信息失败：{{err}}',
+  },
+};

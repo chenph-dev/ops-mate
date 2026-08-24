@@ -81,7 +81,6 @@ export function useSessions(hostId: string | null): {
   newConversation: () => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
   clearMessages: () => Promise<void>;
-  resetView: () => void;
   approve: (command: string) => Promise<void>;
   reject: () => Promise<void>;
   approvePlan: () => Promise<void>;
@@ -292,22 +291,6 @@ export function useSessions(hostId: string | null): {
       setLastErrorCancelled(false);
     }
   }, [activeSession]);
-
-  /** 展开 AI 面板时清空消息区显示（不动 DB 与历史列表）：去掉上一资产会话的残留内容。 */
-  const resetView = useCallback((): void => {
-    setMessages([]);
-    setStreamingText('');
-    setPendingCommand(null);
-    setCommandStatus(null);
-    setPendingPlan(null);
-    setPlanStatus(null);
-    setSessionState(null);
-    setLastError(null);
-    setLastErrorCancelled(false);
-    setRunningCommand(null);
-    setRunStartAt(null);
-    setRunOutput('');
-  }, []);
 
   const sendMessage = useCallback(
     async (text: string): Promise<void> => {
@@ -524,7 +507,6 @@ export function useSessions(hostId: string | null): {
     newConversation,
     sendMessage,
     clearMessages,
-    resetView,
     approve,
     reject,
     approvePlan,
