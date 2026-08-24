@@ -75,4 +75,6 @@ func registerDBDriver(protocol, name, driver string) {
 func init() {
 	registerDBDriver("mysql", "MySQL", "mysql")
 	registerDBDriver("postgres", "PostgreSQL", "postgres")
+	registerDBDriver("clickhouse", "ClickHouse", "clickhouse")
+	registerDBDriver("sqlserver", "SQL Server", "sqlserver")
 }

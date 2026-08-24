@@ -158,6 +158,12 @@ func (t *SQLTool) execute(ctx context.Context, sqlText, approvalStatus string) (
 		cancelled = ctx.Err() != nil
 		display = formatExecResult(res, execErr, cancelled)
 	}
+	// 根因修复：写/DDL（如 CREATE TABLE）走 Exec 且 RowsAffected=0 时，
+	// formatExecResult 返回空串 → eino 生成空 tool_result → Anthropic 兼容 API
+	// 以 "tool_use without tool_result"（HTTP 400）拒绝。统一回灌占位保证非空。
+	if strings.TrimSpace(display) == "" {
+		display = "(执行完成，无受影响行)"
+	}
 	meta := toolMeta{
 		Command: sqlText, DurationMS: time.Since(start).Milliseconds(),
 		Status: approvalStatus, Cancelled: cancelled,

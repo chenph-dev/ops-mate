@@ -16,6 +16,10 @@ func TestDriverName(t *testing.T) {
 		{"postgresql", "postgres"},
 		{"pq", "postgres"},
 		{"sqlite", "sqlite"},
+		{"clickhouse", "clickhouse"},
+		{"ClickHouse", "clickhouse"},
+		{"sqlserver", "sqlserver"},
+		{"mssql", "sqlserver"},
 	}
 	for _, c := range cases {
 		got, err := driverName(c.in)
@@ -54,6 +58,16 @@ func TestDSN(t *testing.T) {
 	}
 	if strings.Contains(got, "sslmode=disable") {
 		t.Errorf("postgres dsn 不应显式关闭 TLS: %q", got)
+	}
+
+	ch := NewExecutor(Host{Driver: "clickhouse", Addr: "10.0.0.8", Port: 9000, User: "default", Password: "p@ss", Database: "analytics"})
+	if got, want := ch.dsn("clickhouse"), "clickhouse://default:p%40ss@10.0.0.8:9000/analytics"; got != want {
+		t.Errorf("clickhouse dsn = %q, want %q", got, want)
+	}
+
+	ss := NewExecutor(Host{Driver: "sqlserver", Addr: "10.0.0.9", Port: 1433, User: "sa", Password: "p@ss", Database: "app"})
+	if got, want := ss.dsn("sqlserver"), "sqlserver://sa:p%40ss@10.0.0.9:1433?database=app"; got != want {
+		t.Errorf("sqlserver dsn = %q, want %q", got, want)
 	}
 }
 
@@ -105,6 +119,18 @@ func TestSchemaQuery(t *testing.T) {
 	q = sl.schemaQuery()
 	if !strings.Contains(q, "'table','view'") || !strings.Contains(q, "m.type AS obj_type") {
 		t.Errorf("sqlite 应含视图与 obj_type 列：%q", q)
+	}
+
+	ch := NewExecutor(Host{Driver: "clickhouse"})
+	q = ch.schemaQuery()
+	if !strings.Contains(q, "system.tables") || !strings.Contains(q, "t.engine AS obj_type") {
+		t.Errorf("clickhouse 应查 system.tables 与引擎列：%q", q)
+	}
+
+	ss := NewExecutor(Host{Driver: "sqlserver"})
+	q = ss.schemaQuery()
+	if !strings.Contains(q, "information_schema.TABLES") || !strings.Contains(q, "DB_NAME()") {
+		t.Errorf("sqlserver 应查 information_schema 与当前库：%q", q)
 	}
 }
 

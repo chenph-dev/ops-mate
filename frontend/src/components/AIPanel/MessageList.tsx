@@ -29,6 +29,8 @@ const SUGGESTIONS_BY_PROTOCOL: Record<string, string[]> = {
   mysql: ['empty.suggestDbTables', 'empty.suggestDbSchema', 'empty.suggestDbCount', 'empty.suggestDbInfo'],
   postgres: ['empty.suggestDbTables', 'empty.suggestDbSchema', 'empty.suggestDbCount', 'empty.suggestDbInfo'],
   sqlite: ['empty.suggestDbTables', 'empty.suggestDbSchema', 'empty.suggestDbCount', 'empty.suggestDbInfo'],
+  clickhouse: ['empty.suggestDbTables', 'empty.suggestDbSchema', 'empty.suggestDbCount', 'empty.suggestDbInfo'],
+  sqlserver: ['empty.suggestDbTables', 'empty.suggestDbSchema', 'empty.suggestDbCount', 'empty.suggestDbInfo'],
   redis: ['empty.suggestRedisInfo', 'empty.suggestRedisDbsize', 'empty.suggestRedisKeys', 'empty.suggestRedisMemory'],
   elasticsearch: [
     'empty.suggestEsHealth',

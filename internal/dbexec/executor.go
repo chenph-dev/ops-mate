@@ -12,8 +12,10 @@ import (
 	"time"
 	"unicode/utf8"
 
+	_ "github.com/ClickHouse/clickhouse-go/v2"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/lib/pq"
+	_ "github.com/microsoft/go-mssqldb"
 
 	"ops-mate/internal/connector"
 )
@@ -55,8 +57,12 @@ func driverName(driver string) (string, error) {
 		return "postgres", nil
 	case "sqlite":
 		return "sqlite", nil
+	case "clickhouse":
+		return "clickhouse", nil
+	case "sqlserver", "mssql":
+		return "sqlserver", nil
 	}
-	return "", fmt.Errorf("不支持的数据库驱动: %q（仅支持 mysql/postgres/sqlite）", driver)
+	return "", fmt.Errorf("不支持的数据库驱动: %q（仅支持 mysql/postgres/sqlite/clickhouse/sqlserver）", driver)
 }
 
 // dsn 构造连接串。
@@ -68,6 +74,14 @@ func (e *Executor) dsn(driver string) string {
 			e.host.User, url.QueryEscape(e.host.Password), e.host.Addr, e.host.Port, e.host.Database)
 	case "sqlite":
 		return e.host.Database // 本地文件路径
+	case "clickhouse":
+		// native TCP 协议（默认 9000）；密码经 QueryEscape 后由驱动反转义
+		return fmt.Sprintf("clickhouse://%s:%s@%s:%d/%s",
+			e.host.User, url.QueryEscape(e.host.Password), e.host.Addr, e.host.Port, e.host.Database)
+	case "sqlserver":
+		// go-mssqldb DSN（默认 1433）；database 走 query 参数，密码经 QueryEscape 后由驱动反转义
+		return fmt.Sprintf("sqlserver://%s:%s@%s:%d?database=%s",
+			e.host.User, url.QueryEscape(e.host.Password), e.host.Addr, e.host.Port, e.host.Database)
 	default: // mysql
 		// go-sql-driver 用「最后一个 @」分割 userinfo/host、不反转义 password，
 		// 密码原样拼接即可（含 @ : / 由驱动解析策略正确处理）；dbname 是路径段同样不转义。
@@ -212,6 +226,22 @@ FROM sqlite_master m
 JOIN pragma_table_info(m.name) p
 WHERE m.type IN ('table','view') AND m.name NOT LIKE 'sqlite_%'
 ORDER BY m.name, p.cid`
+	}
+	if drv == "clickhouse" {
+		// system.tables/system.columns：obj_type 为表引擎（MergeTree/View 等），非 view 引擎归表组
+		return `SELECT t.name AS table_name, c.name AS column_name, c.type AS data_type,
+       'YES' AS is_nullable, '' AS key, t.engine AS obj_type
+FROM system.tables t
+JOIN system.columns c ON c.database = t.database AND c.table = t.table
+WHERE t.database = currentDatabase() AND t.is_temporary = 0
+ORDER BY t.name, c.position`
+	}
+	if drv == "sqlserver" {
+		return `SELECT t.TABLE_NAME, c.COLUMN_NAME, c.DATA_TYPE, c.IS_NULLABLE, '' AS key, t.TABLE_TYPE AS obj_type
+FROM information_schema.TABLES t
+JOIN information_schema.COLUMNS c ON c.TABLE_SCHEMA = t.TABLE_SCHEMA AND c.TABLE_NAME = t.TABLE_NAME
+WHERE t.TABLE_CATALOG = DB_NAME() AND t.TABLE_TYPE IN ('BASE TABLE','VIEW')
+ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION`
 	}
 	if drv == "postgres" {
 		return `SELECT t.table_name, c.column_name, c.data_type, c.is_nullable, '' AS key, t.table_type AS obj_type
