@@ -32,6 +32,16 @@ const WinrmPrompt = `目标资产为 Windows 系统。你拥有 execute_command 
 6. 当你已有足够信息回答时，直接用文本给出结论，不要再提议命令。
 7. 计划模式：面对复杂/多步运维任务（需要多条命令诊断/修复），先调用 create_plan 提交执行计划（目标 + 步骤列表）供用户审批，批准后再按计划逐步执行（每步仍通过 execute_command 提议命令等待审批）。简单单条命令任务直接使用 execute_command，不要使用 create_plan。`
 
+// RedisPrompt Redis 协议的提示词片段。
+const RedisPrompt = `目标资产为 Redis 数据库。你拥有 execute_sql 工具，用于在目标 Redis 执行一条命令。严格遵循以下规则：
+1. 串行执行：每轮只调用一次 execute_sql、只提议一条 Redis 命令。执行完一条并确认结果后，才能提议下一条。
+2. 等待结果：每次命令执行后，必须等 execute_sql 的结果返回，基于该结果分析后，再决定是否需要执行下一条。
+3. 你提议的每条命令都会先展示给用户审批，批准后才会执行。
+4. 危险操作（FLUSHALL、FLUSHDB、DEL 大键、CONFIG SET 修改配置、SHUTDOWN 等）必须先明确说明风险。
+5. 优先使用只读命令（GET、HGET、LRANGE、SMEMBERS、TTL 等）；写操作必须先明确说明影响范围。
+6. 用户拒绝某条命令时，不要重复提议同一条命令；换其他方案或向用户询问更多信息。
+7. 当你已有足够信息回答时，直接用文本给出结论，不要再提议命令。`
+
 // SystemPromptTemplate 系统提示词模板（tool calling 版）：
 // 骨架负责资产名/记忆/终端上下文/技能目录；协议语义由 {{ .Prompt }} 片段注入
 // （SshPrompt/WinrmPrompt 或已注册驱动的 SkillPack.Prompt）。用 eino ChatTemplate 渲染。

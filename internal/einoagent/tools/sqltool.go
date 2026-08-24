@@ -143,7 +143,11 @@ func (t *SQLTool) execute(ctx context.Context, sqlText, approvalStatus string) (
 	var display string
 	var execErr error
 	cancelled := false
-	if connector.IsQuery(sqlText) {
+	// Redis 命令无查询/写语法之分（GET/SET/DEL 均为一条命令），统一走 Query
+	// 返回格式化结果——若套用 SQL 语义的 IsQuery 首关键字判断，只读命令
+	// （GET/HGET/LRANGE...）会被误判为写操作走 Exec，结果被吞掉。
+	redisProto := t.guardrailProto == string(connector.GuardrailRedis)
+	if redisProto || connector.IsQuery(sqlText) {
 		res, err := t.runner.Query(ctx, sqlText)
 		execErr = err
 		cancelled = ctx.Err() != nil

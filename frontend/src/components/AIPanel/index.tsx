@@ -32,6 +32,8 @@ export interface AIPanelProps {
   runOutput: string;
   sshConnected: boolean;
   hostName: string;
+  /** 当前资产协议（ssh/winrm/mysql/postgres/sqlite/redis），决定空态建议命令。 */
+  protocol: string;
   collapsed: boolean;
   onRefreshConversations: () => Promise<void>;
   onSwitchConversation: (sid: string) => Promise<void>;
@@ -66,6 +68,7 @@ export default function AIPanel({
   runOutput,
   sshConnected,
   hostName,
+  protocol,
   collapsed,
   onRefreshConversations,
   onSwitchConversation,
@@ -270,6 +273,7 @@ export default function AIPanel({
         busy={busy}
         configured={configured}
         cfgLoading={cfgLoading}
+        protocol={protocol}
         runningCommand={runningCommand}
         runElapsed={runElapsed}
         runOutput={runOutput}

@@ -40,6 +40,21 @@ export default {
     suggestLoad: 'Check system load and memory usage',
     suggestLogs: 'Show the last 10 system error logs',
     suggestDocker: 'List running Docker containers',
+    // Windows (WinRM)
+    suggestWinrmService: 'List Windows services and their running status',
+    suggestWinrmSysinfo: 'Show system info (version / hostname)',
+    suggestWinrmEventlog: 'Show the last 10 system event log entries',
+    suggestWinrmDisk: 'Check disk usage',
+    // Databases (mysql/postgres/sqlite)
+    suggestDbTables: 'List the tables in the current database',
+    suggestDbSchema: 'Show a table schema (columns & types)',
+    suggestDbCount: 'Count rows for each table',
+    suggestDbInfo: 'Show database version and connection info',
+    // Redis
+    suggestRedisInfo: 'Show Redis server info (version / memory)',
+    suggestRedisDbsize: 'Show total key count of the current database',
+    suggestRedisKeys: 'List keys and their types in the current database',
+    suggestRedisMemory: 'Check memory usage',
   },
   unconfigured: {
     hint: 'No LLM model configured yet. Set provider, Base URL, API key and model on the "LLM Config" page.',

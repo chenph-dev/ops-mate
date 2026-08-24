@@ -135,6 +135,19 @@ export default function HostsPage(): React.JSX.Element {
   useEffect(() => {
     attachRef.current = sessions.attach;
   });
+  const sessionsRef = useRef(sessions);
+  useEffect(() => {
+    sessionsRef.current = sessions;
+  });
+  // 展开 AI 面板时清空消息区显示（不动 DB 与历史列表）：去掉上一资产会话的残留内容，
+  // 避免「当前资产是 mysql，面板却带着上一个资产最近的对话」。
+  const prevCollapsedRef = useRef(aiCollapsed);
+  useEffect(() => {
+    if (prevCollapsedRef.current && !aiCollapsed) {
+      sessionsRef.current.resetView();
+    }
+    prevCollapsedRef.current = aiCollapsed;
+  }, [aiCollapsed]);
 
   // 页面卸载时关闭全部终端会话（terminalRef 为稳定 ref，空依赖即可）
   useEffect(() => {
@@ -394,6 +407,7 @@ export default function HostsPage(): React.JSX.Element {
               {...aiPanelProps}
               sshConnected={panelHost.protocol === 'winrm' || isDB(panelHost.protocol)}
               hostName={panelHost.name}
+              protocol={panelHost.protocol ?? 'ssh'}
               onRunInTerminal={() => {}}
             />
           </div>
@@ -499,11 +513,13 @@ export default function HostsPage(): React.JSX.Element {
             ))}
           </div>
 
-          {/* 智能体面板：绑定当前激活标签的资产；收起时渲染右下角按钮（不占位） */}
+          {/* 智能体面板：绑定当前激活标签的资产（走终端的均为 SSH，WinRM/DB 在面板）；
+              收起时渲染右下角按钮（不占位） */}
           <AIPanel
             {...aiPanelProps}
             sshConnected={activeTab?.connected ?? false}
             hostName={activeTab?.hostName ?? ''}
+            protocol="ssh"
             onRunInTerminal={runInTerminal}
           />
         </div>

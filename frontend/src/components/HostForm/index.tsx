@@ -132,7 +132,7 @@ export default function HostForm({
       form.setFieldsValue({ port: 22 });
     } else {
       // 数据库驱动默认端口（sqlite 无端口，NeedsHost=false 隐藏）
-      const portMap: Record<string, number> = { mysql: 3306, postgres: 5432 };
+      const portMap: Record<string, number> = { mysql: 3306, postgres: 5432, redis: 6379 };
       form.setFieldsValue({ port: portMap[value] ?? undefined });
     }
   };

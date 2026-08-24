@@ -171,6 +171,9 @@ func ClassifyForProtocol(command string, readOnlyWhitelist []string, protocol st
 	if strings.EqualFold(protocol, "sql") {
 		return classifySQL(command)
 	}
+	if strings.EqualFold(protocol, "redis") {
+		return classifyRedis(command)
+	}
 	if AssessRiskForProtocol(command, protocol) == "high" {
 		return "high", ActionApprove
 	}
@@ -186,6 +189,70 @@ func ClassifyForProtocol(command string, readOnlyWhitelist []string, protocol st
 		return "read", ActionAuto
 	}
 	return "write", ActionApprove
+}
+
+// redisDangerPatterns Redis 高危命令（命中即 high/approve）。
+// 命令统一转大写后匹配（Redis 命令惯例大写）。
+var redisDangerPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`^\s*FLUSH(ALL|DB)\b`),
+	regexp.MustCompile(`^\s*SHUTDOWN\b`),
+	regexp.MustCompile(`^\s*CONFIG\s+(SET|REWRITE)\b`),
+	regexp.MustCompile(`^\s*(SLAVEOF|REPLICAOF)\b`),
+	regexp.MustCompile(`^\s*MONITOR\b`),
+	regexp.MustCompile(`^\s*DEBUG\b`),
+	regexp.MustCompile(`^\s*CLIENT\s+PAUSE\b`),
+}
+
+// redisReadOnly Redis 只读命令（首关键字精确匹配，命中即 auto）。
+// 仅收录无副作用命令；写命令（SET/DEL/HSET/EXPIRE 等）默认 write/approve。
+var redisReadOnly = map[string]bool{
+	// string
+	"get": true, "mget": true, "getrange": true, "strlen": true,
+	"exists": true, "type": true, "ttl": true, "pttl": true,
+	// hash
+	"hget": true, "hmget": true, "hgetall": true, "hkeys": true, "hvals": true,
+	"hlen": true, "hexists": true,
+	// list
+	"llen": true, "lindex": true, "lrange": true,
+	// set
+	"smembers": true, "scard": true, "sismember": true, "srandmember": true,
+	"sinter": true, "sunion": true, "sdiff": true,
+	// zset
+	"zrange": true, "zrevrange": true, "zrangebyscore": true, "zrevrangebyscore": true,
+	"zrangebylex": true, "zcard": true, "zscore": true, "zcount": true,
+	"zrank": true, "zrevrank": true, "zmscore": true,
+	// server / info / scan / introspection
+	"info": true, "ping": true, "time": true, "dbsize": true, "echo": true,
+	"scan": true, "hscan": true, "sscan": true, "zscan": true, "keys": true,
+	"object": true, "memory": true, "command": true,
+}
+
+// classifyRedis 按 Redis 命令分类（redis 协议）：
+// 高危命令（FLUSHALL/FLUSHDB/SHUTDOWN/CONFIG SET 等）→ high/approve；
+// 只读命令（GET/HGETALL/LRANGE 等）→ read/auto；
+// 其余写命令 → write/approve。多命令（换行/分号分隔）保守人工审批。
+func classifyRedis(command string) (string, Action) {
+	c := strings.ToUpper(strings.TrimSpace(command))
+	if strings.Contains(c, ";") || strings.Contains(c, "\n") {
+		return "write", ActionApprove
+	}
+	for _, p := range redisDangerPatterns {
+		if p.MatchString(c) {
+			return "high", ActionApprove
+		}
+	}
+	if redisReadOnly[redisKeyword(c)] {
+		return "read", ActionAuto
+	}
+	return "write", ActionApprove
+}
+
+// redisKeyword 提取命令首关键字（输入已大写）。
+func redisKeyword(s string) string {
+	if i := strings.IndexAny(s, " \t\r\n"); i >= 0 {
+		return s[:i]
+	}
+	return s
 }
 
 // classifySQL 按 SQL 首关键字分类（sql 协议）：

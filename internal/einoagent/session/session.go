@@ -23,6 +23,7 @@ import (
 	agentmodel "ops-mate/internal/einoagent/model"
 	agenttools "ops-mate/internal/einoagent/tools"
 	_ "ops-mate/internal/register" // 登记内置命令型驱动（ssh/winrm），供协议分派
+	_ "ops-mate/internal/redis"    // 登记 Redis 连接器
 	"ops-mate/internal/skill"
 	"ops-mate/internal/sshexec"
 	"ops-mate/internal/store"

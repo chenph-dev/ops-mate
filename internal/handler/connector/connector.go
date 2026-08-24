@@ -4,6 +4,7 @@ package connector
 import (
 	connector "ops-mate/internal/connector"
 	_ "ops-mate/internal/register" // 登记内置命令型驱动（ssh/winrm），供 ListConnectors 输出
+	_ "ops-mate/internal/redis"    // 登记 Redis 连接器
 )
 
 // ConnectorHandler 暴露连接类型元信息给前端（wails 绑定）。

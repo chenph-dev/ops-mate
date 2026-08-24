@@ -40,6 +40,21 @@ export default {
     suggestLoad: '查看系统负载和内存占用',
     suggestLogs: '查看最近 10 条系统错误日志',
     suggestDocker: '列出 Docker 容器运行状态',
+    // Windows（WinRM）
+    suggestWinrmService: '列出 Windows 服务及运行状态',
+    suggestWinrmSysinfo: '查看系统基本信息（版本/主机名）',
+    suggestWinrmEventlog: '查看最近 10 条系统事件日志',
+    suggestWinrmDisk: '查看磁盘使用情况',
+    // 数据库（mysql/postgres/sqlite）
+    suggestDbTables: '查看当前数据库有哪些表',
+    suggestDbSchema: '查看某张表的字段与类型结构',
+    suggestDbCount: '统计各表的数据行数',
+    suggestDbInfo: '查看数据库版本与连接信息',
+    // Redis
+    suggestRedisInfo: '查看 Redis 服务器信息（版本/内存）',
+    suggestRedisDbsize: '查看当前数据库的键总数',
+    suggestRedisKeys: '列出当前数据库的键与类型',
+    suggestRedisMemory: '查看内存使用情况',
   },
   unconfigured: {
     hint: '尚未配置 LLM 模型。请在「LLM模型配置」页设置 LLM 模型供应商、Base URL、API Key 与模型。',

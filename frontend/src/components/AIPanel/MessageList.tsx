@@ -11,13 +11,27 @@ import type { ApprovalStatus, CommandSuggestion, Message } from './types';
 import type { PlanInfo } from '@/hooks/useSessions';
 import ToolOutputBlock from './ToolOutputBlock';
 
-/** 空态示例 prompt：点击填充输入框（暗示半自动模型：可提议命令需审批）。值为 ai 命名空间下的 i18n key。 */
-const SUGGESTIONS = [
-  'empty.suggestDisk',
-  'empty.suggestLoad',
-  'empty.suggestLogs',
-  'empty.suggestDocker',
-];
+/** 空态示例 prompt：点击填充输入框（暗示半自动模型：可提议命令需审批）。值为 ai 命名空间下的 i18n key。
+ *  按资产协议分组：ssh → Linux 命令；winrm → PowerShell；mysql/postgres/sqlite → SQL；redis → Redis 命令。 */
+const SUGGESTIONS_BY_PROTOCOL: Record<string, string[]> = {
+  ssh: [
+    'empty.suggestDisk',
+    'empty.suggestLoad',
+    'empty.suggestLogs',
+    'empty.suggestDocker',
+  ],
+  winrm: [
+    'empty.suggestWinrmService',
+    'empty.suggestWinrmSysinfo',
+    'empty.suggestWinrmEventlog',
+    'empty.suggestWinrmDisk',
+  ],
+  mysql: ['empty.suggestDbTables', 'empty.suggestDbSchema', 'empty.suggestDbCount', 'empty.suggestDbInfo'],
+  postgres: ['empty.suggestDbTables', 'empty.suggestDbSchema', 'empty.suggestDbCount', 'empty.suggestDbInfo'],
+  sqlite: ['empty.suggestDbTables', 'empty.suggestDbSchema', 'empty.suggestDbCount', 'empty.suggestDbInfo'],
+  redis: ['empty.suggestRedisInfo', 'empty.suggestRedisDbsize', 'empty.suggestRedisKeys', 'empty.suggestRedisMemory'],
+};
+const DEFAULT_SUGGESTIONS = SUGGESTIONS_BY_PROTOCOL.ssh;
 
 interface MessageListProps {
   messages: Message[];
@@ -31,6 +45,8 @@ interface MessageListProps {
   busy: boolean;
   configured: boolean;
   cfgLoading: boolean;
+  /** 当前资产协议（ssh/winrm/mysql/postgres/sqlite/redis），决定空态建议命令。 */
+  protocol: string;
   runningCommand: string | null;
   runElapsed: number;
   runOutput: string;
@@ -124,6 +140,7 @@ export default function MessageList({
   busy,
   configured,
   cfgLoading,
+  protocol,
   runningCommand,
   runElapsed,
   runOutput,
@@ -136,6 +153,8 @@ export default function MessageList({
 }: MessageListProps): React.JSX.Element {
   const navigate = useNavigate();
   const { t } = useTranslation('ai');
+  // 按资产协议选空态建议命令；未知协议回退 Linux。
+  const suggestions = SUGGESTIONS_BY_PROTOCOL[protocol] ?? DEFAULT_SUGGESTIONS;
   const msgRef = useRef<HTMLDivElement>(null);
   const runOutputRef = useRef<HTMLDivElement>(null);
 
@@ -336,7 +355,7 @@ export default function MessageList({
               width: '100%',
             }}
           >
-            {SUGGESTIONS.map((s) => (
+            {suggestions.map((s) => (
               <div
                 key={s}
                 onClick={() => onSelectSuggestion(t(s))}

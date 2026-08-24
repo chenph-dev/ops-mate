@@ -81,6 +81,7 @@ export function useSessions(hostId: string | null): {
   newConversation: () => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
   clearMessages: () => Promise<void>;
+  resetView: () => void;
   approve: (command: string) => Promise<void>;
   reject: () => Promise<void>;
   approvePlan: () => Promise<void>;
@@ -118,6 +119,11 @@ export function useSessions(hostId: string | null): {
   // 重同步串行化标记：每次 resync 递增。完成时若已有更新的 resync 发起则丢弃本次结果，
   // 保证多个异步 resync 并发时只有最新一次生效，旧结果不覆盖新状态。
   const resyncSeq = useRef(0);
+  // 资产切换守卫：attach 发起时记录目标 hostId；attach/refreshConversations 的异步结果
+  // 与守卫不符时丢弃——防止快速切换资产时旧资产的 IPC 晚到，把 activeSession /
+  // conversations 覆盖成上一资产（表现为打开 mysql 面板却显示其他资产的会话）。
+  const attachSeq = useRef(0);
+  const expectedHostRef = useRef<string | null>(null);
 
   // 保持 ref 与当前会话同步（react-hooks/refs：禁止在 render 期间写 ref）
   useEffect(() => {
@@ -173,6 +179,8 @@ export function useSessions(hostId: string | null): {
     if (!hostId) return;
     try {
       const list = await ListConversations(hostId);
+      // 资产切换守卫：期间已切到其他资产（attach 更新了期望 hostId），丢弃过期结果。
+      if (expectedHostRef.current !== hostId) return;
       setConversations(list ?? []);
     } catch {
       // 列表刷新失败不阻断；打开历史面板时会重试
@@ -195,11 +203,19 @@ export function useSessions(hostId: string | null): {
     [resync],
   );
 
-  /** 资产选中时调用：懒获取/创建会话并加载历史。 */
+  /** 资产选中时调用：懒获取/创建会话并加载历史。
+   * 竞态防护：attach 含多次 IPC await，切换资产时旧资产的 attach 可能晚于新资产完成，
+   * 覆盖 activeSession（显示成上一资产的会话）。用 attachSeq 串行化——只有最新发起的
+   * attach 允许写入状态，期间已发起更新 attach 的旧调用直接丢弃。
+   */
   const attach = useCallback(async (): Promise<void> => {
     if (!hostId) return;
+    expectedHostRef.current = hostId;
+    const seq = ++attachSeq.current;
     await refreshConversations();
+    if (seq !== attachSeq.current) return;
     const sid = await EnsureSession(hostId);
+    if (seq !== attachSeq.current) return;
     setActiveSession(sid);
     setPendingCommand(null);
     setCommandStatus(null);
@@ -276,6 +292,22 @@ export function useSessions(hostId: string | null): {
       setLastErrorCancelled(false);
     }
   }, [activeSession]);
+
+  /** 展开 AI 面板时清空消息区显示（不动 DB 与历史列表）：去掉上一资产会话的残留内容。 */
+  const resetView = useCallback((): void => {
+    setMessages([]);
+    setStreamingText('');
+    setPendingCommand(null);
+    setCommandStatus(null);
+    setPendingPlan(null);
+    setPlanStatus(null);
+    setSessionState(null);
+    setLastError(null);
+    setLastErrorCancelled(false);
+    setRunningCommand(null);
+    setRunStartAt(null);
+    setRunOutput('');
+  }, []);
 
   const sendMessage = useCallback(
     async (text: string): Promise<void> => {
@@ -492,6 +524,7 @@ export function useSessions(hostId: string | null): {
     newConversation,
     sendMessage,
     clearMessages,
+    resetView,
     approve,
     reject,
     approvePlan,

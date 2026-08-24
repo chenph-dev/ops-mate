@@ -7,6 +7,7 @@ import (
 	"ops-mate/internal/connector"
 	"ops-mate/internal/dbexec"
 	_ "ops-mate/internal/register" // 登记内置命令型驱动（ssh/winrm）
+	_ "ops-mate/internal/redis"    // 登记 Redis 连接器
 	"ops-mate/internal/sshexec"
 	hoststore "ops-mate/internal/store/hosts"
 	"ops-mate/internal/winrmexec"
